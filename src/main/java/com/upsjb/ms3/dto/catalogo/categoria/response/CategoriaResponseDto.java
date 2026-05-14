@@ -1,0 +1,24 @@
+﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/response/CategoriaResponseDto.java
+package com.upsjb.ms3.dto.catalogo.categoria.response;
+
+import java.time.LocalDateTime;
+import lombok.Builder;
+
+@Builder
+public record CategoriaResponseDto(
+        Long idCategoria,
+        Long idCategoriaPadre,
+        String codigoCategoriaPadre,
+        String nombreCategoriaPadre,
+        String codigo,
+        String nombre,
+        String slug,
+        Boolean slugGenerado,
+        String descripcion,
+        Integer nivel,
+        Integer orden,
+        Boolean estado,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {
+}
