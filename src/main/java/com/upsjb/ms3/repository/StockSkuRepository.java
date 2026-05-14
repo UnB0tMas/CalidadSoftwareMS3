@@ -104,4 +104,36 @@ public interface StockSkuRepository extends
               and s.estado = true
             """)
     Long sumStockDisponibleByProducto(@Param("idProducto") Long idProducto);
+
+    @Query("""
+            select count(distinct s.sku.idSku)
+            from StockSku s
+            where s.almacen.idAlmacen = :idAlmacen
+              and s.estado = true
+            """)
+    Long countDistinctSkuByAlmacen(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockFisico), 0)
+            from StockSku s
+            where s.almacen.idAlmacen = :idAlmacen
+              and s.estado = true
+            """)
+    Long sumStockFisicoByAlmacen(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockReservado), 0)
+            from StockSku s
+            where s.almacen.idAlmacen = :idAlmacen
+              and s.estado = true
+            """)
+    Long sumStockReservadoByAlmacen(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockDisponible), 0)
+            from StockSku s
+            where s.almacen.idAlmacen = :idAlmacen
+              and s.estado = true
+            """)
+    Long sumStockDisponibleByAlmacen(@Param("idAlmacen") Long idAlmacen);
 }

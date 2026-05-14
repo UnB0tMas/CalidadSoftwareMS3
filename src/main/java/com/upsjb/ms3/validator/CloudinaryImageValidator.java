@@ -6,6 +6,7 @@ import com.upsjb.ms3.domain.enums.CloudinaryResourceType;
 import com.upsjb.ms3.shared.exception.ExternalServiceException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
+import com.upsjb.ms3.util.FileNameUtil;
 import com.upsjb.ms3.util.MimeTypeUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +52,7 @@ public class CloudinaryImageValidator {
             );
         }
 
-        String extension = com.upsjb.ms3.util.FileNameUtil.extension(file.getOriginalFilename());
+        String extension = FileNameUtil.extension(file.getOriginalFilename());
         if (StringNormalizer.hasText(extension) && !MimeTypeUtil.isAllowedProductImageExtension(extension)) {
             errors.add(
                     "extension",
@@ -81,12 +82,14 @@ public class CloudinaryImageValidator {
 
         if (!StringNormalizer.hasText(secureUrl)) {
             errors.add("secureUrl", "Cloudinary no devolvió secure_url.", "REQUIRED", secureUrl);
+        } else if (!secureUrl.startsWith("https://")) {
+            errors.add("secureUrl", "Cloudinary devolvió una URL no segura.", "INVALID_VALUE", secureUrl);
         }
 
         if (!StringNormalizer.hasText(resourceType)) {
             errors.add("resourceType", "Cloudinary no devolvió resource_type.", "REQUIRED", resourceType);
-        } else {
-            validateResourceType(resourceType);
+        } else if (!isValidImageResourceType(resourceType)) {
+            errors.add("resourceType", "Cloudinary devolvió un resource_type inválido.", "INVALID_VALUE", resourceType);
         }
 
         if (!StringNormalizer.hasText(format)) {
@@ -107,6 +110,7 @@ public class CloudinaryImageValidator {
 
         if (errors.hasErrors()) {
             throw new ExternalServiceException(
+                    "Cloudinary",
                     "CLOUDINARY_RESPONSE_INVALIDA",
                     "Cloudinary devolvió una respuesta incompleta o inválida."
             );
@@ -137,6 +141,14 @@ public class CloudinaryImageValidator {
                     "CLOUDINARY_SECURE_URL_INVALIDA",
                     "La imagen debe usar una URL segura HTTPS."
             );
+        }
+    }
+
+    private boolean isValidImageResourceType(String resourceType) {
+        try {
+            return CloudinaryResourceType.fromCode(resourceType).isImage();
+        } catch (IllegalArgumentException ex) {
+            return false;
         }
     }
 }

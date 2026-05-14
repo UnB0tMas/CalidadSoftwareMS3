@@ -1,6 +1,8 @@
-﻿package com.upsjb.ms3.shared.pagination;
+﻿// ruta: src/main/java/com/upsjb/ms3/shared/pagination/PaginationService.java
+package com.upsjb.ms3.shared.pagination;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
+import com.upsjb.ms3.dto.shared.PageResponseDto;
 import com.upsjb.ms3.shared.constants.Ms3Constants;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import java.util.Collection;
@@ -10,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -63,6 +66,27 @@ public class PaginationService {
 
     public <T, R> PaginationMapper.PagedResponse<R> toResponse(Page<T> page, Function<T, R> mapper) {
         return paginationMapper.toPagedResponse(page, mapper);
+    }
+
+    public <T, R> PageResponseDto<R> toPageResponseDto(Page<T> page, Function<T, R> mapper) {
+        PaginationMapper.PagedResponse<R> paged = toResponse(page, mapper);
+
+        Sort.Order order = page.getSort()
+                .stream()
+                .findFirst()
+                .orElse(null);
+
+        return PageResponseDto.<R>builder()
+                .content(paged.content())
+                .page(paged.page().number())
+                .size(paged.page().size())
+                .totalElements(paged.page().totalElements())
+                .totalPages(paged.page().totalPages())
+                .hasNext(paged.page().hasNext())
+                .hasPrevious(paged.page().hasPrevious())
+                .sortBy(order == null ? null : order.getProperty())
+                .sortDirection(order == null ? null : order.getDirection().name())
+                .build();
     }
 
     private int resolvePage(Integer page) {

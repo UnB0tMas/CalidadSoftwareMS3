@@ -5,8 +5,11 @@ import com.upsjb.ms3.domain.entity.EventoDominioOutbox;
 import com.upsjb.ms3.domain.enums.AggregateType;
 import com.upsjb.ms3.domain.enums.EstadoPublicacionEvento;
 import com.upsjb.ms3.dto.outbox.response.EventoDominioOutboxResponseDto;
+import com.upsjb.ms3.dto.outbox.response.OutboxPublishResultResponseDto;
+import com.upsjb.ms3.kafka.outbox.OutboxPublishResult;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -24,7 +27,28 @@ public class EventoDominioOutboxMapper {
             String eventKey,
             String payloadJson
     ) {
+        return toEntity(
+                UUID.randomUUID(),
+                aggregateType,
+                aggregateId,
+                eventType,
+                topic,
+                eventKey,
+                payloadJson
+        );
+    }
+
+    public EventoDominioOutbox toEntity(
+            UUID eventId,
+            AggregateType aggregateType,
+            String aggregateId,
+            String eventType,
+            String topic,
+            String eventKey,
+            String payloadJson
+    ) {
         EventoDominioOutbox entity = new EventoDominioOutbox();
+        entity.setEventId(eventId == null ? UUID.randomUUID() : eventId);
         entity.setAggregateType(aggregateType);
         entity.setAggregateId(requiredClean(aggregateId, 100, "El aggregateId es obligatorio."));
         entity.setEventType(requiredClean(eventType, 120, "El eventType es obligatorio."));
@@ -40,8 +64,12 @@ public class EventoDominioOutboxMapper {
     }
 
     public EventoDominioOutboxResponseDto toResponse(EventoDominioOutbox entity) {
+        return toResponse(entity, true);
+    }
+
+    public EventoDominioOutboxResponseDto toResponse(EventoDominioOutbox entity, boolean includePayload) {
         if (entity == null) {
-            return null;
+            throw new IllegalArgumentException("El evento outbox es obligatorio para mapear respuesta.");
         }
 
         return EventoDominioOutboxResponseDto.builder()
@@ -52,7 +80,7 @@ public class EventoDominioOutboxMapper {
                 .eventType(entity.getEventType())
                 .topic(entity.getTopic())
                 .eventKey(entity.getEventKey())
-                .payloadJson(entity.getPayloadJson())
+                .payloadJson(includePayload ? entity.getPayloadJson() : null)
                 .payloadPreview(payloadPreview(entity.getPayloadJson()))
                 .estadoPublicacion(entity.getEstadoPublicacion())
                 .intentosPublicacion(defaultInteger(entity.getIntentosPublicacion()))
@@ -67,13 +95,40 @@ public class EventoDominioOutboxMapper {
     }
 
     public List<EventoDominioOutboxResponseDto> toResponseList(List<EventoDominioOutbox> entities) {
+        return toResponseList(entities, true);
+    }
+
+    public List<EventoDominioOutboxResponseDto> toResponseList(
+            List<EventoDominioOutbox> entities,
+            boolean includePayload
+    ) {
         if (entities == null || entities.isEmpty()) {
             return List.of();
         }
 
         return entities.stream()
-                .map(this::toResponse)
+                .map(entity -> toResponse(entity, includePayload))
                 .toList();
+    }
+
+    public OutboxPublishResultResponseDto toPublishResultResponse(OutboxPublishResult result) {
+        if (result == null) {
+            throw new IllegalArgumentException("El resultado de publicación Kafka es obligatorio.");
+        }
+
+        return OutboxPublishResultResponseDto.builder()
+                .idEvento(result.idEvento())
+                .eventId(result.eventId())
+                .success(Boolean.TRUE.equals(result.success()))
+                .skipped(Boolean.TRUE.equals(result.skipped()))
+                .code(result.code())
+                .message(result.message())
+                .topic(result.topic())
+                .eventKey(result.eventKey())
+                .partition(result.partition())
+                .offset(result.offset())
+                .processedAt(result.processedAt())
+                .build();
     }
 
     public void markPublished(EventoDominioOutbox entity, LocalDateTime publishedAt) {
@@ -116,6 +171,14 @@ public class EventoDominioOutboxMapper {
         }
 
         entity.setIntentosPublicacion(defaultInteger(entity.getIntentosPublicacion()) + 1);
+    }
+
+    public void resetAttempts(EventoDominioOutbox entity) {
+        if (entity == null) {
+            return;
+        }
+
+        entity.setIntentosPublicacion(0);
     }
 
     public void lock(EventoDominioOutbox entity, String lockedBy, LocalDateTime lockedAt) {

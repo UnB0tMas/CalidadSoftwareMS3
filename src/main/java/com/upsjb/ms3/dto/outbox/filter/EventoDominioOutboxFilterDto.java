@@ -12,7 +12,12 @@ import lombok.Builder;
 @Builder
 public record EventoDominioOutboxFilterDto(
 
+        Long idEvento,
+
         UUID eventId,
+
+        @Size(max = 200, message = "El texto de búsqueda no debe superar 200 caracteres.")
+        String search,
 
         AggregateType aggregateType,
 
@@ -32,7 +37,16 @@ public record EventoDominioOutboxFilterDto(
 
         Boolean soloReintentables,
 
+        Boolean conError,
+
+        Boolean bloqueado,
+
         Boolean bloqueados,
+
+        Boolean locked,
+
+        @Size(max = 100, message = "El lockedBy no debe superar 100 caracteres.")
+        String lockedBy,
 
         Boolean estado,
 
@@ -40,6 +54,9 @@ public record EventoDominioOutboxFilterDto(
         DateRangeFilterDto fechaCreacion,
 
         @Valid
-        DateRangeFilterDto fechaPublicacion
+        DateRangeFilterDto fechaPublicacion,
+
+        @Valid
+        DateRangeFilterDto fechaBloqueo
 ) {
 }

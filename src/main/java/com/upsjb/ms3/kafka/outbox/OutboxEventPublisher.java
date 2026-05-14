@@ -38,12 +38,22 @@ public class OutboxEventPublisher {
 
     @Transactional
     public OutboxPublishResult retry(Long idEvento) {
+        return retry(idEvento, false);
+    }
+
+    @Transactional
+    public OutboxPublishResult retry(Long idEvento, boolean forceRetry) {
         EventoDominioOutbox event = repository.findActivoByIdForUpdate(idEvento)
                 .orElse(null);
 
-        validator.validateCanRetry(event);
+        validator.validateCanRetry(event, forceRetry);
         mapper.markPending(event);
-        repository.save(event);
+
+        if (forceRetry) {
+            mapper.resetAttempts(event);
+        }
+
+        repository.saveAndFlush(event);
 
         return publishLocked(idEvento);
     }

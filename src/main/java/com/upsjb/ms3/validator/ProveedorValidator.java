@@ -2,6 +2,7 @@
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Proveedor;
+import com.upsjb.ms3.domain.enums.TipoDocumentoProveedor;
 import com.upsjb.ms3.domain.enums.TipoProveedor;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
@@ -14,7 +15,7 @@ public class ProveedorValidator {
 
     public void validateCreate(
             TipoProveedor tipoProveedor,
-            String tipoDocumento,
+            TipoDocumentoProveedor tipoDocumento,
             String numeroDocumento,
             String ruc,
             String razonSocial,
@@ -33,25 +34,13 @@ public class ProveedorValidator {
 
         errors.throwIfAny("No se puede registrar el proveedor.");
 
-        if (duplicatedDocumento) {
-            throw new ConflictException(
-                    "PROVEEDOR_DOCUMENTO_DUPLICADO",
-                    "Ya existe un proveedor activo con el mismo documento."
-            );
-        }
-
-        if (duplicatedRuc) {
-            throw new ConflictException(
-                    "PROVEEDOR_RUC_DUPLICADO",
-                    "Ya existe un proveedor activo con el mismo RUC."
-            );
-        }
+        validateDuplicados(duplicatedDocumento, duplicatedRuc, false);
     }
 
     public void validateUpdate(
             Proveedor proveedor,
             TipoProveedor tipoProveedor,
-            String tipoDocumento,
+            TipoDocumentoProveedor tipoDocumento,
             String numeroDocumento,
             String ruc,
             String razonSocial,
@@ -72,19 +61,11 @@ public class ProveedorValidator {
 
         errors.throwIfAny("No se puede actualizar el proveedor.");
 
-        if (duplicatedDocumento) {
-            throw new ConflictException(
-                    "PROVEEDOR_DOCUMENTO_DUPLICADO",
-                    "Ya existe otro proveedor activo con el mismo documento."
-            );
-        }
+        validateDuplicados(duplicatedDocumento, duplicatedRuc, true);
+    }
 
-        if (duplicatedRuc) {
-            throw new ConflictException(
-                    "PROVEEDOR_RUC_DUPLICADO",
-                    "Ya existe otro proveedor activo con el mismo RUC."
-            );
-        }
+    public void validateCanActivate(Proveedor proveedor) {
+        requireExists(proveedor);
     }
 
     public void validateCanDeactivate(Proveedor proveedor, boolean hasPendingPurchases) {
@@ -98,25 +79,29 @@ public class ProveedorValidator {
         }
     }
 
-    public void requireActive(Proveedor proveedor) {
+    public void requireExists(Proveedor proveedor) {
         if (proveedor == null) {
             throw new NotFoundException(
                     "PROVEEDOR_NO_ENCONTRADO",
-                    "Proveedor no encontrado."
+                    "No se encontró el registro solicitado."
             );
         }
+    }
+
+    public void requireActive(Proveedor proveedor) {
+        requireExists(proveedor);
 
         if (!proveedor.isActivo()) {
             throw new NotFoundException(
                     "PROVEEDOR_INACTIVO",
-                    "El proveedor no está activo."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }
 
     private void validateTipoProveedor(
             TipoProveedor tipoProveedor,
-            String tipoDocumento,
+            TipoDocumentoProveedor tipoDocumento,
             String numeroDocumento,
             String ruc,
             String razonSocial,
@@ -129,29 +114,99 @@ public class ProveedorValidator {
         }
 
         if (tipoProveedor.isEmpresa()) {
-            if (!StringNormalizer.hasText(ruc)) {
-                errors.add("ruc", "El RUC es obligatorio para proveedores empresa.", "REQUIRED", ruc);
-            } else if (StringNormalizer.onlyDigits(ruc).length() != 11) {
-                errors.add("ruc", "El RUC debe tener 11 dígitos.", "INVALID_FORMAT", ruc);
-            }
-
-            if (!StringNormalizer.hasText(razonSocial)) {
-                errors.add("razonSocial", "La razón social es obligatoria para proveedores empresa.", "REQUIRED", razonSocial);
-            }
+            validateEmpresa(ruc, razonSocial, errors);
+            return;
         }
 
         if (tipoProveedor.isPersonaNatural()) {
-            if (!StringNormalizer.hasText(tipoDocumento)) {
-                errors.add("tipoDocumento", "El tipo de documento es obligatorio para persona natural.", "REQUIRED", tipoDocumento);
-            }
+            validatePersonaNatural(tipoDocumento, numeroDocumento, nombres, errors);
+        }
+    }
 
-            if (!StringNormalizer.hasText(numeroDocumento)) {
-                errors.add("numeroDocumento", "El número de documento es obligatorio para persona natural.", "REQUIRED", numeroDocumento);
-            }
+    private void validateEmpresa(
+            String ruc,
+            String razonSocial,
+            ValidationErrorCollector errors
+    ) {
+        if (!StringNormalizer.hasText(ruc)) {
+            errors.add("ruc", "El RUC es obligatorio para proveedores empresa.", "REQUIRED", ruc);
+        } else if (StringNormalizer.onlyDigits(ruc).length() != 11) {
+            errors.add("ruc", "El RUC debe tener 11 dígitos.", "INVALID_FORMAT", ruc);
+        }
 
-            if (!StringNormalizer.hasText(nombres)) {
-                errors.add("nombres", "Los nombres son obligatorios para persona natural.", "REQUIRED", nombres);
-            }
+        if (!StringNormalizer.hasText(razonSocial)) {
+            errors.add("razonSocial", "La razón social es obligatoria para proveedores empresa.", "REQUIRED", razonSocial);
+        }
+    }
+
+    private void validatePersonaNatural(
+            TipoDocumentoProveedor tipoDocumento,
+            String numeroDocumento,
+            String nombres,
+            ValidationErrorCollector errors
+    ) {
+        if (tipoDocumento == null) {
+            errors.add("tipoDocumento", "El tipo de documento es obligatorio para persona natural.", "REQUIRED", null);
+        }
+
+        if (!StringNormalizer.hasText(numeroDocumento)) {
+            errors.add("numeroDocumento", "El número de documento es obligatorio para persona natural.", "REQUIRED", numeroDocumento);
+        }
+
+        if (!StringNormalizer.hasText(nombres)) {
+            errors.add("nombres", "Los nombres son obligatorios para persona natural.", "REQUIRED", nombres);
+        }
+
+        if (tipoDocumento == null || !StringNormalizer.hasText(numeroDocumento)) {
+            return;
+        }
+
+        String normalizedDocument = tipoDocumento.isSoloNumeros()
+                ? StringNormalizer.onlyDigits(numeroDocumento)
+                : StringNormalizer.clean(numeroDocumento);
+
+        if (normalizedDocument.length() < tipoDocumento.getMinLength()
+                || normalizedDocument.length() > tipoDocumento.getMaxLength()) {
+            errors.add(
+                    "numeroDocumento",
+                    "El número de documento no cumple la longitud permitida para " + tipoDocumento.getCode() + ".",
+                    "INVALID_LENGTH",
+                    numeroDocumento
+            );
+        }
+
+        if (tipoDocumento.isSoloNumeros()
+                && !normalizedDocument.equals(numeroDocumento.trim())) {
+            errors.add(
+                    "numeroDocumento",
+                    "El número de documento solo debe contener dígitos.",
+                    "INVALID_FORMAT",
+                    numeroDocumento
+            );
+        }
+    }
+
+    private void validateDuplicados(
+            boolean duplicatedDocumento,
+            boolean duplicatedRuc,
+            boolean update
+    ) {
+        if (duplicatedDocumento) {
+            throw new ConflictException(
+                    "PROVEEDOR_DOCUMENTO_DUPLICADO",
+                    update
+                            ? "Ya existe otro proveedor activo con el mismo documento."
+                            : "Ya existe un proveedor activo con el mismo documento."
+            );
+        }
+
+        if (duplicatedRuc) {
+            throw new ConflictException(
+                    "PROVEEDOR_RUC_DUPLICADO",
+                    update
+                            ? "Ya existe otro proveedor activo con el mismo RUC."
+                            : "Ya existe un proveedor activo con el mismo RUC."
+            );
         }
     }
 }

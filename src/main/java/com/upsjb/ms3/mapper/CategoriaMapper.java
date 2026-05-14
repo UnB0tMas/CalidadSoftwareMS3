@@ -7,22 +7,19 @@ import com.upsjb.ms3.dto.catalogo.categoria.request.CategoriaUpdateRequestDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaResponseDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaTreeResponseDto;
+import com.upsjb.ms3.dto.reference.response.CategoriaOptionDto;
 import com.upsjb.ms3.dto.shared.IdCodigoNombreResponseDto;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class CategoriaMapper {
-
-    private final ReferenceMapper referenceMapper;
 
     public Categoria toEntity(
             CategoriaCreateRequestDto request,
             Categoria categoriaPadre,
             String slug,
-            Boolean slugGenerado
+            Integer nivel
     ) {
         if (request == null) {
             return null;
@@ -33,10 +30,10 @@ public class CategoriaMapper {
         entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
         entity.setSlug(slug);
-        entity.setSlugGenerado(slugGenerado == null || slugGenerado);
+        entity.setSlugGenerado(Boolean.TRUE);
         entity.setDescripcion(request.descripcion());
-        entity.setNivel(resolveNivel(categoriaPadre));
-        entity.setOrden(defaultInteger(request.orden(), 0));
+        entity.setNivel(nivel);
+        entity.setOrden(request.orden() == null ? 0 : request.orden());
 
         return entity;
     }
@@ -46,7 +43,7 @@ public class CategoriaMapper {
             CategoriaUpdateRequestDto request,
             Categoria categoriaPadre,
             String slug,
-            Boolean slugGenerado
+            Integer nivel
     ) {
         if (entity == null || request == null) {
             return;
@@ -55,18 +52,11 @@ public class CategoriaMapper {
         entity.setCategoriaPadre(categoriaPadre);
         entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
-
-        if (slug != null) {
-            entity.setSlug(slug);
-        }
-
-        if (slugGenerado != null) {
-            entity.setSlugGenerado(slugGenerado);
-        }
-
+        entity.setSlug(slug);
+        entity.setSlugGenerado(Boolean.TRUE);
         entity.setDescripcion(request.descripcion());
-        entity.setNivel(resolveNivel(categoriaPadre));
-        entity.setOrden(defaultInteger(request.orden(), 0));
+        entity.setNivel(nivel);
+        entity.setOrden(request.orden() == null ? 0 : request.orden());
     }
 
     public CategoriaResponseDto toResponse(Categoria entity) {
@@ -74,13 +64,13 @@ public class CategoriaMapper {
             return null;
         }
 
-        Categoria padre = entity.getCategoriaPadre();
+        Categoria parent = entity.getCategoriaPadre();
 
         return CategoriaResponseDto.builder()
                 .idCategoria(entity.getIdCategoria())
-                .idCategoriaPadre(padre == null ? null : padre.getIdCategoria())
-                .codigoCategoriaPadre(padre == null ? null : padre.getCodigo())
-                .nombreCategoriaPadre(padre == null ? null : padre.getNombre())
+                .idCategoriaPadre(parent == null ? null : parent.getIdCategoria())
+                .codigoCategoriaPadre(parent == null ? null : parent.getCodigo())
+                .nombreCategoriaPadre(parent == null ? null : parent.getNombre())
                 .codigo(entity.getCodigo())
                 .nombre(entity.getNombre())
                 .slug(entity.getSlug())
@@ -97,7 +87,7 @@ public class CategoriaMapper {
     public CategoriaDetailResponseDto toDetailResponse(
             Categoria entity,
             Long cantidadProductos,
-            List<IdCodigoNombreResponseDto> subcategorias
+            List<Categoria> subcategorias
     ) {
         if (entity == null) {
             return null;
@@ -105,7 +95,7 @@ public class CategoriaMapper {
 
         return CategoriaDetailResponseDto.builder()
                 .idCategoria(entity.getIdCategoria())
-                .categoriaPadre(referenceMapper.toIdCodigoNombre(entity.getCategoriaPadre()))
+                .categoriaPadre(toIdCodigoNombre(entity.getCategoriaPadre()))
                 .codigo(entity.getCodigo())
                 .nombre(entity.getNombre())
                 .slug(entity.getSlug())
@@ -114,8 +104,10 @@ public class CategoriaMapper {
                 .nivel(entity.getNivel())
                 .orden(entity.getOrden())
                 .estado(entity.getEstado())
-                .cantidadProductos(defaultLong(cantidadProductos))
-                .subcategorias(subcategorias == null ? List.of() : subcategorias)
+                .cantidadProductos(cantidadProductos == null ? 0L : cantidadProductos)
+                .subcategorias(subcategorias == null
+                        ? List.of()
+                        : subcategorias.stream().map(this::toIdCodigoNombre).toList())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
@@ -123,7 +115,7 @@ public class CategoriaMapper {
 
     public CategoriaTreeResponseDto toTreeResponse(
             Categoria entity,
-            List<CategoriaTreeResponseDto> hijos
+            List<CategoriaTreeResponseDto> children
     ) {
         if (entity == null) {
             return null;
@@ -137,27 +129,37 @@ public class CategoriaMapper {
                 .nivel(entity.getNivel())
                 .orden(entity.getOrden())
                 .estado(entity.getEstado())
-                .hijos(hijos == null ? List.of() : hijos)
+                .hijos(children == null ? List.of() : children)
                 .build();
     }
 
-    public IdCodigoNombreResponseDto toSummary(Categoria entity) {
-        return referenceMapper.toIdCodigoNombre(entity);
-    }
-
-    private Integer resolveNivel(Categoria categoriaPadre) {
-        if (categoriaPadre == null || categoriaPadre.getNivel() == null) {
-            return 1;
+    public CategoriaOptionDto toOption(Categoria entity) {
+        if (entity == null) {
+            return null;
         }
 
-        return categoriaPadre.getNivel() + 1;
+        return CategoriaOptionDto.builder()
+                .idCategoria(entity.getIdCategoria())
+                .idCategoriaPadre(entity.getCategoriaPadre() == null ? null : entity.getCategoriaPadre().getIdCategoria())
+                .codigo(entity.getCodigo())
+                .nombre(entity.getNombre())
+                .slug(entity.getSlug())
+                .nivel(entity.getNivel())
+                .orden(entity.getOrden())
+                .estado(entity.getEstado())
+                .build();
     }
 
-    private Integer defaultInteger(Integer value, Integer defaultValue) {
-        return value == null ? defaultValue : value;
-    }
+    private IdCodigoNombreResponseDto toIdCodigoNombre(Categoria entity) {
+        if (entity == null) {
+            return null;
+        }
 
-    private Long defaultLong(Long value) {
-        return value == null ? 0L : value;
+        return IdCodigoNombreResponseDto.builder()
+                .id(entity.getIdCategoria())
+                .codigo(entity.getCodigo())
+                .nombre(entity.getNombre())
+                .estado(entity.getEstado())
+                .build();
     }
 }

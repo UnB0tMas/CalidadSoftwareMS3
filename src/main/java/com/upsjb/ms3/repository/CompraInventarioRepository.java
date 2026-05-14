@@ -27,6 +27,13 @@ public interface CompraInventarioRepository extends
 
     boolean existsByCodigoCompraIgnoreCaseAndEstadoTrueAndIdCompraNot(String codigoCompra, Long idCompra);
 
+    boolean existsByProveedor_IdProveedorAndEstadoCompraAndEstadoTrue(
+            Long idProveedor,
+            EstadoCompraInventario estadoCompra
+    );
+
+    Long countByProveedor_IdProveedorAndEstadoTrue(Long idProveedor);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select c

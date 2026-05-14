@@ -4,6 +4,7 @@ package com.upsjb.ms3.specification;
 import com.upsjb.ms3.domain.entity.MovimientoInventario;
 import com.upsjb.ms3.domain.enums.EstadoMovimientoInventario;
 import com.upsjb.ms3.dto.inventario.movimiento.filter.KardexFilterDto;
+import com.upsjb.ms3.shared.specification.BooleanCriteria;
 import com.upsjb.ms3.shared.specification.SpecificationBuilder;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -18,7 +19,21 @@ public final class KardexSpecifications {
         }
 
         return SpecificationBuilder.<MovimientoInventario>create()
-                .activeOnly()
+                .textSearch(
+                        filter.search(),
+                        "codigoMovimiento",
+                        "sku.codigoSku",
+                        "sku.producto.codigoProducto",
+                        "sku.producto.nombre",
+                        "almacen.codigo",
+                        "almacen.nombre",
+                        "referenciaTipo",
+                        "referenciaIdExterno",
+                        "requestId",
+                        "correlationId"
+                )
+                .equal("idMovimiento", filter.idMovimiento())
+                .like("codigoMovimiento", filter.codigoMovimiento())
                 .equal("sku.idSku", filter.idSku())
                 .like("sku.codigoSku", filter.codigoSku())
                 .equal("sku.producto.idProducto", filter.idProducto())
@@ -30,6 +45,11 @@ public final class KardexSpecifications {
                 .equal("estadoMovimiento", filter.estadoMovimiento())
                 .like("referenciaTipo", filter.referenciaTipo())
                 .like("referenciaIdExterno", filter.referenciaIdExterno())
+                .equal("actorIdUsuarioMs1", filter.actorIdUsuarioMs1())
+                .equal("actorIdEmpleadoMs2", filter.actorIdEmpleadoMs2())
+                .like("requestId", filter.requestId())
+                .like("correlationId", filter.correlationId())
+                .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
                 .range("createdAt", SpecificationFilterSupport.dateRange(filter.fechaMovimiento()))
                 .build();
     }

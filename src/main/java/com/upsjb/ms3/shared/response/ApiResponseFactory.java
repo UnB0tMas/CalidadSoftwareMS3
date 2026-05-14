@@ -1,5 +1,8 @@
-﻿package com.upsjb.ms3.shared.response;
+﻿// ruta: src/main/java/com/upsjb/ms3/shared/response/ApiResponseFactory.java
+package com.upsjb.ms3.shared.response;
 
+import com.upsjb.ms3.dto.shared.ApiResponseDto;
+import com.upsjb.ms3.shared.audit.AuditContext;
 import com.upsjb.ms3.shared.audit.AuditContextHolder;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -38,6 +41,40 @@ public class ApiResponseFactory {
                 message,
                 data,
                 trace()
+        );
+    }
+
+    public <T> ApiResponseDto<T> dtoOk(String message, T data) {
+        AuditContext context = AuditContextHolder.getOrEmpty();
+        return ApiResponseDto.ok(
+                message,
+                data,
+                context.requestId(),
+                context.correlationId(),
+                context.requestPath()
+        );
+    }
+
+    public <T> ApiResponseDto<T> dtoCreated(String message, T data) {
+        AuditContext context = AuditContextHolder.getOrEmpty();
+        return ApiResponseDto.created(
+                message,
+                data,
+                context.requestId(),
+                context.correlationId(),
+                context.requestPath()
+        );
+    }
+
+    public <T> ApiResponseDto<T> dtoFail(String code, String message, T data) {
+        AuditContext context = AuditContextHolder.getOrEmpty();
+        return ApiResponseDto.fail(
+                code,
+                message,
+                data,
+                context.requestId(),
+                context.correlationId(),
+                context.requestPath()
         );
     }
 

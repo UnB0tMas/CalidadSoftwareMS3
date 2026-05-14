@@ -14,6 +14,7 @@ public class MarcaValidator {
     public void validateCreate(
             String codigo,
             String nombre,
+            String slug,
             boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean duplicatedSlug
@@ -22,6 +23,7 @@ public class MarcaValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateSlug(slug, errors);
 
         errors.throwIfAny("No se puede crear la marca.");
 
@@ -32,18 +34,36 @@ public class MarcaValidator {
 
     public void validateUpdate(
             Marca marca,
+            String codigo,
             String nombre,
+            String slug,
+            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean duplicatedSlug
     ) {
         requireActive(marca);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
+        validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateSlug(slug, errors);
+
         errors.throwIfAny("No se puede actualizar la marca.");
 
+        requireNotDuplicated(duplicatedCodigo, "Ya existe otra marca activa con el mismo código.");
         requireNotDuplicated(duplicatedNombre, "Ya existe otra marca activa con el mismo nombre.");
         requireNotDuplicated(duplicatedSlug, "Ya existe otra marca activa con el mismo slug.");
+    }
+
+    public void validateCanActivate(Marca marca) {
+        requireExists(marca);
+
+        if (marca.isActivo()) {
+            throw new ConflictException(
+                    "MARCA_YA_ACTIVA",
+                    "La marca ya se encuentra activa."
+            );
+        }
     }
 
     public void validateCanDeactivate(Marca marca, boolean hasActiveProducts) {
@@ -63,16 +83,16 @@ public class MarcaValidator {
         if (!marca.isActivo()) {
             throw new NotFoundException(
                     "MARCA_INACTIVA",
-                    "La marca no está activa."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }
 
-    private void requireExists(Marca marca) {
+    public void requireExists(Marca marca) {
         if (marca == null) {
             throw new NotFoundException(
                     "MARCA_NO_ENCONTRADA",
-                    "Marca no encontrada."
+                    "No se encontró el registro solicitado."
             );
         }
     }
@@ -96,6 +116,17 @@ public class MarcaValidator {
 
         if (StringNormalizer.clean(nombre).length() > 120) {
             errors.add("nombre", "El nombre no debe superar 120 caracteres.", "MAX_LENGTH", nombre);
+        }
+    }
+
+    private void validateSlug(String slug, ValidationErrorCollector errors) {
+        if (!StringNormalizer.hasText(slug)) {
+            errors.add("slug", "El slug de la marca es obligatorio.", "REQUIRED", slug);
+            return;
+        }
+
+        if (StringNormalizer.clean(slug).length() > 150) {
+            errors.add("slug", "El slug no debe superar 150 caracteres.", "MAX_LENGTH", slug);
         }
     }
 

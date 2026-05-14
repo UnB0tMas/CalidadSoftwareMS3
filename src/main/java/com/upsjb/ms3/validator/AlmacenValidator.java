@@ -25,23 +25,22 @@ public class AlmacenValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
-
-        if (permiteVenta == null) {
-            errors.add("permiteVenta", "Debe indicar si el almacén permite venta.", "REQUIRED", null);
-        }
-
-        if (permiteCompra == null) {
-            errors.add("permiteCompra", "Debe indicar si el almacén permite compra.", "REQUIRED", null);
-        }
+        validateFlags(permiteVenta, permiteCompra, errors);
 
         errors.throwIfAny("No se puede crear el almacén.");
 
         if (duplicatedCodigo) {
-            throw new ConflictException("ALMACEN_CODIGO_DUPLICADO", "Ya existe un almacén activo con el mismo código.");
+            throw new ConflictException(
+                    "ALMACEN_CODIGO_DUPLICADO",
+                    "Ya existe un almacén activo con el mismo código."
+            );
         }
 
         if (duplicatedNombre) {
-            throw new ConflictException("ALMACEN_NOMBRE_DUPLICADO", "Ya existe un almacén activo con el mismo nombre.");
+            throw new ConflictException(
+                    "ALMACEN_NOMBRE_DUPLICADO",
+                    "Ya existe un almacén activo con el mismo nombre."
+            );
         }
 
         validatePrincipal(alreadyHasPrincipal, principal);
@@ -49,7 +48,11 @@ public class AlmacenValidator {
 
     public void validateUpdate(
             Almacen almacen,
+            String codigo,
             String nombre,
+            Boolean permiteVenta,
+            Boolean permiteCompra,
+            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean alreadyHasPrincipal,
             Boolean principal
@@ -57,11 +60,25 @@ public class AlmacenValidator {
         requireActive(almacen);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
+
+        validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateFlags(permiteVenta, permiteCompra, errors);
+
         errors.throwIfAny("No se puede actualizar el almacén.");
 
+        if (duplicatedCodigo) {
+            throw new ConflictException(
+                    "ALMACEN_CODIGO_DUPLICADO",
+                    "Ya existe otro almacén activo con el mismo código."
+            );
+        }
+
         if (duplicatedNombre) {
-            throw new ConflictException("ALMACEN_NOMBRE_DUPLICADO", "Ya existe otro almacén activo con el mismo nombre.");
+            throw new ConflictException(
+                    "ALMACEN_NOMBRE_DUPLICADO",
+                    "Ya existe otro almacén activo con el mismo nombre."
+            );
         }
 
         if (!Boolean.TRUE.equals(almacen.getPrincipal())) {
@@ -69,7 +86,12 @@ public class AlmacenValidator {
         }
     }
 
-    public void validateCanDeactivate(Almacen almacen, boolean hasStock, boolean hasMovements, boolean hasPendingReservations) {
+    public void validateCanDeactivate(
+            Almacen almacen,
+            boolean hasStock,
+            boolean hasMovements,
+            boolean hasPendingReservations
+    ) {
         requireActive(almacen);
 
         if (Boolean.TRUE.equals(almacen.getPrincipal())) {
@@ -94,18 +116,26 @@ public class AlmacenValidator {
         }
     }
 
+    public void validateCanActivate(Almacen almacen) {
+        requireExists(almacen);
+    }
+
     public void requireActive(Almacen almacen) {
-        if (almacen == null) {
-            throw new NotFoundException(
-                    "ALMACEN_NO_ENCONTRADO",
-                    "Almacén no encontrado."
-            );
-        }
+        requireExists(almacen);
 
         if (!almacen.isActivo()) {
             throw new NotFoundException(
                     "ALMACEN_INACTIVO",
                     "El almacén no está activo."
+            );
+        }
+    }
+
+    public void requireExists(Almacen almacen) {
+        if (almacen == null) {
+            throw new NotFoundException(
+                    "ALMACEN_NO_ENCONTRADO",
+                    "No se encontró el registro solicitado."
             );
         }
     }
@@ -138,6 +168,16 @@ public class AlmacenValidator {
 
         if (StringNormalizer.clean(nombre).length() > 150) {
             errors.add("nombre", "El nombre no debe superar 150 caracteres.", "MAX_LENGTH", nombre);
+        }
+    }
+
+    private void validateFlags(Boolean permiteVenta, Boolean permiteCompra, ValidationErrorCollector errors) {
+        if (permiteVenta == null) {
+            errors.add("permiteVenta", "Debe indicar si el almacén permite venta.", "REQUIRED", null);
+        }
+
+        if (permiteCompra == null) {
+            errors.add("permiteCompra", "Debe indicar si el almacén permite compra.", "REQUIRED", null);
         }
     }
 }

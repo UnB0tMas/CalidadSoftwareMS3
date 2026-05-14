@@ -117,6 +117,15 @@ public class ProductoImagenMapper {
         entity.setPrincipal(defaultBoolean(principal, false));
     }
 
+    public void deactivate(ProductoImagenCloudinary entity) {
+        if (entity == null) {
+            return;
+        }
+
+        entity.setPrincipal(Boolean.FALSE);
+        entity.inactivar();
+    }
+
     private Integer defaultInteger(Integer value, Integer defaultValue) {
         return value == null ? defaultValue : value;
     }

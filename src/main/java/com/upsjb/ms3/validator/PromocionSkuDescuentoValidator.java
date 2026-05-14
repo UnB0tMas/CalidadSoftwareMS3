@@ -33,33 +33,9 @@ public class PromocionSkuDescuentoValidator {
     ) {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
-        if (promocionVersion == null) {
-            errors.add("promocionVersion", "La versión de promoción es obligatoria.", "REQUIRED", null);
-        } else if (!promocionVersion.isActivo()) {
-            errors.add("promocionVersion", "La versión de promoción debe estar activa.", "INACTIVE", promocionVersion.getIdPromocionVersion());
-        }
-
-        if (sku == null) {
-            errors.add("sku", "El SKU es obligatorio.", "REQUIRED", null);
-        } else if (!sku.isActivo()) {
-            errors.add("sku", "El SKU debe estar activo.", "INACTIVE", sku.getIdSku());
-        }
-
-        if (tipoDescuento == null) {
-            errors.add("tipoDescuento", "El tipo de descuento es obligatorio.", "REQUIRED", null);
-        }
-
-        if (valorDescuento == null || valorDescuento.compareTo(BigDecimal.ZERO) < 0) {
-            errors.add("valorDescuento", "El valor del descuento no puede ser negativo.", "INVALID_VALUE", valorDescuento);
-        }
-
-        if (limiteUnidades != null && limiteUnidades <= 0) {
-            errors.add("limiteUnidades", "El límite de unidades debe ser mayor a cero.", "INVALID_VALUE", limiteUnidades);
-        }
-
-        if (prioridad != null && prioridad <= 0) {
-            errors.add("prioridad", "La prioridad debe ser mayor a cero.", "INVALID_VALUE", prioridad);
-        }
+        validateVersionForDiscount(promocionVersion, errors);
+        validateSku(sku, errors);
+        validateBasicDiscountFields(tipoDescuento, valorDescuento, limiteUnidades, prioridad, errors);
 
         errors.throwIfAny("No se puede registrar el descuento de SKU en la promoción.");
 
@@ -81,12 +57,32 @@ public class PromocionSkuDescuentoValidator {
             BigDecimal precioBase,
             BigDecimal costoEstimado
     ) {
-        if (promocionVersion == null || !promocionVersion.isActivo()) {
-            throw new NotFoundException(
-                    "PROMOCION_VERSION_INACTIVA",
-                    "La versión de promoción no está activa."
-            );
-        }
+        validateUpdate(
+                promocionVersion,
+                tipoDescuento,
+                valorDescuento,
+                precioBase,
+                costoEstimado,
+                null,
+                null
+        );
+    }
+
+    public void validateUpdate(
+            PromocionVersion promocionVersion,
+            TipoDescuento tipoDescuento,
+            BigDecimal valorDescuento,
+            BigDecimal precioBase,
+            BigDecimal costoEstimado,
+            Integer limiteUnidades,
+            Integer prioridad
+    ) {
+        ValidationErrorCollector errors = ValidationErrorCollector.create();
+
+        validateVersionForDiscount(promocionVersion, errors);
+        validateBasicDiscountFields(tipoDescuento, valorDescuento, limiteUnidades, prioridad, errors);
+
+        errors.throwIfAny("No se puede actualizar el descuento de SKU en la promoción.");
 
         if (!promocionVersion.getEstadoPromocion().isEditable()) {
             throw new ConflictException(
@@ -97,6 +93,98 @@ public class PromocionSkuDescuentoValidator {
 
         validateDiscountValue(tipoDescuento, valorDescuento, precioBase);
         validateMargin(tipoDescuento, valorDescuento, precioBase, costoEstimado);
+    }
+
+    public void requireActive(PromocionVersion promocionVersion) {
+        if (promocionVersion == null) {
+            throw new NotFoundException(
+                    "PROMOCION_VERSION_NO_ENCONTRADA",
+                    "Versión de promoción no encontrada."
+            );
+        }
+
+        if (!promocionVersion.isActivo()) {
+            throw new NotFoundException(
+                    "PROMOCION_VERSION_INACTIVA",
+                    "La versión de promoción no está activa."
+            );
+        }
+    }
+
+    private void validateVersionForDiscount(PromocionVersion promocionVersion, ValidationErrorCollector errors) {
+        if (promocionVersion == null) {
+            errors.add("promocionVersion", "La versión de promoción es obligatoria.", "REQUIRED", null);
+            return;
+        }
+
+        if (!promocionVersion.isActivo()) {
+            errors.add(
+                    "promocionVersion",
+                    "La versión de promoción debe estar activa.",
+                    "INACTIVE",
+                    promocionVersion.getIdPromocionVersion()
+            );
+            return;
+        }
+
+        if (promocionVersion.getEstadoPromocion() == null) {
+            errors.add(
+                    "estadoPromocion",
+                    "El estado de promoción de la versión es obligatorio.",
+                    "REQUIRED",
+                    null
+            );
+            return;
+        }
+
+        if (!promocionVersion.getEstadoPromocion().isEditable()) {
+            errors.add(
+                    "estadoPromocion",
+                    "La versión de promoción no es editable.",
+                    "INVALID_STATE",
+                    promocionVersion.getEstadoPromocion()
+            );
+        }
+    }
+
+    private void validateSku(ProductoSku sku, ValidationErrorCollector errors) {
+        if (sku == null) {
+            errors.add("sku", "El SKU es obligatorio.", "REQUIRED", null);
+            return;
+        }
+
+        if (!sku.isActivo()) {
+            errors.add("sku", "El SKU debe estar activo.", "INACTIVE", sku.getIdSku());
+        }
+    }
+
+    private void validateBasicDiscountFields(
+            TipoDescuento tipoDescuento,
+            BigDecimal valorDescuento,
+            Integer limiteUnidades,
+            Integer prioridad,
+            ValidationErrorCollector errors
+    ) {
+        if (tipoDescuento == null) {
+            errors.add("tipoDescuento", "El tipo de descuento es obligatorio.", "REQUIRED", null);
+        }
+
+        if (valorDescuento == null || valorDescuento.compareTo(BigDecimal.ZERO) <= 0) {
+            errors.add(
+                    "valorDescuento",
+                    "El valor del descuento debe ser mayor a cero.",
+                    "INVALID_VALUE",
+                    valorDescuento
+            );
+        }
+
+        if (limiteUnidades != null && limiteUnidades <= 0) {
+            errors.add("limiteUnidades", "El límite de unidades debe ser mayor a cero.", "INVALID_VALUE", limiteUnidades);
+        }
+
+        if (prioridad != null && prioridad <= 0) {
+            errors.add("prioridad", "La prioridad debe ser mayor a cero.", "INVALID_VALUE", prioridad);
+        }
     }
 
     private void validateDiscountValue(

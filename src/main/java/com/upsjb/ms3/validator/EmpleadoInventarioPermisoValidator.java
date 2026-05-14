@@ -23,11 +23,7 @@ public class EmpleadoInventarioPermisoValidator {
     ) {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
-        if (empleadoSnapshot == null) {
-            errors.add("empleadoSnapshot", "El empleado es obligatorio.", "REQUIRED", null);
-        } else if (!empleadoSnapshot.isActivo() || !Boolean.TRUE.equals(empleadoSnapshot.getEmpleadoActivo())) {
-            errors.add("empleadoSnapshot", "El empleado debe estar activo.", "INACTIVE", empleadoSnapshot.getIdEmpleadoSnapshot());
-        }
+        validateEmpleadoSnapshot(errors, empleadoSnapshot);
 
         if (fechaInicio == null) {
             errors.add("fechaInicio", "La fecha de inicio del permiso es obligatoria.", "REQUIRED", null);
@@ -54,6 +50,52 @@ public class EmpleadoInventarioPermisoValidator {
             throw new ConflictException(
                     "EMPLEADO_NO_PUEDE_AUTORIZARSE",
                     "Un empleado no puede otorgarse permisos de inventario a sí mismo."
+            );
+        }
+    }
+
+    public void validateGrantOrReplace(
+            EmpleadoSnapshotMs2 empleadoSnapshot,
+            LocalDateTime fechaInicio,
+            LocalDateTime fechaFin,
+            String motivo,
+            Long otorgadoPorIdUsuarioMs1,
+            boolean selfGrant
+    ) {
+        validateGrant(
+                empleadoSnapshot,
+                fechaInicio,
+                motivo,
+                otorgadoPorIdUsuarioMs1,
+                false,
+                selfGrant
+        );
+        validateDateRange(fechaInicio, fechaFin);
+    }
+
+    public void validatePermissionPayload(EmpleadoInventarioPermisoHistorial permiso) {
+        if (permiso == null) {
+            throw new ConflictException(
+                    "PERMISO_INVENTARIO_INVALIDO",
+                    "El permiso de inventario no tiene datos válidos."
+            );
+        }
+
+        validateDateRange(permiso.getFechaInicio(), permiso.getFechaFin());
+
+        boolean hasAnyPermission = Boolean.TRUE.equals(permiso.getPuedeCrearProductoBasico())
+                || Boolean.TRUE.equals(permiso.getPuedeEditarProductoBasico())
+                || Boolean.TRUE.equals(permiso.getPuedeRegistrarEntrada())
+                || Boolean.TRUE.equals(permiso.getPuedeRegistrarSalida())
+                || Boolean.TRUE.equals(permiso.getPuedeRegistrarAjuste())
+                || Boolean.TRUE.equals(permiso.getPuedeConsultarKardex())
+                || Boolean.TRUE.equals(permiso.getPuedeGestionarImagenes())
+                || Boolean.TRUE.equals(permiso.getPuedeActualizarAtributos());
+
+        if (!hasAnyPermission) {
+            throw new ConflictException(
+                    "PERMISO_INVENTARIO_SIN_PERMISOS",
+                    "Debe activar al menos un permiso funcional de inventario."
             );
         }
     }
@@ -92,6 +134,34 @@ public class EmpleadoInventarioPermisoValidator {
             throw new ConflictException(
                     "PERMISO_INVENTARIO_NO_VIGENTE",
                     "El permiso de inventario no está vigente."
+            );
+        }
+    }
+
+    private void validateEmpleadoSnapshot(
+            ValidationErrorCollector errors,
+            EmpleadoSnapshotMs2 empleadoSnapshot
+    ) {
+        if (empleadoSnapshot == null) {
+            errors.add("empleadoSnapshot", "El empleado es obligatorio.", "REQUIRED", null);
+            return;
+        }
+
+        if (!empleadoSnapshot.isActivo() || !Boolean.TRUE.equals(empleadoSnapshot.getEmpleadoActivo())) {
+            errors.add(
+                    "empleadoSnapshot",
+                    "El empleado debe estar activo.",
+                    "INACTIVE",
+                    empleadoSnapshot.getIdEmpleadoSnapshot()
+            );
+        }
+    }
+
+    private void validateDateRange(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new ConflictException(
+                    "PERMISO_FECHA_FIN_INVALIDA",
+                    "La fecha fin del permiso no puede ser menor que la fecha inicio."
             );
         }
     }

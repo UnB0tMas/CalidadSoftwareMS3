@@ -33,6 +33,7 @@ public final class MovimientoInventarioSpecifications {
                         "requestId",
                         "correlationId"
                 )
+                .equal("idMovimiento", filter.idMovimiento())
                 .like("codigoMovimiento", filter.codigoMovimiento())
                 .equal("sku.idSku", filter.idSku())
                 .like("sku.codigoSku", filter.codigoSku())
@@ -50,6 +51,8 @@ public final class MovimientoInventarioSpecifications {
                 .equal("actorIdUsuarioMs1", filter.actorIdUsuarioMs1())
                 .equal("actorIdEmpleadoMs2", filter.actorIdEmpleadoMs2())
                 .equal("actorRol", filter.actorRol())
+                .like("requestId", filter.requestId())
+                .like("correlationId", filter.correlationId())
                 .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
                 .range("createdAt", SpecificationFilterSupport.dateRange(filter.fechaMovimiento()))
                 .build();
@@ -63,18 +66,21 @@ public final class MovimientoInventarioSpecifications {
 
     public static Specification<MovimientoInventario> bySku(Long idSku) {
         return SpecificationBuilder.<MovimientoInventario>create()
+                .activeOnly()
                 .equal("sku.idSku", idSku)
                 .build();
     }
 
     public static Specification<MovimientoInventario> byAlmacen(Long idAlmacen) {
         return SpecificationBuilder.<MovimientoInventario>create()
+                .activeOnly()
                 .equal("almacen.idAlmacen", idAlmacen)
                 .build();
     }
 
     public static Specification<MovimientoInventario> byReferencia(String referenciaTipo, String referenciaIdExterno) {
         return SpecificationBuilder.<MovimientoInventario>create()
+                .activeOnly()
                 .like("referenciaTipo", referenciaTipo)
                 .like("referenciaIdExterno", referenciaIdExterno)
                 .build();

@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -17,10 +19,33 @@ public interface ProductoRepository extends
         JpaRepository<Producto, Long>,
         JpaSpecificationExecutor<Producto> {
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
+    @Override
+    Page<Producto> findAll(Specification<Producto> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
     Optional<Producto> findByIdProductoAndEstadoTrue(Long idProducto);
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
     Optional<Producto> findByCodigoProductoIgnoreCaseAndEstadoTrue(String codigoProducto);
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
     Optional<Producto> findBySlugIgnoreCaseAndEstadoTrue(String slug);
 
     Optional<Producto> findByNombreIgnoreCaseAndEstadoTrue(String nombre);
@@ -65,11 +90,21 @@ public interface ProductoRepository extends
 
     List<Producto> findByEstadoVentaAndEstadoTrueOrderByUpdatedAtDesc(EstadoProductoVenta estadoVenta);
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
     Page<Producto> findByEstadoTrueAndVisiblePublicoTrueAndEstadoPublicacionInAndEstadoVentaIn(
             Collection<EstadoProductoPublicacion> estadosPublicacion,
             Collection<EstadoProductoVenta> estadosVenta,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
     Optional<Producto> findBySlugIgnoreCaseAndEstadoTrueAndVisiblePublicoTrue(String slug);
 }

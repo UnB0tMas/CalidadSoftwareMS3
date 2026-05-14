@@ -69,6 +69,8 @@ public class PrecioSkuValidator {
             return;
         }
 
+        requireActive(currentPrice);
+
         if (!Boolean.TRUE.equals(currentPrice.getVigente())) {
             throw new ConflictException(
                     "PRECIO_ACTUAL_NO_VIGENTE",
@@ -78,26 +80,50 @@ public class PrecioSkuValidator {
 
         if (newStartDate != null
                 && currentPrice.getFechaInicio() != null
-                && newStartDate.isBefore(currentPrice.getFechaInicio())) {
+                && (newStartDate.isBefore(currentPrice.getFechaInicio())
+                || newStartDate.isEqual(currentPrice.getFechaInicio()))) {
             throw new ConflictException(
                     "PRECIO_FECHA_INICIO_INVALIDA",
-                    "La fecha de inicio del nuevo precio no puede ser menor que la del precio vigente."
+                    "La fecha de inicio del nuevo precio debe ser mayor que la del precio vigente."
             );
         }
+    }
+
+    public void validateNewVersion(
+            ProductoSku sku,
+            BigDecimal precioVenta,
+            Moneda moneda,
+            LocalDateTime fechaInicio,
+            String motivo,
+            Long creadoPorIdUsuarioMs1,
+            PrecioSkuHistorial currentPrice,
+            boolean sameStartDateExists
+    ) {
+        validateCreate(
+                sku,
+                precioVenta,
+                moneda,
+                fechaInicio,
+                motivo,
+                creadoPorIdUsuarioMs1
+        );
+
+        validateNoCurrentPriceConflict(sameStartDateExists);
+        validateCanCloseCurrent(currentPrice, fechaInicio);
     }
 
     public void requireActive(PrecioSkuHistorial precio) {
         if (precio == null) {
             throw new NotFoundException(
                     "PRECIO_SKU_NO_ENCONTRADO",
-                    "Precio de SKU no encontrado."
+                    "No se encontró el registro solicitado."
             );
         }
 
         if (!precio.isActivo()) {
             throw new NotFoundException(
                     "PRECIO_SKU_INACTIVO",
-                    "El precio de SKU no está activo."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }

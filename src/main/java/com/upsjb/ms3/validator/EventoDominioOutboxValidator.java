@@ -9,6 +9,7 @@ import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
 import com.upsjb.ms3.util.JsonUtil;
 import com.upsjb.ms3.util.StringNormalizer;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -57,6 +58,22 @@ public class EventoDominioOutboxValidator {
         errors.throwIfAny("No se puede crear el evento outbox.");
     }
 
+    public void validateUniqueEventId(UUID eventId, boolean exists) {
+        if (eventId == null) {
+            throw new ConflictException(
+                    "OUTBOX_EVENT_ID_INVALIDO",
+                    "El identificador del evento outbox es obligatorio."
+            );
+        }
+
+        if (exists) {
+            throw new ConflictException(
+                    "OUTBOX_EVENT_ID_DUPLICADO",
+                    "Ya existe un evento outbox activo con el mismo eventId."
+            );
+        }
+    }
+
     public void validateCanPublish(EventoDominioOutbox event) {
         requireActive(event);
 
@@ -71,6 +88,10 @@ public class EventoDominioOutboxValidator {
     }
 
     public void validateCanRetry(EventoDominioOutbox event) {
+        validateCanRetry(event, false);
+    }
+
+    public void validateCanRetry(EventoDominioOutbox event, boolean forceRetry) {
         requireActive(event);
 
         if (!event.isError()) {
@@ -80,7 +101,9 @@ public class EventoDominioOutboxValidator {
             );
         }
 
-        validateAttempts(event);
+        if (!forceRetry) {
+            validateAttempts(event);
+        }
     }
 
     public void validateCanInspectPayload(boolean allowed) {
@@ -96,14 +119,14 @@ public class EventoDominioOutboxValidator {
         if (event == null) {
             throw new NotFoundException(
                     "OUTBOX_EVENTO_NO_ENCONTRADO",
-                    "Evento outbox no encontrado."
+                    "No se encontró el registro solicitado."
             );
         }
 
         if (!Boolean.TRUE.equals(event.getEstado())) {
             throw new NotFoundException(
                     "OUTBOX_EVENTO_INACTIVO",
-                    "El evento outbox no está activo."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }
@@ -111,7 +134,7 @@ public class EventoDominioOutboxValidator {
     private void validateAttempts(EventoDominioOutbox event) {
         if (!outboxProperties.canRetry(event.getIntentosPublicacion())) {
             throw new ConflictException(
-                    "OUTBOX_MAX_INTENTOS_SUPERADO",
+                    "EVENTO_OUTBOX_NO_REINTENTABLE",
                     "El evento superó el máximo de intentos de publicación configurado."
             );
         }

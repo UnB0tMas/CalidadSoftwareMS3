@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -18,8 +20,20 @@ public interface PromocionVersionRepository extends
         JpaRepository<PromocionVersion, Long>,
         JpaSpecificationExecutor<PromocionVersion> {
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
+    @Override
+    Page<PromocionVersion> findAll(Specification<PromocionVersion> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     Optional<PromocionVersion> findByIdPromocionVersionAndEstadoTrue(Long idPromocionVersion);
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     Optional<PromocionVersion>
     findFirstByPromocion_IdPromocionAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPromocionVersionDesc(
             Long idPromocion
@@ -32,23 +46,41 @@ public interface PromocionVersionRepository extends
             Long idPromocionVersion
     );
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     Page<PromocionVersion> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     Page<PromocionVersion> findByPromocion_IdPromocionAndEstadoTrue(Long idPromocion, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     Page<PromocionVersion> findByEstadoPromocionAndEstadoTrue(
             EstadoPromocion estadoPromocion,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     List<PromocionVersion> findByPromocion_IdPromocionAndEstadoTrueOrderByFechaInicioDescIdPromocionVersionDesc(
             Long idPromocion
     );
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     List<PromocionVersion> findByEstadoPromocionInAndVisiblePublicoTrueAndEstadoTrueOrderByFechaInicioAsc(
             Collection<EstadoPromocion> estados
     );
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     @Query("""
             select pv
             from PromocionVersion pv
@@ -65,6 +97,9 @@ public interface PromocionVersionRepository extends
             @Param("idPromocionVersionExcluir") Long idPromocionVersionExcluir
     );
 
+    @EntityGraph(attributePaths = {
+            "promocion"
+    })
     @Query("""
             select pv
             from PromocionVersion pv

@@ -20,7 +20,9 @@ public class EmpleadoSnapshotMs2Validator {
             Boolean empleadoActivo,
             LocalDateTime snapshotAt,
             boolean duplicatedByEmpleado,
-            boolean duplicatedByUsuario
+            boolean duplicatedByUsuario,
+            boolean duplicatedByCodigo,
+            boolean staleSnapshotVersion
     ) {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
@@ -63,6 +65,20 @@ public class EmpleadoSnapshotMs2Validator {
                     "Ya existe otro snapshot activo para el usuario MS1 indicado."
             );
         }
+
+        if (duplicatedByCodigo) {
+            throw new ConflictException(
+                    "CODIGO_EMPLEADO_DUPLICADO",
+                    "Ya existe otro snapshot activo con el código de empleado indicado."
+            );
+        }
+
+        if (staleSnapshotVersion) {
+            throw new ConflictException(
+                    "SNAPSHOT_EMPLEADO_OBSOLETO",
+                    "No se puede reemplazar el snapshot porque la versión recibida es anterior a la versión vigente."
+            );
+        }
     }
 
     public void requireActiveEmployee(EmpleadoSnapshotMs2 empleado) {
@@ -77,6 +93,17 @@ public class EmpleadoSnapshotMs2Validator {
             throw new ConflictException(
                     "EMPLEADO_MS2_INACTIVO",
                     "El empleado no está activo para operar inventario."
+            );
+        }
+    }
+
+    public void requireReference(Long idEmpleadoMs2, Long idUsuarioMs1, String codigoEmpleado) {
+        if (idEmpleadoMs2 == null
+                && idUsuarioMs1 == null
+                && !StringNormalizer.hasText(codigoEmpleado)) {
+            throw new NotFoundException(
+                    "EMPLEADO_REFERENCIA_OBLIGATORIA",
+                    "Debe indicar el empleado por idEmpleadoMs2, idUsuarioMs1 o código de empleado."
             );
         }
     }

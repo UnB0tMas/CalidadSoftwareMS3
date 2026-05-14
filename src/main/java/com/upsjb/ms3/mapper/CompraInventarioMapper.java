@@ -1,11 +1,16 @@
 ﻿// ruta: src/main/java/com/upsjb/ms3/mapper/CompraInventarioMapper.java
 package com.upsjb.ms3.mapper;
 
+import com.upsjb.ms3.domain.entity.Almacen;
 import com.upsjb.ms3.domain.entity.CompraInventario;
+import com.upsjb.ms3.domain.entity.CompraInventarioDetalle;
+import com.upsjb.ms3.domain.entity.Producto;
+import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.Proveedor;
 import com.upsjb.ms3.domain.enums.EstadoCompraInventario;
 import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.dto.inventario.compra.request.CompraInventarioCreateRequestDto;
+import com.upsjb.ms3.dto.inventario.compra.request.CompraInventarioDetalleRequestDto;
 import com.upsjb.ms3.dto.inventario.compra.request.CompraInventarioUpdateRequestDto;
 import com.upsjb.ms3.dto.inventario.compra.response.CompraInventarioDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.compra.response.CompraInventarioDetalleResponseDto;
@@ -46,7 +51,6 @@ public class CompraInventarioMapper {
         entity.setEstadoCompra(EstadoCompraInventario.BORRADOR);
         entity.setObservacion(request.observacion());
         entity.setCreadoPorIdUsuarioMs1(creadoPorIdUsuarioMs1);
-
         return entity;
     }
 
@@ -63,6 +67,68 @@ public class CompraInventarioMapper {
         entity.setFechaCompra(request.fechaCompra() == null ? entity.getFechaCompra() : request.fechaCompra());
         entity.setMoneda(request.moneda() == null ? entity.getMoneda() : request.moneda());
         entity.setObservacion(request.observacion());
+    }
+
+    public CompraInventarioDetalle toDetalleEntity(
+            CompraInventario compra,
+            CompraInventarioDetalleRequestDto request,
+            ProductoSku sku,
+            Almacen almacen
+    ) {
+        if (compra == null || request == null) {
+            return null;
+        }
+
+        BigDecimal descuento = defaultAmount(request.descuento());
+        BigDecimal impuesto = defaultAmount(request.impuesto());
+        BigDecimal subtotal = request.costoUnitario().multiply(BigDecimal.valueOf(request.cantidad()));
+        BigDecimal costoTotal = subtotal.subtract(descuento).add(impuesto);
+
+        CompraInventarioDetalle detalle = new CompraInventarioDetalle();
+        detalle.setCompra(compra);
+        detalle.setSku(sku);
+        detalle.setAlmacen(almacen);
+        detalle.setCantidad(request.cantidad());
+        detalle.setCostoUnitario(request.costoUnitario());
+        detalle.setDescuento(descuento);
+        detalle.setImpuesto(impuesto);
+        detalle.setCostoTotal(costoTotal);
+        detalle.activar();
+
+        return detalle;
+    }
+
+    public CompraInventarioDetalleResponseDto toDetalleResponse(
+            CompraInventarioDetalle entity,
+            Moneda moneda
+    ) {
+        if (entity == null) {
+            return null;
+        }
+
+        ProductoSku sku = entity.getSku();
+        Producto producto = sku == null ? null : sku.getProducto();
+        Almacen almacen = entity.getAlmacen();
+
+        return CompraInventarioDetalleResponseDto.builder()
+                .idCompraDetalle(entity.getIdCompraDetalle())
+                .idCompra(entity.getCompra() == null ? null : entity.getCompra().getIdCompra())
+                .idSku(sku == null ? null : sku.getIdSku())
+                .codigoSku(sku == null ? null : sku.getCodigoSku())
+                .codigoProducto(producto == null ? null : producto.getCodigoProducto())
+                .nombreProducto(producto == null ? null : producto.getNombre())
+                .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
+                .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
+                .nombreAlmacen(almacen == null ? null : almacen.getNombre())
+                .cantidad(entity.getCantidad())
+                .costoUnitario(toMoney(entity.getCostoUnitario(), moneda))
+                .descuento(toMoney(entity.getDescuento(), moneda))
+                .impuesto(toMoney(entity.getImpuesto(), moneda))
+                .costoTotal(toMoney(entity.getCostoTotal(), moneda))
+                .estado(entity.getEstado())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
     }
 
     public void applyTotals(

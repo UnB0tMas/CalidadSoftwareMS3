@@ -50,12 +50,18 @@ public class ProductoSkuValidator {
             String barcode,
             Integer stockMinimo,
             Integer stockMaximo,
+            BigDecimal pesoGramos,
+            BigDecimal altoCm,
+            BigDecimal anchoCm,
+            BigDecimal largoCm,
             boolean duplicatedBarcode
     ) {
         requireActive(sku);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
+
         validateStockRange(stockMinimo, stockMaximo, errors);
+        validateDimensions(pesoGramos, altoCm, anchoCm, largoCm, errors);
 
         if (StringNormalizer.hasText(barcode) && StringNormalizer.clean(barcode).length() > 100) {
             errors.add("barcode", "El barcode no debe superar 100 caracteres.", "MAX_LENGTH", barcode);
@@ -80,6 +86,17 @@ public class ProductoSkuValidator {
             throw new ConflictException(
                     "SKU_CON_STOCK",
                     "No se puede inactivar el SKU porque todavía tiene stock registrado."
+            );
+        }
+    }
+
+    public void validateCanDiscontinue(ProductoSku sku, boolean hasPendingReservations) {
+        requireActive(sku);
+
+        if (hasPendingReservations) {
+            throw new ConflictException(
+                    "SKU_CON_RESERVAS_PENDIENTES",
+                    "No se puede descontinuar el SKU porque tiene reservas pendientes."
             );
         }
     }
@@ -126,7 +143,12 @@ public class ProductoSkuValidator {
         }
 
         if (producto.getEstadoRegistro() == EstadoProductoRegistro.DESCONTINUADO) {
-            errors.add("producto", "No se puede crear SKU para un producto descontinuado.", "INVALID_STATE", producto.getIdProducto());
+            errors.add(
+                    "producto",
+                    "No se puede crear SKU para un producto descontinuado.",
+                    "INVALID_STATE",
+                    producto.getIdProducto()
+            );
         }
     }
 
@@ -151,7 +173,12 @@ public class ProductoSkuValidator {
         }
 
         if (stockMinimo != null && stockMaximo != null && stockMaximo < stockMinimo) {
-            errors.add("stockMaximo", "El stock máximo no puede ser menor que el stock mínimo.", "INVALID_RANGE", stockMaximo);
+            errors.add(
+                    "stockMaximo",
+                    "El stock máximo no puede ser menor que el stock mínimo.",
+                    "INVALID_RANGE",
+                    stockMaximo
+            );
         }
     }
 

@@ -1,12 +1,35 @@
 ﻿// ruta: src/main/java/com/upsjb/ms3/validator/KardexValidator.java
 package com.upsjb.ms3.validator;
 
+import com.upsjb.ms3.dto.inventario.movimiento.filter.KardexFilterDto;
+import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
 import com.upsjb.ms3.shared.exception.ConflictException;
+import com.upsjb.ms3.shared.exception.ValidationException;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 public class KardexValidator {
+
+    public void validateFilter(KardexFilterDto filter) {
+        if (filter == null) {
+            throw new ValidationException(
+                    "KARDEX_FILTRO_REQUERIDO",
+                    "Debe indicar filtros para consultar kardex."
+            );
+        }
+
+        validateReferenceSearch(filter.referenciaTipo(), filter.referenciaIdExterno());
+
+        DateRangeFilterDto dateRange = filter.fechaMovimiento();
+        validateFilter(
+                filter.idSku(),
+                filter.idAlmacen(),
+                dateRange == null ? null : dateRange.fechaInicio(),
+                dateRange == null ? null : dateRange.fechaFin()
+        );
+    }
 
     public void validateFilter(
             Long idSku,
@@ -39,8 +62,8 @@ public class KardexValidator {
     }
 
     public void validateReferenceSearch(String referenciaTipo, String referenciaIdExterno) {
-        boolean hasTipo = referenciaTipo != null && !referenciaTipo.isBlank();
-        boolean hasId = referenciaIdExterno != null && !referenciaIdExterno.isBlank();
+        boolean hasTipo = StringUtils.hasText(referenciaTipo);
+        boolean hasId = StringUtils.hasText(referenciaIdExterno);
 
         if (hasTipo != hasId) {
             throw new ConflictException(

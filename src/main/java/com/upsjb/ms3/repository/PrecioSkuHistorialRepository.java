@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -17,8 +19,23 @@ public interface PrecioSkuHistorialRepository extends
         JpaRepository<PrecioSkuHistorial, Long>,
         JpaSpecificationExecutor<PrecioSkuHistorial> {
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
+    @Override
+    Page<PrecioSkuHistorial> findAll(Specification<PrecioSkuHistorial> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     Optional<PrecioSkuHistorial> findByIdPrecioHistorialAndEstadoTrue(Long idPrecioHistorial);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     Optional<PrecioSkuHistorial>
     findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(Long idSku);
 
@@ -29,14 +46,39 @@ public interface PrecioSkuHistorialRepository extends
             Long idPrecioHistorial
     );
 
+    boolean existsBySku_IdSkuAndFechaInicioAndEstadoTrue(
+            Long idSku,
+            LocalDateTime fechaInicio
+    );
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     Page<PrecioSkuHistorial> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     Page<PrecioSkuHistorial> findBySku_IdSkuAndEstadoTrue(Long idSku, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     Page<PrecioSkuHistorial> findBySku_IdSkuAndMonedaAndEstadoTrue(Long idSku, Moneda moneda, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     List<PrecioSkuHistorial> findBySku_IdSkuAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(Long idSku);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     @Query("""
             select p
             from PrecioSkuHistorial p
@@ -51,6 +93,10 @@ public interface PrecioSkuHistorialRepository extends
             @Param("fecha") LocalDateTime fecha
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto"
+    })
     @Query("""
             select p
             from PrecioSkuHistorial p

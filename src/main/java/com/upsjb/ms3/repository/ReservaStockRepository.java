@@ -39,6 +39,11 @@ public interface ReservaStockRepository extends
 
     boolean existsByCodigoReservaIgnoreCaseAndEstadoTrue(String codigoReserva);
 
+    boolean existsByAlmacen_IdAlmacenAndEstadoReservaInAndEstadoTrue(
+            Long idAlmacen,
+            Collection<EstadoReservaStock> estadosReserva
+    );
+
     boolean existsByReferenciaTipoAndReferenciaIdExternoAndEstadoTrue(
             TipoReferenciaStock referenciaTipo,
             String referenciaIdExterno

@@ -11,11 +11,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class CategoriaValidator {
 
-    private static final int MAX_NIVEL = 6;
-
     public void validateCreate(
             String codigo,
             String nombre,
+            String slug,
             Categoria categoriaPadre,
             Integer orden,
             boolean duplicatedCodigo,
@@ -26,76 +25,49 @@ public class CategoriaValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateSlug(slug, errors);
         validateOrden(orden, errors);
-
-        if (categoriaPadre != null && !categoriaPadre.isActivo()) {
-            errors.add("categoriaPadre", "La categoría padre debe estar activa.", "INACTIVE_PARENT", categoriaPadre.getIdCategoria());
-        }
-
-        if (categoriaPadre != null && categoriaPadre.getNivel() != null && categoriaPadre.getNivel() >= MAX_NIVEL) {
-            errors.add("categoriaPadre", "La categoría padre supera el nivel máximo permitido.", "MAX_LEVEL", categoriaPadre.getIdCategoria());
-        }
+        validateParent(categoriaPadre, errors);
 
         errors.throwIfAny("No se puede crear la categoría.");
 
-        requireNotDuplicated(duplicatedCodigo, "Ya existe una categoría activa con el mismo código.");
-        requireNotDuplicated(duplicatedNombre, "Ya existe una categoría activa con el mismo nombre.");
-        requireNotDuplicated(duplicatedSlug, "Ya existe una categoría activa con el mismo slug.");
+        validateDuplicates(duplicatedCodigo, duplicatedNombre, duplicatedSlug);
     }
 
     public void validateUpdate(
             Categoria categoria,
+            String codigo,
             String nombre,
+            String slug,
+            Categoria categoriaPadre,
             Integer orden,
+            boolean duplicatedCodigo,
             boolean duplicatedNombre,
-            boolean duplicatedSlug
+            boolean duplicatedSlug,
+            boolean wouldCreateCycle
     ) {
         requireActive(categoria);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
+
+        validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateSlug(slug, errors);
         validateOrden(orden, errors);
+        validateParent(categoriaPadre, errors);
+
+        if (wouldCreateCycle) {
+            errors.add(
+                    "categoriaPadre",
+                    "La categoría padre seleccionada genera una jerarquía circular.",
+                    "CYCLE_DETECTED",
+                    categoriaPadre == null ? null : categoriaPadre.getIdCategoria()
+            );
+        }
+
         errors.throwIfAny("No se puede actualizar la categoría.");
 
-        requireNotDuplicated(duplicatedNombre, "Ya existe otra categoría activa con el mismo nombre.");
-        requireNotDuplicated(duplicatedSlug, "Ya existe otra categoría activa con el mismo slug.");
-    }
-
-    public void validateChangeParent(Categoria categoria, Categoria nuevaPadre) {
-        requireActive(categoria);
-
-        if (nuevaPadre == null) {
-            return;
-        }
-
-        requireActive(nuevaPadre);
-
-        if (categoria.getIdCategoria() != null
-                && categoria.getIdCategoria().equals(nuevaPadre.getIdCategoria())) {
-            throw new ConflictException(
-                    "CATEGORIA_PADRE_INVALIDA",
-                    "Una categoría no puede ser padre de sí misma."
-            );
-        }
-
-        Categoria cursor = nuevaPadre;
-        while (cursor != null) {
-            if (cursor.getIdCategoria() != null
-                    && cursor.getIdCategoria().equals(categoria.getIdCategoria())) {
-                throw new ConflictException(
-                        "CATEGORIA_CICLO_DETECTADO",
-                        "No se puede asignar esa categoría padre porque genera un ciclo jerárquico."
-                );
-            }
-            cursor = cursor.getCategoriaPadre();
-        }
-
-        if (nuevaPadre.getNivel() != null && nuevaPadre.getNivel() >= MAX_NIVEL) {
-            throw new ConflictException(
-                    "CATEGORIA_NIVEL_MAXIMO",
-                    "No se puede asignar la categoría padre porque supera el nivel máximo permitido."
-            );
-        }
+        validateDuplicates(duplicatedCodigo, duplicatedNombre, duplicatedSlug);
     }
 
     public void validateCanDeactivate(
@@ -107,7 +79,7 @@ public class CategoriaValidator {
 
         if (hasActiveChildren) {
             throw new ConflictException(
-                    "CATEGORIA_CON_HIJAS_ACTIVAS",
+                    "CATEGORIA_CON_SUBCATEGORIAS_ACTIVAS",
                     "No se puede inactivar la categoría porque tiene subcategorías activas."
             );
         }
@@ -120,22 +92,40 @@ public class CategoriaValidator {
         }
     }
 
-    public void requireActive(Categoria categoria) {
+    public void validateCanActivate(Categoria categoria, boolean parentActive) {
         requireExists(categoria);
 
-        if (!categoria.isActivo()) {
-            throw new NotFoundException(
-                    "CATEGORIA_INACTIVA",
-                    "La categoría no está activa."
+        if (categoria.isActivo()) {
+            throw new ConflictException(
+                    "CATEGORIA_YA_ACTIVA",
+                    "La categoría ya se encuentra activa."
+            );
+        }
+
+        if (!parentActive) {
+            throw new ConflictException(
+                    "CATEGORIA_PADRE_INACTIVA",
+                    "No se puede activar la categoría porque su categoría padre está inactiva."
             );
         }
     }
 
-    private void requireExists(Categoria categoria) {
+    public void requireActive(Categoria categoria) {
+        requireExists(categoria);
+
+        if (!categoria.isActivo()) {
+            throw new ConflictException(
+                    "CATEGORIA_INACTIVA",
+                    "No se puede completar la operación porque el registro está inactivo."
+            );
+        }
+    }
+
+    public void requireExists(Categoria categoria) {
         if (categoria == null) {
             throw new NotFoundException(
                     "CATEGORIA_NO_ENCONTRADA",
-                    "Categoría no encontrada."
+                    "No se encontró el registro solicitado."
             );
         }
     }
@@ -146,7 +136,7 @@ public class CategoriaValidator {
             return;
         }
 
-        if (StringNormalizer.clean(codigo).length() > 50) {
+        if (codigo.length() > 50) {
             errors.add("codigo", "El código no debe superar 50 caracteres.", "MAX_LENGTH", codigo);
         }
     }
@@ -157,20 +147,63 @@ public class CategoriaValidator {
             return;
         }
 
-        if (StringNormalizer.clean(nombre).length() > 150) {
+        if (nombre.length() > 150) {
             errors.add("nombre", "El nombre no debe superar 150 caracteres.", "MAX_LENGTH", nombre);
+        }
+    }
+
+    private void validateSlug(String slug, ValidationErrorCollector errors) {
+        if (!StringNormalizer.hasText(slug)) {
+            errors.add("slug", "El slug de la categoría es obligatorio.", "REQUIRED", slug);
+            return;
+        }
+
+        if (slug.length() > 180) {
+            errors.add("slug", "El slug no debe superar 180 caracteres.", "MAX_LENGTH", slug);
         }
     }
 
     private void validateOrden(Integer orden, ValidationErrorCollector errors) {
         if (orden != null && orden < 0) {
-            errors.add("orden", "El orden no puede ser negativo.", "INVALID_VALUE", orden);
+            errors.add("orden", "El orden no puede ser negativo.", "MIN_VALUE", orden);
         }
     }
 
-    private void requireNotDuplicated(boolean duplicated, String message) {
-        if (duplicated) {
-            throw new ConflictException("CATEGORIA_DUPLICADA", message);
+    private void validateParent(Categoria categoriaPadre, ValidationErrorCollector errors) {
+        if (categoriaPadre != null && !categoriaPadre.isActivo()) {
+            errors.add(
+                    "categoriaPadre",
+                    "La categoría padre debe estar activa.",
+                    "INACTIVE_REFERENCE",
+                    categoriaPadre.getIdCategoria()
+            );
+        }
+    }
+
+    private void validateDuplicates(
+            boolean duplicatedCodigo,
+            boolean duplicatedNombre,
+            boolean duplicatedSlug
+    ) {
+        if (duplicatedCodigo) {
+            throw new ConflictException(
+                    "CATEGORIA_CODIGO_DUPLICADO",
+                    "Ya existe un registro activo con los mismos datos."
+            );
+        }
+
+        if (duplicatedNombre) {
+            throw new ConflictException(
+                    "CATEGORIA_NOMBRE_DUPLICADO",
+                    "Ya existe un registro activo con los mismos datos."
+            );
+        }
+
+        if (duplicatedSlug) {
+            throw new ConflictException(
+                    "CATEGORIA_SLUG_DUPLICADO",
+                    "Ya existe un registro activo con los mismos datos."
+            );
         }
     }
 }

@@ -7,7 +7,6 @@ import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
 import com.upsjb.ms3.shared.specification.BooleanCriteria;
 import com.upsjb.ms3.shared.specification.DateRangeCriteria;
 import com.upsjb.ms3.shared.specification.SpecificationBuilder;
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -24,14 +23,25 @@ public final class PrecioSkuSpecifications {
         }
 
         return SpecificationBuilder.<PrecioSkuHistorial>create()
+                .textSearch(
+                        filter.search(),
+                        "sku.codigoSku",
+                        "sku.barcode",
+                        "sku.producto.codigoProducto",
+                        "sku.producto.nombre",
+                        "motivo"
+                )
+                .equal("idPrecioHistorial", filter.idPrecioHistorial())
                 .equal("sku.idSku", filter.idSku())
                 .like("sku.codigoSku", filter.codigoSku())
                 .equal("sku.producto.idProducto", filter.idProducto())
                 .like("sku.producto.codigoProducto", filter.codigoProducto())
                 .equal("moneda", filter.moneda())
                 .bool("vigente", BooleanCriteria.of(filter.vigente()))
+                .equal("creadoPorIdUsuarioMs1", filter.creadoPorIdUsuarioMs1())
                 .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
                 .range("fechaInicio", toDateTimeRange(filter.fechaInicio()))
+                .range("fechaFin", toDateTimeRange(filter.fechaFin()))
                 .range("createdAt", toDateTimeRange(filter.fechaCreacion()))
                 .build();
     }
@@ -45,6 +55,7 @@ public final class PrecioSkuSpecifications {
 
     public static Specification<PrecioSkuHistorial> bySku(Long idSku) {
         return SpecificationBuilder.<PrecioSkuHistorial>create()
+                .activeOnly()
                 .equal("sku.idSku", idSku)
                 .build();
     }
@@ -55,25 +66,8 @@ public final class PrecioSkuSpecifications {
         }
 
         return DateRangeCriteria.of(
-                readDateTime(filter, "from", "desde", "fechaDesde", "inicio", "start", "fechaInicio"),
-                readDateTime(filter, "to", "hasta", "fechaHasta", "fin", "end", "fechaFin")
+                filter.fechaInicio(),
+                filter.fechaFin()
         );
-    }
-
-    private static LocalDateTime readDateTime(DateRangeFilterDto filter, String... methodNames) {
-        for (String methodName : methodNames) {
-            try {
-                Method method = filter.getClass().getMethod(methodName);
-                Object value = method.invoke(filter);
-
-                if (value instanceof LocalDateTime dateTime) {
-                    return dateTime;
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // Se intenta con el siguiente nombre soportado.
-            }
-        }
-
-        return null;
     }
 }

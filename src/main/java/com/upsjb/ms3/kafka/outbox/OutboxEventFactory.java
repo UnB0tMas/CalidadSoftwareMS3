@@ -13,6 +13,7 @@ import com.upsjb.ms3.kafka.producer.KafkaEventKeyResolver;
 import com.upsjb.ms3.kafka.producer.KafkaTopicResolver;
 import com.upsjb.ms3.mapper.EventoDominioOutboxMapper;
 import com.upsjb.ms3.validator.EventoDominioOutboxValidator;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +40,7 @@ public class OutboxEventFactory {
         validator.validateCreate(aggregateType, aggregateId, eventType, topic, eventKey, payloadJson);
 
         return mapper.toEntity(
+                UUID.randomUUID(),
                 aggregateType,
                 aggregateId,
                 eventType,
@@ -49,6 +51,10 @@ public class OutboxEventFactory {
     }
 
     public EventoDominioOutbox createEnvelope(DomainEventEnvelope<?> envelope) {
+        if (envelope == null) {
+            throw new IllegalArgumentException("El envelope del evento outbox es obligatorio.");
+        }
+
         String topic = topicResolver.resolve(envelope.aggregateType(), envelope.eventType());
         String eventKey = keyResolver.resolve(envelope);
         String payloadJson = serializer.toEnvelopeJson(envelope);
@@ -63,6 +69,7 @@ public class OutboxEventFactory {
         );
 
         return mapper.toEntity(
+                envelope.eventId(),
                 envelope.aggregateType(),
                 envelope.aggregateId(),
                 envelope.eventType(),
@@ -73,22 +80,42 @@ public class OutboxEventFactory {
     }
 
     public EventoDominioOutbox create(ProductoSnapshotEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("El evento de producto es obligatorio.");
+        }
+
         return createEnvelope(event.envelope());
     }
 
     public EventoDominioOutbox create(PrecioSnapshotEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("El evento de precio es obligatorio.");
+        }
+
         return createEnvelope(event.envelope());
     }
 
     public EventoDominioOutbox create(PromocionSnapshotEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("El evento de promoción es obligatorio.");
+        }
+
         return createEnvelope(event.envelope());
     }
 
     public EventoDominioOutbox create(StockSnapshotEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("El evento de stock es obligatorio.");
+        }
+
         return createEnvelope(event.envelope());
     }
 
     public EventoDominioOutbox create(MovimientoInventarioEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("El evento de movimiento de inventario es obligatorio.");
+        }
+
         return createEnvelope(event.envelope());
     }
 }

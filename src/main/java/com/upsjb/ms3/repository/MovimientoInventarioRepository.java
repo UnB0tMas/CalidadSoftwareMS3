@@ -11,18 +11,39 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.domain.Specification;
 
 public interface MovimientoInventarioRepository extends
         JpaRepository<MovimientoInventario, Long>,
         JpaSpecificationExecutor<MovimientoInventario> {
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
+    @Override
+    Page<MovimientoInventario> findAll(Specification<MovimientoInventario> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Optional<MovimientoInventario> findByIdMovimientoAndEstadoTrue(Long idMovimiento);
 
     Optional<MovimientoInventario> findByCodigoMovimientoIgnoreCaseAndEstadoTrue(String codigoMovimiento);
 
     boolean existsByCodigoMovimientoIgnoreCaseAndEstadoTrue(String codigoMovimiento);
+
+    boolean existsByAlmacen_IdAlmacenAndEstadoTrue(Long idAlmacen);
 
     boolean existsByReferenciaTipoAndReferenciaIdExternoAndTipoMovimientoAndEstadoTrue(
             String referenciaTipo,
@@ -38,10 +59,31 @@ public interface MovimientoInventarioRepository extends
             Long idAlmacen
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findBySku_IdSkuAndEstadoTrue(Long idSku, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByAlmacen_IdAlmacenAndEstadoTrue(Long idAlmacen, Pageable pageable);
 
     Page<MovimientoInventario> findByTipoMovimientoAndEstadoTrue(
@@ -59,6 +101,13 @@ public interface MovimientoInventarioRepository extends
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByReferenciaTipoAndReferenciaIdExternoAndEstadoTrue(
             String referenciaTipo,
             String referenciaIdExterno,

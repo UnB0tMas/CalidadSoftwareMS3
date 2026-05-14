@@ -26,47 +26,70 @@ public class AtributoValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
-
-        if (tipoDato == null) {
-            errors.add("tipoDato", "El tipo de dato del atributo es obligatorio.", "REQUIRED", null);
-        }
-
-        if (StringNormalizer.hasText(unidadMedida) && StringNormalizer.clean(unidadMedida).length() > 30) {
-            errors.add("unidadMedida", "La unidad de medida no debe superar 30 caracteres.", "MAX_LENGTH", unidadMedida);
-        }
+        validateTipoDato(tipoDato, errors);
+        validateUnidadMedida(unidadMedida, errors);
 
         errors.throwIfAny("No se puede crear el atributo.");
 
-        requireNotDuplicated(duplicatedCodigo, "Ya existe un atributo activo con el mismo código.");
-        requireNotDuplicated(duplicatedNombre, "Ya existe un atributo activo con el mismo nombre.");
+        if (duplicatedCodigo) {
+            throw new ConflictException(
+                    "ATRIBUTO_CODIGO_DUPLICADO",
+                    "Ya existe un atributo activo con el mismo código."
+            );
+        }
+
+        if (duplicatedNombre) {
+            throw new ConflictException(
+                    "ATRIBUTO_NOMBRE_DUPLICADO",
+                    "Ya existe un atributo activo con el mismo nombre."
+            );
+        }
     }
 
     public void validateUpdate(
             Atributo atributo,
+            String codigo,
             String nombre,
             TipoDatoAtributo tipoDato,
+            String unidadMedida,
+            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean hasExistingValues
     ) {
         requireActive(atributo);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
-        validateNombre(nombre, errors);
 
-        if (tipoDato == null) {
-            errors.add("tipoDato", "El tipo de dato del atributo es obligatorio.", "REQUIRED", null);
-        }
+        validateCodigo(codigo, errors);
+        validateNombre(nombre, errors);
+        validateTipoDato(tipoDato, errors);
+        validateUnidadMedida(unidadMedida, errors);
 
         errors.throwIfAny("No se puede actualizar el atributo.");
 
-        if (hasExistingValues && atributo.getTipoDato() != null && !atributo.getTipoDato().equals(tipoDato)) {
+        if (hasExistingValues
+                && atributo.getTipoDato() != null
+                && tipoDato != null
+                && !atributo.getTipoDato().equals(tipoDato)) {
             throw new ConflictException(
                     "ATRIBUTO_TIPO_DATO_NO_EDITABLE",
                     "No se puede cambiar el tipo de dato porque el atributo ya tiene valores registrados."
             );
         }
 
-        requireNotDuplicated(duplicatedNombre, "Ya existe otro atributo activo con el mismo nombre.");
+        if (duplicatedCodigo) {
+            throw new ConflictException(
+                    "ATRIBUTO_CODIGO_DUPLICADO",
+                    "Ya existe otro atributo activo con el mismo código."
+            );
+        }
+
+        if (duplicatedNombre) {
+            throw new ConflictException(
+                    "ATRIBUTO_NOMBRE_DUPLICADO",
+                    "Ya existe otro atributo activo con el mismo nombre."
+            );
+        }
     }
 
     public void validateValueByType(
@@ -91,7 +114,10 @@ public class AtributoValidator {
         boolean hasBoolean = valorBoolean != null;
         boolean hasDate = valorFecha != null;
 
-        int filled = (hasText ? 1 : 0) + (hasNumber ? 1 : 0) + (hasBoolean ? 1 : 0) + (hasDate ? 1 : 0);
+        int filled = (hasText ? 1 : 0)
+                + (hasNumber ? 1 : 0)
+                + (hasBoolean ? 1 : 0)
+                + (hasDate ? 1 : 0);
 
         if (filled == 0 && Boolean.TRUE.equals(atributo.getRequerido())) {
             throw new ConflictException(
@@ -124,13 +150,28 @@ public class AtributoValidator {
         }
     }
 
-    public void validateCanDeactivate(Atributo atributo, boolean hasActiveAssociations, boolean hasExistingValues) {
+    public void validateCanDeactivate(
+            Atributo atributo,
+            boolean hasActiveAssociations,
+            boolean hasExistingValues
+    ) {
         requireActive(atributo);
 
         if (hasActiveAssociations || hasExistingValues) {
             throw new ConflictException(
                     "ATRIBUTO_EN_USO",
                     "No se puede inactivar el atributo porque está asociado o tiene valores registrados."
+            );
+        }
+    }
+
+    public void validateCanActivate(Atributo atributo) {
+        requireExists(atributo);
+
+        if (atributo.isActivo()) {
+            throw new ConflictException(
+                    "ATRIBUTO_YA_ACTIVO",
+                    "El atributo ya se encuentra activo."
             );
         }
     }
@@ -146,11 +187,11 @@ public class AtributoValidator {
         }
     }
 
-    private void requireExists(Atributo atributo) {
+    public void requireExists(Atributo atributo) {
         if (atributo == null) {
             throw new NotFoundException(
                     "ATRIBUTO_NO_ENCONTRADO",
-                    "Atributo no encontrado."
+                    "No se encontró el registro solicitado."
             );
         }
     }
@@ -161,7 +202,8 @@ public class AtributoValidator {
             return;
         }
 
-        if (StringNormalizer.clean(codigo).length() > 50) {
+        String normalized = StringNormalizer.clean(codigo);
+        if (normalized.length() > 50) {
             errors.add("codigo", "El código no debe superar 50 caracteres.", "MAX_LENGTH", codigo);
         }
     }
@@ -172,14 +214,31 @@ public class AtributoValidator {
             return;
         }
 
-        if (StringNormalizer.clean(nombre).length() > 120) {
+        String normalized = StringNormalizer.clean(nombre);
+        if (normalized.length() > 120) {
             errors.add("nombre", "El nombre no debe superar 120 caracteres.", "MAX_LENGTH", nombre);
         }
     }
 
-    private void requireNotDuplicated(boolean duplicated, String message) {
-        if (duplicated) {
-            throw new ConflictException("ATRIBUTO_DUPLICADO", message);
+    private void validateTipoDato(TipoDatoAtributo tipoDato, ValidationErrorCollector errors) {
+        if (tipoDato == null) {
+            errors.add("tipoDato", "El tipo de dato del atributo es obligatorio.", "REQUIRED", null);
+        }
+    }
+
+    private void validateUnidadMedida(String unidadMedida, ValidationErrorCollector errors) {
+        if (!StringNormalizer.hasText(unidadMedida)) {
+            return;
+        }
+
+        String normalized = StringNormalizer.clean(unidadMedida);
+        if (normalized.length() > 30) {
+            errors.add(
+                    "unidadMedida",
+                    "La unidad de medida no debe superar 30 caracteres.",
+                    "MAX_LENGTH",
+                    unidadMedida
+            );
         }
     }
 

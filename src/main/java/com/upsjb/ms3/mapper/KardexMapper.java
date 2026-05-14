@@ -17,10 +17,22 @@ import org.springframework.stereotype.Component;
 public class KardexMapper {
 
     public KardexResponseDto toResponse(MovimientoInventario entity) {
-        return toResponse(entity, Moneda.PEN);
+        return toResponse(entity, Moneda.PEN, true);
+    }
+
+    public KardexResponseDto toResponse(MovimientoInventario entity, Boolean includeCosts) {
+        return toResponse(entity, Moneda.PEN, Boolean.TRUE.equals(includeCosts));
     }
 
     public KardexResponseDto toResponse(MovimientoInventario entity, Moneda moneda) {
+        return toResponse(entity, moneda, true);
+    }
+
+    public KardexResponseDto toResponse(
+            MovimientoInventario entity,
+            Moneda moneda,
+            boolean includeCosts
+    ) {
         if (entity == null) {
             return null;
         }
@@ -52,8 +64,8 @@ public class KardexMapper {
                 .stockAnterior(defaultInteger(entity.getStockAnterior()))
                 .stockNuevo(defaultInteger(entity.getStockNuevo()))
                 .variacionStock(resolveVariacion(entity))
-                .costoUnitario(toMoney(entity.getCostoUnitario(), moneda))
-                .costoTotal(toMoney(entity.getCostoTotal(), moneda))
+                .costoUnitario(includeCosts ? toMoney(entity.getCostoUnitario(), moneda) : null)
+                .costoTotal(includeCosts ? toMoney(entity.getCostoTotal(), moneda) : null)
                 .referenciaTipo(entity.getReferenciaTipo())
                 .referenciaIdExterno(entity.getReferenciaIdExterno())
                 .observacion(entity.getObservacion())
@@ -70,16 +82,20 @@ public class KardexMapper {
     }
 
     public List<KardexResponseDto> toResponseList(List<MovimientoInventario> entities) {
-        return toResponseList(entities, Moneda.PEN);
+        return toResponseList(entities, Moneda.PEN, true);
     }
 
-    public List<KardexResponseDto> toResponseList(List<MovimientoInventario> entities, Moneda moneda) {
+    public List<KardexResponseDto> toResponseList(
+            List<MovimientoInventario> entities,
+            Moneda moneda,
+            boolean includeCosts
+    ) {
         if (entities == null || entities.isEmpty()) {
             return List.of();
         }
 
         return entities.stream()
-                .map(entity -> toResponse(entity, moneda))
+                .map(entity -> toResponse(entity, moneda, includeCosts))
                 .toList();
     }
 

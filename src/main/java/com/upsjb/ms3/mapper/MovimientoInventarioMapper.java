@@ -174,7 +174,9 @@ public class MovimientoInventarioMapper {
             return null;
         }
 
-        BigDecimal costoTotal = multiply(request.costoUnitario(), request.cantidad());
+        BigDecimal costoTotal = request.tipoMovimiento() != null && request.tipoMovimiento().isEntradaFisica()
+                ? multiply(request.costoUnitario(), request.cantidad())
+                : null;
 
         return toEntity(
                 codigoMovimiento,
@@ -185,7 +187,9 @@ public class MovimientoInventarioMapper {
                 request.tipoMovimiento(),
                 request.motivoMovimiento(),
                 request.cantidad(),
-                request.costoUnitario(),
+                request.tipoMovimiento() != null && request.tipoMovimiento().isEntradaFisica()
+                        ? request.costoUnitario()
+                        : null,
                 costoTotal,
                 stockAnterior,
                 stockNuevo,
@@ -201,12 +205,20 @@ public class MovimientoInventarioMapper {
     }
 
     public MovimientoInventarioResponseDto toResponse(MovimientoInventario entity) {
-        return toResponse(entity, Moneda.PEN);
+        return toResponse(entity, Moneda.PEN, true);
     }
 
     public MovimientoInventarioResponseDto toResponse(
             MovimientoInventario entity,
             Moneda moneda
+    ) {
+        return toResponse(entity, moneda, true);
+    }
+
+    public MovimientoInventarioResponseDto toResponse(
+            MovimientoInventario entity,
+            Moneda moneda,
+            boolean includeCosts
     ) {
         if (entity == null) {
             return null;
@@ -232,8 +244,8 @@ public class MovimientoInventarioMapper {
                 .tipoMovimiento(entity.getTipoMovimiento())
                 .motivoMovimiento(entity.getMotivoMovimiento())
                 .cantidad(entity.getCantidad())
-                .costoUnitario(toMoney(entity.getCostoUnitario(), moneda))
-                .costoTotal(toMoney(entity.getCostoTotal(), moneda))
+                .costoUnitario(includeCosts ? toMoney(entity.getCostoUnitario(), moneda) : null)
+                .costoTotal(includeCosts ? toMoney(entity.getCostoTotal(), moneda) : null)
                 .stockAnterior(entity.getStockAnterior())
                 .stockNuevo(entity.getStockNuevo())
                 .variacionStock(variacionStock(entity))
@@ -253,12 +265,20 @@ public class MovimientoInventarioMapper {
     }
 
     public KardexResponseDto toKardexResponse(MovimientoInventario entity) {
-        return toKardexResponse(entity, Moneda.PEN);
+        return toKardexResponse(entity, Moneda.PEN, true);
     }
 
     public KardexResponseDto toKardexResponse(
             MovimientoInventario entity,
             Moneda moneda
+    ) {
+        return toKardexResponse(entity, moneda, true);
+    }
+
+    public KardexResponseDto toKardexResponse(
+            MovimientoInventario entity,
+            Moneda moneda,
+            boolean includeCosts
     ) {
         if (entity == null) {
             return null;
@@ -273,6 +293,7 @@ public class MovimientoInventarioMapper {
                 .idMovimiento(entity.getIdMovimiento())
                 .fechaMovimiento(entity.getCreatedAt())
                 .codigoMovimiento(entity.getCodigoMovimiento())
+                .codigoGenerado(entity.getCodigoGenerado())
                 .idSku(sku == null ? null : sku.getIdSku())
                 .codigoSku(sku == null ? null : sku.getCodigoSku())
                 .codigoProducto(producto == null ? null : producto.getCodigoProducto())
@@ -280,6 +301,8 @@ public class MovimientoInventarioMapper {
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
                 .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
                 .nombreAlmacen(almacen == null ? null : almacen.getNombre())
+                .idCompraDetalle(entity.getCompraDetalle() == null ? null : entity.getCompraDetalle().getIdCompraDetalle())
+                .idReservaStock(entity.getReservaStock() == null ? null : entity.getReservaStock().getIdReservaStock())
                 .tipoMovimiento(tipo)
                 .motivoMovimiento(entity.getMotivoMovimiento())
                 .entrada(tipo != null && tipo.isEntradaFisica() ? entity.getCantidad() : 0)
@@ -287,8 +310,9 @@ public class MovimientoInventarioMapper {
                 .cantidad(entity.getCantidad())
                 .stockAnterior(entity.getStockAnterior())
                 .stockNuevo(entity.getStockNuevo())
-                .costoUnitario(toMoney(entity.getCostoUnitario(), moneda))
-                .costoTotal(toMoney(entity.getCostoTotal(), moneda))
+                .variacionStock(variacionStock(entity))
+                .costoUnitario(includeCosts ? toMoney(entity.getCostoUnitario(), moneda) : null)
+                .costoTotal(includeCosts ? toMoney(entity.getCostoTotal(), moneda) : null)
                 .referenciaTipo(entity.getReferenciaTipo())
                 .referenciaIdExterno(entity.getReferenciaIdExterno())
                 .observacion(entity.getObservacion())
@@ -298,6 +322,9 @@ public class MovimientoInventarioMapper {
                 .estadoMovimiento(entity.getEstadoMovimiento())
                 .requestId(entity.getRequestId())
                 .correlationId(entity.getCorrelationId())
+                .estado(entity.getEstado())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
                 .build();
     }
 

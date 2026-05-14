@@ -51,7 +51,8 @@ public final class EventoDominioOutboxSpecifications {
                         SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaBloqueo", "lockedAt")
                 ))
                 .and(conError(SpecificationFilterSupport.bool(filter, "conError")))
-                .and(bloqueadosOnly(SpecificationFilterSupport.bool(filter, "bloqueado", "locked")))
+                .and(bloqueadosOnly(SpecificationFilterSupport.bool(filter, "bloqueado", "bloqueados", "locked")))
+                .and(reintentablesOnly(SpecificationFilterSupport.bool(filter, "soloReintentables")))
                 .build();
     }
 
@@ -113,6 +114,19 @@ public final class EventoDominioOutboxSpecifications {
             }
 
             return cb.isNull(root.get("lockedAt"));
+        };
+    }
+
+    public static Specification<EventoDominioOutbox> reintentablesOnly(Boolean soloReintentables) {
+        return (root, query, cb) -> {
+            if (!Boolean.TRUE.equals(soloReintentables)) {
+                return cb.conjunction();
+            }
+
+            return root.get("estadoPublicacion").in(
+                    EstadoPublicacionEvento.PENDIENTE,
+                    EstadoPublicacionEvento.ERROR
+            );
         };
     }
 

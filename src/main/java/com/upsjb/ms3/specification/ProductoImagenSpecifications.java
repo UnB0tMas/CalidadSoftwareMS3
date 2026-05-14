@@ -2,6 +2,7 @@
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
+import com.upsjb.ms3.dto.catalogo.producto.filter.ProductoImagenFilterDto;
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
 import com.upsjb.ms3.shared.specification.BooleanCriteria;
 import com.upsjb.ms3.shared.specification.DateRangeCriteria;
@@ -13,6 +14,54 @@ import org.springframework.data.jpa.domain.Specification;
 public final class ProductoImagenSpecifications {
 
     private ProductoImagenSpecifications() {
+    }
+
+    public static Specification<ProductoImagenCloudinary> fromFilter(ProductoImagenFilterDto filter) {
+        if (filter == null) {
+            return activeOnly();
+        }
+
+        Specification<ProductoImagenCloudinary> specification = SpecificationBuilder.<ProductoImagenCloudinary>create()
+                .textSearch(
+                        filter.search(),
+                        "cloudinaryPublicId",
+                        "cloudinaryAssetId",
+                        "secureUrl",
+                        "originalFilename",
+                        "altText",
+                        "titulo",
+                        "producto.codigoProducto",
+                        "producto.slug",
+                        "producto.nombre",
+                        "sku.codigoSku",
+                        "sku.barcode"
+                )
+                .equal("idImagen", filter.idImagen())
+                .equal("producto.idProducto", filter.idProducto())
+                .like("producto.codigoProducto", filter.codigoProducto())
+                .like("producto.slug", filter.slugProducto())
+                .equal("sku.idSku", filter.idSku())
+                .like("sku.codigoSku", filter.codigoSku())
+                .like("sku.barcode", filter.barcode())
+                .like("cloudinaryPublicId", filter.cloudinaryPublicId())
+                .like("cloudinaryAssetId", filter.cloudinaryAssetId())
+                .like("resourceType", filter.resourceType())
+                .like("format", filter.format())
+                .equal("principal", filter.principal())
+                .equal("creadoPorIdUsuarioMs1", filter.creadoPorIdUsuarioMs1())
+                .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
+                .range("createdAt", toDateTimeRange(filter.fechaCreacion()))
+                .build();
+
+        if (Boolean.TRUE.equals(filter.soloProductoBase())) {
+            specification = specification.and(byProductoBase(filter.idProducto()));
+        }
+
+        if (Boolean.TRUE.equals(filter.soloSku())) {
+            specification = specification.and((root, query, cb) -> cb.isNotNull(root.get("sku")));
+        }
+
+        return specification;
     }
 
     public static Specification<ProductoImagenCloudinary> activeOnly() {
@@ -35,7 +84,7 @@ public final class ProductoImagenSpecifications {
 
     public static Specification<ProductoImagenCloudinary> byProductoBase(Long idProducto) {
         return (root, query, cb) -> idProducto == null
-                ? cb.conjunction()
+                ? cb.isNull(root.get("sku"))
                 : cb.and(
                 cb.equal(root.get("producto").get("idProducto"), idProducto),
                 cb.isNull(root.get("sku"))
