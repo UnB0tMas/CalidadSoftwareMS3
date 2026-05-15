@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.specification;
+package com.upsjb.ms3.shared.specification;
 
 public record NumericRangeCriteria<N extends Number & Comparable<? super N>>(
         N min,

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/almacen/request/AlmacenUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/almacen/request/AlmacenUpdateRequestDto.java
 package com.upsjb.ms3.dto.inventario.almacen.request;
 
 import jakarta.validation.constraints.NotBlank;

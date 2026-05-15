@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/ProductoSkuValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/ProductoSkuValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Producto;
@@ -47,6 +47,7 @@ public class ProductoSkuValidator {
 
     public void validateUpdate(
             ProductoSku sku,
+            EstadoSku requestedEstadoSku,
             String barcode,
             Integer stockMinimo,
             Integer stockMaximo,
@@ -57,6 +58,8 @@ public class ProductoSkuValidator {
             boolean duplicatedBarcode
     ) {
         requireActive(sku);
+
+        validateStateUpdate(sku, requestedEstadoSku);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
@@ -70,6 +73,53 @@ public class ProductoSkuValidator {
         errors.throwIfAny("No se puede actualizar el SKU.");
 
         requireNotDuplicated(duplicatedBarcode, "Ya existe otro SKU activo con el mismo barcode.");
+    }
+
+    public void validateUpdate(
+            ProductoSku sku,
+            String barcode,
+            Integer stockMinimo,
+            Integer stockMaximo,
+            BigDecimal pesoGramos,
+            BigDecimal altoCm,
+            BigDecimal anchoCm,
+            BigDecimal largoCm,
+            boolean duplicatedBarcode
+    ) {
+        validateUpdate(
+                sku,
+                null,
+                barcode,
+                stockMinimo,
+                stockMaximo,
+                pesoGramos,
+                altoCm,
+                anchoCm,
+                largoCm,
+                duplicatedBarcode
+        );
+    }
+
+    private void validateStateUpdate(ProductoSku sku, EstadoSku requestedEstadoSku) {
+        EstadoSku currentEstadoSku = sku.getEstadoSku();
+
+        if (currentEstadoSku == EstadoSku.DESCONTINUADO && requestedEstadoSku != EstadoSku.DESCONTINUADO) {
+            throw new ConflictException(
+                    "SKU_DESCONTINUADO_NO_EDITABLE",
+                    "No se puede actualizar porque el estado actual no lo permite."
+            );
+        }
+
+        if (requestedEstadoSku == null) {
+            return;
+        }
+
+        if (requestedEstadoSku == EstadoSku.INACTIVO) {
+            throw new ConflictException(
+                    "SKU_INACTIVACION_REQUIERE_FLUJO",
+                    "No se puede inactivar el SKU desde actualización. Use la operación de inactivación indicando motivo."
+            );
+        }
     }
 
     public void validateCanDeactivate(ProductoSku sku, boolean hasStock, boolean hasPendingReservations) {

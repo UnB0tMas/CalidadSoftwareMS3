@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/filter/AtributoFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/filter/AtributoFilterDto.java
 package com.upsjb.ms3.dto.catalogo.atributo.filter;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionVersionEstadoRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionVersionEstadoRequestDto.java
 package com.upsjb.ms3.dto.promocion.request;
 
 import com.upsjb.ms3.domain.enums.EstadoPromocion;

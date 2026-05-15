@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/CategoriaValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/CategoriaValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Categoria;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/reserva/request/ReservaStockCreateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/reserva/request/ReservaStockCreateRequestDto.java
 package com.upsjb.ms3.dto.inventario.reserva.request;
 
 import com.upsjb.ms3.domain.enums.TipoReferenciaStock;
@@ -37,6 +37,7 @@ public record ReservaStockCreateRequestDto(
         @Future(message = "La fecha de expiración debe ser futura.")
         LocalDateTime expiresAt,
 
+        @NotBlank(message = "El motivo de la reserva es obligatorio.")
         @Size(max = 500, message = "El motivo no debe superar 500 caracteres.")
         String motivo
 ) {

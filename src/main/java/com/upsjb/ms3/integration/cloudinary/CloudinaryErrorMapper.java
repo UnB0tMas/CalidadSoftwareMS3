@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryErrorMapper.java
+// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryErrorMapper.java
 package com.upsjb.ms3.integration.cloudinary;
 
 import java.io.IOException;

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.handler;
+package com.upsjb.ms3.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upsjb.ms3.security.filter.RequestTraceFilter;

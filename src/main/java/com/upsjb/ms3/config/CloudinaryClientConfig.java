@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.config;
+package com.upsjb.ms3.config;
 
 import com.cloudinary.Cloudinary;
 import java.util.HashMap;

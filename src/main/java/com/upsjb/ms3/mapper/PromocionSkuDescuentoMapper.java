@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/PromocionSkuDescuentoMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/PromocionSkuDescuentoMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Producto;
@@ -60,6 +60,27 @@ public class PromocionSkuDescuentoMapper {
             MoneyResponseDto precioBase,
             Moneda moneda
     ) {
+        return toResponse(entity, precioBase, moneda, true);
+    }
+
+    public PromocionSkuDescuentoResponseDto toPublicResponse(
+            PromocionSkuDescuentoVersion entity,
+            MoneyResponseDto precioBase,
+            Moneda moneda
+    ) {
+        return toResponse(entity, precioBase, moneda, false);
+    }
+
+    public PromocionSkuDescuentoResponseDto toResponse(PromocionSkuDescuentoVersion entity) {
+        return toResponse(entity, null, Moneda.PEN, true);
+    }
+
+    private PromocionSkuDescuentoResponseDto toResponse(
+            PromocionSkuDescuentoVersion entity,
+            MoneyResponseDto precioBase,
+            Moneda moneda,
+            boolean includeInternalMargin
+    ) {
         if (entity == null) {
             return null;
         }
@@ -84,17 +105,13 @@ public class PromocionSkuDescuentoMapper {
                 .valorDescuento(entity.getValorDescuento())
                 .precioBase(precioBase)
                 .precioFinalEstimado(toMoney(entity.getPrecioFinalEstimado(), monedaFinal))
-                .margenEstimado(toMoney(entity.getMargenEstimado(), monedaFinal))
+                .margenEstimado(includeInternalMargin ? toMoney(entity.getMargenEstimado(), monedaFinal) : null)
                 .limiteUnidades(entity.getLimiteUnidades())
                 .prioridad(entity.getPrioridad())
                 .estado(entity.getEstado())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-    }
-
-    public PromocionSkuDescuentoResponseDto toResponse(PromocionSkuDescuentoVersion entity) {
-        return toResponse(entity, null, Moneda.PEN);
     }
 
     private MoneyResponseDto toMoney(BigDecimal amount, Moneda moneda) {

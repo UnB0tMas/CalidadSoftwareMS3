@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/ProductoRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/ProductoRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.Producto;
@@ -78,9 +78,23 @@ public interface ProductoRepository extends
 
     Page<Producto> findByTipoProducto_IdTipoProductoAndEstadoTrue(Long idTipoProducto, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
+    List<Producto> findByTipoProducto_IdTipoProductoAndEstadoTrueOrderByIdProductoAsc(Long idTipoProducto);
+
     Page<Producto> findByCategoria_IdCategoriaAndEstadoTrue(Long idCategoria, Pageable pageable);
 
     Page<Producto> findByMarca_IdMarcaAndEstadoTrue(Long idMarca, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "tipoProducto",
+            "categoria",
+            "marca"
+    })
+    List<Producto> findByMarca_IdMarcaAndEstadoTrueOrderByIdProductoAsc(Long idMarca);
 
     List<Producto> findByEstadoRegistroAndEstadoTrueOrderByUpdatedAtDesc(EstadoProductoRegistro estadoRegistro);
 

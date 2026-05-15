@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.pagination;
+package com.upsjb.ms3.shared.pagination;
 
 import java.util.List;
 import java.util.function.Function;

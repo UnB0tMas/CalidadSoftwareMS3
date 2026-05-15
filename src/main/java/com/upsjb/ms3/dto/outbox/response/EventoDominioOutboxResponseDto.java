@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/outbox/response/EventoDominioOutboxResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/outbox/response/EventoDominioOutboxResponseDto.java
 package com.upsjb.ms3.dto.outbox.response;
 
 import com.upsjb.ms3.domain.enums.AggregateType;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/SkuAtributoValorMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/SkuAtributoValorMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -89,10 +89,14 @@ public class SkuAtributoValorMapper {
             return null;
         }
 
-        return switch (entity.getAtributo().getTipoDato()) {
+        TipoDatoAtributo tipoDato = entity.getAtributo().getTipoDato();
+
+        return switch (tipoDato) {
             case TEXTO -> entity.getValorTexto();
-            case NUMERO -> entity.getValorNumero() == null ? null : entity.getValorNumero().toPlainString();
-            case BOOLEAN -> entity.getValorBoolean() == null ? null : entity.getValorBoolean().toString();
+            case NUMERO, DECIMAL -> entity.getValorNumero() == null
+                    ? null
+                    : entity.getValorNumero().stripTrailingZeros().toPlainString();
+            case BOOLEANO -> entity.getValorBoolean() == null ? null : entity.getValorBoolean().toString();
             case FECHA -> entity.getValorFecha() == null ? null : entity.getValorFecha().toString();
         };
     }

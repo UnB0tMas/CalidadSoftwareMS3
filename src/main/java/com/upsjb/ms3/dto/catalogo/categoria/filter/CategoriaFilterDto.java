@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/filter/CategoriaFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/filter/CategoriaFilterDto.java
 package com.upsjb.ms3.dto.catalogo.categoria.filter;
 
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;

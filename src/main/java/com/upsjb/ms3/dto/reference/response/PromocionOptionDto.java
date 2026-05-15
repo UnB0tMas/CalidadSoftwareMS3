@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/reference/response/PromocionOptionDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/reference/response/PromocionOptionDto.java
 package com.upsjb.ms3.dto.reference.response;
 
 import lombok.Builder;

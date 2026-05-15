@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.jwt;
+package com.upsjb.ms3.security.jwt;
 
 public final class JwtClaimNames {
 

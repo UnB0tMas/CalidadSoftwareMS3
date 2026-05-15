@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.validation;
+package com.upsjb.ms3.shared.validation;
 
 import com.upsjb.ms3.shared.exception.ValidationException;
 import java.util.Collection;

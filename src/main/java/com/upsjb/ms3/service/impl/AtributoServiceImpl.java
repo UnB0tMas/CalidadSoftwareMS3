@@ -1,7 +1,9 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/AtributoServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/AtributoServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Atributo;
+import com.upsjb.ms3.domain.entity.TipoProducto;
+import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
@@ -20,7 +22,6 @@ import com.upsjb.ms3.mapper.AtributoMapper;
 import com.upsjb.ms3.mapper.TipoProductoAtributoMapper;
 import com.upsjb.ms3.policy.AtributoPolicy;
 import com.upsjb.ms3.repository.AtributoRepository;
-import com.upsjb.ms3.repository.EmpleadoInventarioPermisoHistorialRepository;
 import com.upsjb.ms3.repository.ProductoAtributoValorRepository;
 import com.upsjb.ms3.repository.SkuAtributoValorRepository;
 import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
@@ -28,19 +29,21 @@ import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AtributoService;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
+import com.upsjb.ms3.service.contract.EmpleadoInventarioPermisoService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
+import com.upsjb.ms3.shared.outbox.ProductoSnapshotOutboxRegistrar;
 import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.AtributoSpecifications;
 import com.upsjb.ms3.util.StringNormalizer;
+import com.upsjb.ms3.validator.AtributoValidator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
-import com.upsjb.ms3.validator.AtributoValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -73,13 +76,14 @@ public class AtributoServiceImpl implements AtributoService {
     private final ProductoAtributoValorRepository productoAtributoValorRepository;
     private final SkuAtributoValorRepository skuAtributoValorRepository;
     private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
-    private final EmpleadoInventarioPermisoHistorialRepository empleadoInventarioPermisoHistorialRepository;
     private final AtributoMapper atributoMapper;
     private final TipoProductoAtributoMapper tipoProductoAtributoMapper;
     private final AtributoValidator atributoValidator;
     private final AtributoPolicy atributoPolicy;
     private final CurrentUserResolver currentUserResolver;
+    private final EmpleadoInventarioPermisoService empleadoInventarioPermisoService;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
+    private final ProductoSnapshotOutboxRegistrar productoSnapshotOutboxRegistrar;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
 
@@ -87,7 +91,7 @@ public class AtributoServiceImpl implements AtributoService {
     @Transactional
     public ApiResponseDto<AtributoResponseDto> crear(AtributoCreateRequestDto request) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        atributoPolicy.ensureCanCreate(actor);
+        atributoPolicy.ensureCanCreate(actor, employeeCanUpdateAttributes(actor));
 
         AtributoCreateRequestDto normalized = normalizeCreate(request);
 
@@ -129,11 +133,10 @@ public class AtributoServiceImpl implements AtributoService {
     @Transactional
     public ApiResponseDto<AtributoResponseDto> actualizar(Long idAtributo, AtributoUpdateRequestDto request) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        boolean employeeCanUpdateAttributes = employeeCanUpdateAttributes(actor);
-        atributoPolicy.ensureCanUpdate(actor, employeeCanUpdateAttributes);
+        atributoPolicy.ensureCanUpdate(actor, employeeCanUpdateAttributes(actor));
 
         Atributo entity = findRequired(idAtributo);
-        AtributoUpdateRequestDto normalized = normalizeUpdate(request);
+        AtributoUpdateRequestDto normalized = normalizeUpdate(request, entity);
 
         boolean hasExistingValues = hasExistingValues(entity.getIdAtributo());
 
@@ -155,11 +158,11 @@ public class AtributoServiceImpl implements AtributoService {
         );
 
         Map<String, Object> before = Map.of(
-                "codigo", safe(entity.getCodigo()),
-                "nombre", safe(entity.getNombre()),
-                "tipoDato", entity.getTipoDato() == null ? "" : entity.getTipoDato().getCode(),
-                "filtrable", Boolean.TRUE.equals(entity.getFiltrable()),
-                "visiblePublico", Boolean.TRUE.equals(entity.getVisiblePublico())
+                "codigoAnterior", safe(entity.getCodigo()),
+                "nombreAnterior", safe(entity.getNombre()),
+                "tipoDatoAnterior", entity.getTipoDato() == null ? "" : entity.getTipoDato().getCode(),
+                "filtrableAnterior", Boolean.TRUE.equals(entity.getFiltrable()),
+                "visiblePublicoAnterior", Boolean.TRUE.equals(entity.getVisiblePublico())
         );
 
         atributoMapper.updateEntity(entity, normalized);
@@ -173,6 +176,8 @@ public class AtributoServiceImpl implements AtributoService {
                 "Atributo actualizado correctamente.",
                 auditMetadata(saved, actor, before)
         );
+
+        registrarOutboxAtributoAfectado(saved, "ACTUALIZAR_ATRIBUTO");
 
         log.info(
                 "Atributo actualizado. idAtributo={}, codigo={}, actor={}",
@@ -200,7 +205,8 @@ public class AtributoServiceImpl implements AtributoService {
             );
         }
 
-        requireMotivo(request.motivo());
+        String motivo = StringNormalizer.cleanOrNull(request.motivo());
+        requireMotivo(motivo);
 
         Atributo entity = findRequired(idAtributo);
 
@@ -212,8 +218,19 @@ public class AtributoServiceImpl implements AtributoService {
         }
 
         if (Boolean.TRUE.equals(request.estado())) {
-            atributoValidator.validateCanActivate(entity);
+            boolean duplicatedCodigo = atributoRepository.existsByCodigoIgnoreCaseAndEstadoTrueAndIdAtributoNot(
+                    entity.getCodigo(),
+                    entity.getIdAtributo()
+            );
+
+            boolean duplicatedNombre = atributoRepository.existsByNombreIgnoreCaseAndEstadoTrueAndIdAtributoNot(
+                    entity.getNombre(),
+                    entity.getIdAtributo()
+            );
+
+            atributoValidator.validateCanActivate(entity, duplicatedCodigo, duplicatedNombre);
             entity.activar();
+
             Atributo saved = atributoRepository.save(entity);
 
             auditoriaFuncionalService.registrarExito(
@@ -222,7 +239,16 @@ public class AtributoServiceImpl implements AtributoService {
                     String.valueOf(saved.getIdAtributo()),
                     "ACTIVAR_ATRIBUTO",
                     "Atributo activado correctamente.",
-                    auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                    auditMetadata(saved, actor, Map.of("motivo", motivo))
+            );
+
+            registrarOutboxAtributoAfectado(saved, "ACTIVAR_ATRIBUTO");
+
+            log.info(
+                    "Atributo activado. idAtributo={}, codigo={}, actor={}",
+                    saved.getIdAtributo(),
+                    saved.getCodigo(),
+                    actor.actorLabel()
             );
 
             return apiResponseFactory.dtoOk(
@@ -242,6 +268,7 @@ public class AtributoServiceImpl implements AtributoService {
         );
 
         entity.inactivar();
+
         Atributo saved = atributoRepository.save(entity);
 
         auditoriaFuncionalService.registrarExito(
@@ -250,7 +277,16 @@ public class AtributoServiceImpl implements AtributoService {
                 String.valueOf(saved.getIdAtributo()),
                 "INACTIVAR_ATRIBUTO",
                 "Atributo inactivado correctamente.",
-                auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                auditMetadata(saved, actor, Map.of("motivo", motivo))
+        );
+
+        registrarOutboxAtributoAfectado(saved, "INACTIVAR_ATRIBUTO");
+
+        log.info(
+                "Atributo inactivado. idAtributo={}, codigo={}, actor={}",
+                saved.getIdAtributo(),
+                saved.getCodigo(),
+                actor.actorLabel()
         );
 
         return apiResponseFactory.dtoOk(
@@ -352,14 +388,14 @@ public class AtributoServiceImpl implements AtributoService {
         );
 
         AtributoFilterDto filter = AtributoFilterDto.builder()
-                .search(search)
+                .search(StringNormalizer.cleanOrNull(search))
                 .estado(Boolean.TRUE)
                 .build();
 
         List<AtributoOptionDto> options = atributoRepository
                 .findAll(AtributoSpecifications.fromFilter(filter), pageable)
                 .stream()
-                .map(this::toOption)
+                .map(atributoMapper::toOption)
                 .toList();
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", options);
@@ -383,8 +419,8 @@ public class AtributoServiceImpl implements AtributoService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<AtributoResponseDto>> listarVisiblesPublico() {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        atributoPolicy.ensureCanViewAdmin(actor);
+        AuthenticatedUserContext actor = currentUserResolver.resolveOptional().orElse(null);
+        atributoPolicy.ensureCanViewPublic(actor);
 
         List<AtributoResponseDto> response = atributoRepository
                 .findByVisiblePublicoTrueAndEstadoTrueOrderByNombreAsc()
@@ -451,7 +487,7 @@ public class AtributoServiceImpl implements AtributoService {
                 .build();
     }
 
-    private AtributoUpdateRequestDto normalizeUpdate(AtributoUpdateRequestDto request) {
+    private AtributoUpdateRequestDto normalizeUpdate(AtributoUpdateRequestDto request, Atributo current) {
         if (request == null) {
             throw new ValidationException(
                     "ATRIBUTO_REQUEST_REQUERIDO",
@@ -464,9 +500,9 @@ public class AtributoServiceImpl implements AtributoService {
                 .nombre(StringNormalizer.clean(request.nombre()))
                 .tipoDato(request.tipoDato())
                 .unidadMedida(StringNormalizer.cleanOrNull(request.unidadMedida()))
-                .requerido(defaultBoolean(request.requerido(), false))
-                .filtrable(defaultBoolean(request.filtrable(), false))
-                .visiblePublico(defaultBoolean(request.visiblePublico(), true))
+                .requerido(defaultBoolean(request.requerido(), Boolean.TRUE.equals(current.getRequerido())))
+                .filtrable(defaultBoolean(request.filtrable(), Boolean.TRUE.equals(current.getFiltrable())))
+                .visiblePublico(defaultBoolean(request.visiblePublico(), Boolean.TRUE.equals(current.getVisiblePublico())))
                 .build();
     }
 
@@ -489,29 +525,42 @@ public class AtributoServiceImpl implements AtributoService {
     }
 
     private boolean employeeCanUpdateAttributes(AuthenticatedUserContext actor) {
-        if (actor == null || actor.getIdUsuarioMs1() == null || !actor.isEmpleado()) {
-            return false;
-        }
-
-        return empleadoInventarioPermisoHistorialRepository
-                .existsByEmpleadoSnapshot_IdUsuarioMs1AndVigenteTrueAndEstadoTrueAndPuedeActualizarAtributosTrue(
-                        actor.getIdUsuarioMs1()
-                );
+        return actor != null
+                && actor.getIdUsuarioMs1() != null
+                && actor.isEmpleado()
+                && empleadoInventarioPermisoService.puedeActualizarAtributos(actor.getIdUsuarioMs1());
     }
 
-    private AtributoOptionDto toOption(Atributo atributo) {
-        return AtributoOptionDto.builder()
-                .idAtributo(atributo.getIdAtributo())
-                .codigo(atributo.getCodigo())
-                .nombre(atributo.getNombre())
-                .tipoDato(atributo.getTipoDato())
-                .tipoDatoLabel(atributo.getTipoDato() == null ? null : atributo.getTipoDato().getLabel())
-                .unidadMedida(atributo.getUnidadMedida())
-                .requerido(atributo.getRequerido())
-                .filtrable(atributo.getFiltrable())
-                .visiblePublico(atributo.getVisiblePublico())
-                .estado(atributo.getEstado())
-                .build();
+    private void registrarOutboxAtributoAfectado(Atributo atributo, String accion) {
+        if (atributo == null || atributo.getIdAtributo() == null) {
+            return;
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("accion", accion);
+        metadata.put("idAtributo", atributo.getIdAtributo());
+        metadata.put("codigoAtributo", atributo.getCodigo());
+        metadata.put("nombreAtributo", atributo.getNombre());
+        metadata.put("tipoDato", atributo.getTipoDato() == null ? null : atributo.getTipoDato().getCode());
+
+        Set<Long> tiposProductoAfectados = new LinkedHashSet<>();
+
+        tipoProductoAtributoRepository
+                .findByAtributo_IdAtributoAndEstadoTrueOrderByIdTipoProductoAtributoAsc(atributo.getIdAtributo())
+                .stream()
+                .map(TipoProductoAtributo::getTipoProducto)
+                .filter(Objects::nonNull)
+                .map(TipoProducto::getIdTipoProducto)
+                .filter(Objects::nonNull)
+                .forEach(tiposProductoAfectados::add);
+
+        tiposProductoAfectados.forEach(idTipoProducto ->
+                productoSnapshotOutboxRegistrar.registrarProductosDeTipoActualizados(
+                        idTipoProducto,
+                        "AtributoService",
+                        metadata
+                )
+        );
     }
 
     private Map<String, Object> auditMetadata(
@@ -528,6 +577,7 @@ public class AtributoServiceImpl implements AtributoService {
         metadata.put("requerido", Boolean.TRUE.equals(atributo.getRequerido()));
         metadata.put("filtrable", Boolean.TRUE.equals(atributo.getFiltrable()));
         metadata.put("visiblePublico", Boolean.TRUE.equals(atributo.getVisiblePublico()));
+        metadata.put("estado", Boolean.TRUE.equals(atributo.getEstado()));
         metadata.put("actor", actor.actorLabel());
         metadata.put("idUsuarioMs1", actor.getIdUsuarioMs1());
 
@@ -539,11 +589,7 @@ public class AtributoServiceImpl implements AtributoService {
     }
 
     private int sanitizeLimit(Integer limit) {
-        if (limit == null) {
-            return DEFAULT_LOOKUP_LIMIT;
-        }
-
-        if (limit < 1) {
+        if (limit == null || limit < 1) {
             return DEFAULT_LOOKUP_LIMIT;
         }
 

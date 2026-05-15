@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/StockSkuMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/StockSkuMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -11,6 +11,7 @@ import com.upsjb.ms3.dto.inventario.stock.response.StockSkuDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuResponseDto;
 import com.upsjb.ms3.dto.shared.MoneyResponseDto;
 import com.upsjb.ms3.dto.shared.StockResumenResponseDto;
+import com.upsjb.ms3.util.StockMathUtil;
 import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
 
@@ -18,10 +19,14 @@ import org.springframework.stereotype.Component;
 public class StockSkuMapper {
 
     public StockSkuResponseDto toResponse(StockSku entity) {
-        return toResponse(entity, Moneda.PEN);
+        return toResponse(entity, Moneda.PEN, true);
     }
 
     public StockSkuResponseDto toResponse(StockSku entity, Moneda moneda) {
+        return toResponse(entity, moneda, true);
+    }
+
+    public StockSkuResponseDto toResponse(StockSku entity, Moneda moneda, boolean includeCosts) {
         if (entity == null) {
             return null;
         }
@@ -34,19 +39,26 @@ public class StockSkuMapper {
                 .idStock(entity.getIdStock())
                 .idSku(sku == null ? null : sku.getIdSku())
                 .codigoSku(sku == null ? null : sku.getCodigoSku())
+                .barcode(sku == null ? null : sku.getBarcode())
+                .estadoSku(sku == null ? null : sku.getEstadoSku())
+                .color(sku == null ? null : sku.getColor())
+                .talla(sku == null ? null : sku.getTalla())
+                .modelo(sku == null ? null : sku.getModelo())
                 .codigoProducto(producto == null ? null : producto.getCodigoProducto())
                 .nombreProducto(producto == null ? null : producto.getNombre())
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
                 .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
                 .nombreAlmacen(almacen == null ? null : almacen.getNombre())
+                .almacenPrincipal(almacen == null ? null : almacen.getPrincipal())
                 .stockFisico(defaultInteger(entity.getStockFisico()))
                 .stockReservado(defaultInteger(entity.getStockReservado()))
                 .stockDisponible(resolveStockDisponible(entity))
                 .stockMinimo(defaultInteger(entity.getStockMinimo()))
                 .stockMaximo(entity.getStockMaximo())
                 .bajoStock(isBajoStock(entity))
-                .costoPromedioActual(toMoney(entity.getCostoPromedioActual(), moneda))
-                .ultimoCostoCompra(toMoney(entity.getUltimoCostoCompra(), moneda))
+                .sobreStock(isSobreStock(entity))
+                .costoPromedioActual(includeCosts ? toMoney(entity.getCostoPromedioActual(), moneda) : null)
+                .ultimoCostoCompra(includeCosts ? toMoney(entity.getUltimoCostoCompra(), moneda) : null)
                 .estado(entity.getEstado())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -54,10 +66,14 @@ public class StockSkuMapper {
     }
 
     public StockSkuDetailResponseDto toDetailResponse(StockSku entity) {
-        return toDetailResponse(entity, Moneda.PEN);
+        return toDetailResponse(entity, Moneda.PEN, true);
     }
 
     public StockSkuDetailResponseDto toDetailResponse(StockSku entity, Moneda moneda) {
+        return toDetailResponse(entity, moneda, true);
+    }
+
+    public StockSkuDetailResponseDto toDetailResponse(StockSku entity, Moneda moneda, boolean includeCosts) {
         if (entity == null) {
             return null;
         }
@@ -71,11 +87,19 @@ public class StockSkuMapper {
                 .idSku(sku == null ? null : sku.getIdSku())
                 .codigoSku(sku == null ? null : sku.getCodigoSku())
                 .barcode(sku == null ? null : sku.getBarcode())
+                .estadoSku(sku == null ? null : sku.getEstadoSku())
+                .color(sku == null ? null : sku.getColor())
+                .talla(sku == null ? null : sku.getTalla())
+                .material(sku == null ? null : sku.getMaterial())
+                .modelo(sku == null ? null : sku.getModelo())
                 .codigoProducto(producto == null ? null : producto.getCodigoProducto())
                 .nombreProducto(producto == null ? null : producto.getNombre())
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
                 .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
                 .nombreAlmacen(almacen == null ? null : almacen.getNombre())
+                .almacenPrincipal(almacen == null ? null : almacen.getPrincipal())
+                .almacenPermiteVenta(almacen == null ? null : almacen.getPermiteVenta())
+                .almacenPermiteCompra(almacen == null ? null : almacen.getPermiteCompra())
                 .stockFisico(defaultInteger(entity.getStockFisico()))
                 .stockReservado(defaultInteger(entity.getStockReservado()))
                 .stockDisponible(resolveStockDisponible(entity))
@@ -83,8 +107,8 @@ public class StockSkuMapper {
                 .stockMaximo(entity.getStockMaximo())
                 .bajoStock(isBajoStock(entity))
                 .sobreStock(isSobreStock(entity))
-                .costoPromedioActual(toMoney(entity.getCostoPromedioActual(), moneda))
-                .ultimoCostoCompra(toMoney(entity.getUltimoCostoCompra(), moneda))
+                .costoPromedioActual(includeCosts ? toMoney(entity.getCostoPromedioActual(), moneda) : null)
+                .ultimoCostoCompra(includeCosts ? toMoney(entity.getUltimoCostoCompra(), moneda) : null)
                 .estado(entity.getEstado())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -103,11 +127,12 @@ public class StockSkuMapper {
         Producto producto = sku == null ? null : sku.getProducto();
         Almacen almacen = entity.getAlmacen();
         Integer disponible = resolveStockDisponible(entity);
-        Integer cantidad = defaultInteger(cantidadSolicitada);
 
         return StockDisponibleResponseDto.builder()
                 .idSku(sku == null ? null : sku.getIdSku())
                 .codigoSku(sku == null ? null : sku.getCodigoSku())
+                .barcode(sku == null ? null : sku.getBarcode())
+                .estadoSku(sku == null ? null : sku.getEstadoSku())
                 .codigoProducto(producto == null ? null : producto.getCodigoProducto())
                 .nombreProducto(producto == null ? null : producto.getNombre())
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
@@ -118,7 +143,33 @@ public class StockSkuMapper {
                 .stockDisponible(disponible)
                 .disponible(disponible > 0)
                 .cantidadSolicitada(cantidadSolicitada)
-                .cantidadDisponible(cantidadSolicitada == null || disponible >= cantidad)
+                .cantidadDisponible(resolveCantidadDisponible(disponible, cantidadSolicitada))
+                .build();
+    }
+
+    public StockDisponibleResponseDto toDisponibleResponse(
+            ProductoSku sku,
+            Almacen almacen,
+            Integer cantidadSolicitada
+    ) {
+        Producto producto = sku == null ? null : sku.getProducto();
+
+        return StockDisponibleResponseDto.builder()
+                .idSku(sku == null ? null : sku.getIdSku())
+                .codigoSku(sku == null ? null : sku.getCodigoSku())
+                .barcode(sku == null ? null : sku.getBarcode())
+                .estadoSku(sku == null ? null : sku.getEstadoSku())
+                .codigoProducto(producto == null ? null : producto.getCodigoProducto())
+                .nombreProducto(producto == null ? null : producto.getNombre())
+                .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
+                .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
+                .nombreAlmacen(almacen == null ? null : almacen.getNombre())
+                .stockFisico(0)
+                .stockReservado(0)
+                .stockDisponible(0)
+                .disponible(Boolean.FALSE)
+                .cantidadSolicitada(cantidadSolicitada)
+                .cantidadDisponible(resolveCantidadDisponible(0, cantidadSolicitada))
                 .build();
     }
 
@@ -154,7 +205,15 @@ public class StockSkuMapper {
             return entity.getStockDisponible();
         }
 
-        return defaultInteger(entity.getStockFisico()) - defaultInteger(entity.getStockReservado());
+        return StockMathUtil.available(entity.getStockFisico(), entity.getStockReservado());
+    }
+
+    private Boolean resolveCantidadDisponible(Integer disponible, Integer cantidadSolicitada) {
+        if (cantidadSolicitada == null) {
+            return null;
+        }
+
+        return defaultInteger(disponible) >= cantidadSolicitada;
     }
 
     private Boolean isBajoStock(StockSku entity) {
@@ -162,7 +221,7 @@ public class StockSkuMapper {
             return false;
         }
 
-        return resolveStockDisponible(entity) <= defaultInteger(entity.getStockMinimo());
+        return StockMathUtil.isLowStock(resolveStockDisponible(entity), entity.getStockMinimo());
     }
 
     private Boolean isSobreStock(StockSku entity) {

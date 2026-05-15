@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/BigDecimalUtil.java
+// ruta: src/main/java/com/upsjb/ms3/util/BigDecimalUtil.java
 package com.upsjb.ms3.util;
 
 import java.math.BigDecimal;

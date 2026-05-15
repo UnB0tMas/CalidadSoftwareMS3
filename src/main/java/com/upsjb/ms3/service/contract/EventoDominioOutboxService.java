@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/EventoDominioOutboxService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/EventoDominioOutboxService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.domain.enums.AggregateType;
@@ -46,6 +46,14 @@ public interface EventoDominioOutboxService {
     ApiResponseDto<EventoDominioOutboxResponseDto> obtenerDetalle(Long idEvento, Boolean incluirPayload);
 
     ApiResponseDto<EventoDominioOutboxResponseDto> obtenerPorEventId(UUID eventId, Boolean incluirPayload);
+
+    ApiResponseDto<EventoDominioOutboxResponseDto> marcarPublicado(Long idEvento);
+
+    ApiResponseDto<EventoDominioOutboxResponseDto> marcarError(Long idEvento, String errorPublicacion);
+
+    ApiResponseDto<EventoDominioOutboxResponseDto> incrementarIntento(Long idEvento);
+
+    ApiResponseDto<EventoDominioOutboxResponseDto> prepararReintento(Long idEvento, OutboxRetryRequestDto request);
 
     ApiResponseDto<OutboxPublishResultResponseDto> reintentar(
             Long idEvento,

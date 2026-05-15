@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/request/AtributoCreateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/request/AtributoCreateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.atributo.request;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;

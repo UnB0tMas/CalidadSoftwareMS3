@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/EmpleadoSnapshotMs2ServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/EmpleadoSnapshotMs2ServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.EmpleadoSnapshotMs2;
@@ -19,6 +19,7 @@ import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
 import com.upsjb.ms3.service.contract.EmpleadoSnapshotMs2Service;
 import com.upsjb.ms3.shared.exception.NotFoundException;
+import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.EmpleadoSnapshotMs2Specifications;
@@ -72,11 +73,16 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanUpsertEmployeeSnapshot(actor);
 
-        EmpleadoSnapshotMs2 saved = upsertLocal(request, false);
+        UpsertResult result = upsertLocal(request, false);
 
-        return apiResponseFactory.dtoOk(
-                "Operación realizada correctamente.",
-                empleadoMapper.toResponse(saved)
+        return result.created()
+                ? apiResponseFactory.dtoCreated(
+                "Snapshot de empleado MS2 registrado correctamente.",
+                empleadoMapper.toResponse(result.empleado())
+        )
+                : apiResponseFactory.dtoOk(
+                "Snapshot de empleado MS2 actualizado correctamente.",
+                empleadoMapper.toResponse(result.empleado())
         );
     }
 
@@ -85,6 +91,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> sincronizarDesdeMs2PorUsuarioMs1(Long idUsuarioMs1) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanUpsertEmployeeSnapshot(actor);
+        requirePositiveId(idUsuarioMs1, "idUsuarioMs1");
 
         Ms2EmpleadoSnapshotClient.EmpleadoSnapshotResponse response = ms2EmpleadoSnapshotClient
                 .findByIdUsuarioMs1(idUsuarioMs1)
@@ -93,11 +100,11 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
                         "No se encontró el empleado solicitado en MS2."
                 ));
 
-        EmpleadoSnapshotMs2 saved = upsertFromMs2Response(response);
+        UpsertResult result = upsertFromMs2Response(response);
 
         return apiResponseFactory.dtoOk(
-                "Operación realizada correctamente.",
-                empleadoMapper.toResponse(saved)
+                "Snapshot de empleado MS2 sincronizado correctamente.",
+                empleadoMapper.toResponse(result.empleado())
         );
     }
 
@@ -106,6 +113,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> sincronizarDesdeMs2PorEmpleadoMs2(Long idEmpleadoMs2) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanUpsertEmployeeSnapshot(actor);
+        requirePositiveId(idEmpleadoMs2, "idEmpleadoMs2");
 
         Ms2EmpleadoSnapshotClient.EmpleadoSnapshotResponse response = ms2EmpleadoSnapshotClient
                 .findByIdEmpleadoMs2(idEmpleadoMs2)
@@ -114,11 +122,11 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
                         "No se encontró el empleado solicitado en MS2."
                 ));
 
-        EmpleadoSnapshotMs2 saved = upsertFromMs2Response(response);
+        UpsertResult result = upsertFromMs2Response(response);
 
         return apiResponseFactory.dtoOk(
-                "Operación realizada correctamente.",
-                empleadoMapper.toResponse(saved)
+                "Snapshot de empleado MS2 sincronizado correctamente.",
+                empleadoMapper.toResponse(result.empleado())
         );
     }
 
@@ -127,6 +135,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> obtenerPorId(Long idEmpleadoSnapshot) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idEmpleadoSnapshot, "idEmpleadoSnapshot");
 
         EmpleadoSnapshotMs2 empleado = empleadoRepository.findByIdEmpleadoSnapshotAndEstadoTrue(idEmpleadoSnapshot)
                 .orElseThrow(() -> new NotFoundException(
@@ -145,6 +154,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> obtenerPorIdUsuarioMs1(Long idUsuarioMs1) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idUsuarioMs1, "idUsuarioMs1");
 
         EmpleadoSnapshotMs2 empleado = empleadoRepository.findByIdUsuarioMs1AndEstadoTrue(idUsuarioMs1)
                 .orElseThrow(() -> new NotFoundException(
@@ -163,6 +173,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> obtenerPorIdEmpleadoMs2(Long idEmpleadoMs2) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idEmpleadoMs2, "idEmpleadoMs2");
 
         EmpleadoSnapshotMs2 empleado = empleadoRepository.findByIdEmpleadoMs2AndEstadoTrue(idEmpleadoMs2)
                 .orElseThrow(() -> new NotFoundException(
@@ -182,6 +193,13 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanViewPermissions(actor);
 
+        if (!StringNormalizer.hasText(codigoEmpleado)) {
+            throw new ValidationException(
+                    "CODIGO_EMPLEADO_REQUERIDO",
+                    "Debe indicar el código del empleado."
+            );
+        }
+
         EmpleadoSnapshotMs2 empleado = empleadoRepository
                 .findByCodigoEmpleadoIgnoreCaseAndEstadoTrue(StringNormalizer.clean(codigoEmpleado))
                 .orElseThrow(() -> new NotFoundException(
@@ -200,6 +218,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     public ApiResponseDto<EmpleadoSnapshotMs2ResponseDto> validarEmpleadoActivoPorUsuarioMs1(Long idUsuarioMs1) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         empleadoInventarioPermisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idUsuarioMs1, "idUsuarioMs1");
 
         EmpleadoSnapshotMs2 empleado = empleadoRepository.findByIdUsuarioMs1AndEstadoTrue(idUsuarioMs1)
                 .orElseThrow(() -> new NotFoundException(
@@ -246,7 +265,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     @Override
     @Transactional(readOnly = true)
     public boolean existeEmpleadoActivoPorUsuarioMs1(Long idUsuarioMs1) {
-        if (idUsuarioMs1 == null) {
+        if (idUsuarioMs1 == null || idUsuarioMs1 <= 0) {
             return false;
         }
 
@@ -259,7 +278,7 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
     @Override
     @Transactional(readOnly = true)
     public boolean existeEmpleadoActivoPorEmpleadoMs2(Long idEmpleadoMs2) {
-        if (idEmpleadoMs2 == null) {
+        if (idEmpleadoMs2 == null || idEmpleadoMs2 <= 0) {
             return false;
         }
 
@@ -269,7 +288,14 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
                 .isPresent();
     }
 
-    private EmpleadoSnapshotMs2 upsertFromMs2Response(Ms2EmpleadoSnapshotClient.EmpleadoSnapshotResponse response) {
+    private UpsertResult upsertFromMs2Response(Ms2EmpleadoSnapshotClient.EmpleadoSnapshotResponse response) {
+        if (response == null) {
+            throw new NotFoundException(
+                    "EMPLEADO_MS2_NO_ENCONTRADO",
+                    "No se encontró el empleado solicitado en MS2."
+            );
+        }
+
         EmpleadoSnapshotMs2UpsertRequestDto request = EmpleadoSnapshotMs2UpsertRequestDto.builder()
                 .idEmpleadoMs2(response.idEmpleadoMs2())
                 .idUsuarioMs1(response.idUsuarioMs1())
@@ -286,13 +312,27 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         return upsertLocal(request, true);
     }
 
-    private EmpleadoSnapshotMs2 upsertLocal(
+    private UpsertResult upsertLocal(
             EmpleadoSnapshotMs2UpsertRequestDto request,
             boolean sincronizadoDesdeMs2
     ) {
-        LocalDateTime snapshotAt = request.snapshotAt() == null ? LocalDateTime.now() : request.snapshotAt();
+        if (request == null) {
+            throw new ValidationException(
+                    "EMPLEADO_SNAPSHOT_REQUEST_REQUERIDO",
+                    "Debe enviar los datos del snapshot de empleado MS2."
+            );
+        }
 
-        Optional<EmpleadoSnapshotMs2> existing = findExisting(request);
+        LocalDateTime snapshotAt = request.snapshotAt() == null ? LocalDateTime.now() : request.snapshotAt();
+        String codigoEmpleado = StringNormalizer.clean(request.codigoEmpleado());
+        String nombresCompletos = StringNormalizer.clean(request.nombresCompletos());
+
+        Optional<EmpleadoSnapshotMs2> existing = findExistingForUpdate(
+                request.idEmpleadoMs2(),
+                request.idUsuarioMs1(),
+                codigoEmpleado
+        );
+
         Long currentId = existing.map(EmpleadoSnapshotMs2::getIdEmpleadoSnapshot).orElse(null);
 
         boolean duplicatedByEmpleado = currentId == null
@@ -310,9 +350,9 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         );
 
         boolean duplicatedByCodigo = currentId == null
-                ? empleadoRepository.existsByCodigoEmpleadoIgnoreCaseAndEstadoTrue(request.codigoEmpleado())
+                ? empleadoRepository.existsByCodigoEmpleadoIgnoreCaseAndEstadoTrue(codigoEmpleado)
                 : empleadoRepository.existsByCodigoEmpleadoIgnoreCaseAndEstadoTrueAndIdEmpleadoSnapshotNot(
-                request.codigoEmpleado(),
+                codigoEmpleado,
                 currentId
         );
 
@@ -323,8 +363,8 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         empleadoValidator.validateUpsert(
                 request.idEmpleadoMs2(),
                 request.idUsuarioMs1(),
-                request.codigoEmpleado(),
-                request.nombresCompletos(),
+                codigoEmpleado,
+                nombresCompletos,
                 request.empleadoActivo(),
                 snapshotAt,
                 duplicatedByEmpleado,
@@ -340,8 +380,8 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
             empleadoMapper.updateEntity(entity, request);
         }
 
-        entity.setCodigoEmpleado(StringNormalizer.clean(request.codigoEmpleado()));
-        entity.setNombresCompletos(StringNormalizer.clean(request.nombresCompletos()));
+        entity.setCodigoEmpleado(codigoEmpleado);
+        entity.setNombresCompletos(nombresCompletos);
         entity.setAreaCodigo(StringNormalizer.cleanOrNull(request.areaCodigo()));
         entity.setAreaNombre(StringNormalizer.cleanOrNull(request.areaNombre()));
         entity.setSnapshotAt(snapshotAt);
@@ -354,47 +394,60 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
 
         EmpleadoSnapshotMs2 saved = empleadoRepository.saveAndFlush(entity);
 
+        TipoEventoAuditoria evento = sincronizadoDesdeMs2
+                ? TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_SINCRONIZADO
+                : isCreate
+                ? TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_REGISTRADO
+                : TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_ACTUALIZADO;
+
         auditoriaFuncionalService.registrarExito(
-                sincronizadoDesdeMs2
-                        ? TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_SINCRONIZADO
-                        : isCreate
-                        ? TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_REGISTRADO
-                        : TipoEventoAuditoria.EMPLEADO_SNAPSHOT_MS2_ACTUALIZADO,
+                evento,
                 EntidadAuditada.EMPLEADO_SNAPSHOT_MS2,
                 String.valueOf(saved.getIdEmpleadoSnapshot()),
                 sincronizadoDesdeMs2 ? "SINCRONIZAR_EMPLEADO_SNAPSHOT_MS2" : "UPSERT_EMPLEADO_SNAPSHOT_MS2",
                 sincronizadoDesdeMs2
                         ? "Snapshot de empleado MS2 sincronizado correctamente."
-                        : "Snapshot de empleado MS2 registrado correctamente.",
+                        : isCreate
+                        ? "Snapshot de empleado MS2 registrado correctamente."
+                        : "Snapshot de empleado MS2 actualizado correctamente.",
                 metadata(saved)
         );
 
-        return saved;
+        log.info(
+                "Snapshot MS2 procesado. idEmpleadoSnapshot={}, idEmpleadoMs2={}, idUsuarioMs1={}, codigoEmpleado={}, sincronizadoDesdeMs2={}",
+                saved.getIdEmpleadoSnapshot(),
+                saved.getIdEmpleadoMs2(),
+                saved.getIdUsuarioMs1(),
+                saved.getCodigoEmpleado(),
+                sincronizadoDesdeMs2
+        );
+
+        return new UpsertResult(saved, isCreate);
     }
 
-    private Optional<EmpleadoSnapshotMs2> findExisting(EmpleadoSnapshotMs2UpsertRequestDto request) {
-        if (request == null) {
-            return Optional.empty();
-        }
-
-        if (request.idEmpleadoMs2() != null) {
+    private Optional<EmpleadoSnapshotMs2> findExistingForUpdate(
+            Long idEmpleadoMs2,
+            Long idUsuarioMs1,
+            String codigoEmpleado
+    ) {
+        if (idEmpleadoMs2 != null) {
             Optional<EmpleadoSnapshotMs2> byEmpleado = empleadoRepository
-                    .findByIdEmpleadoMs2AndEstadoTrue(request.idEmpleadoMs2());
+                    .findActivoByIdEmpleadoMs2ForUpdate(idEmpleadoMs2);
             if (byEmpleado.isPresent()) {
                 return byEmpleado;
             }
         }
 
-        if (request.idUsuarioMs1() != null) {
+        if (idUsuarioMs1 != null) {
             Optional<EmpleadoSnapshotMs2> byUsuario = empleadoRepository
-                    .findByIdUsuarioMs1AndEstadoTrue(request.idUsuarioMs1());
+                    .findActivoByIdUsuarioMs1ForUpdate(idUsuarioMs1);
             if (byUsuario.isPresent()) {
                 return byUsuario;
             }
         }
 
-        if (StringNormalizer.hasText(request.codigoEmpleado())) {
-            return empleadoRepository.findByCodigoEmpleadoIgnoreCaseAndEstadoTrue(request.codigoEmpleado());
+        if (StringNormalizer.hasText(codigoEmpleado)) {
+            return empleadoRepository.findActivoByCodigoEmpleadoForUpdate(codigoEmpleado);
         }
 
         return Optional.empty();
@@ -420,6 +473,15 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         return metadata;
     }
 
+    private void requirePositiveId(Long id, String field) {
+        if (id == null || id <= 0) {
+            throw new ValidationException(
+                    "ID_INVALIDO",
+                    "El campo " + field + " debe ser mayor a cero."
+            );
+        }
+    }
+
     private PageRequestDto safePageRequest(PageRequestDto pageRequest, String defaultSortBy) {
         if (pageRequest == null) {
             return PageRequestDto.builder()
@@ -431,5 +493,11 @@ public class EmpleadoSnapshotMs2ServiceImpl implements EmpleadoSnapshotMs2Servic
         }
 
         return pageRequest;
+    }
+
+    private record UpsertResult(
+            EmpleadoSnapshotMs2 empleado,
+            boolean created
+    ) {
     }
 }

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.roles;
+package com.upsjb.ms3.security.roles;
 
 import java.util.Arrays;
 import java.util.Collection;

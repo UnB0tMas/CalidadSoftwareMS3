@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/event/Ms4StockCommandPayload.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/event/Ms4StockCommandPayload.java
 package com.upsjb.ms3.kafka.event;
 
 import com.fasterxml.jackson.annotation.JsonInclude;

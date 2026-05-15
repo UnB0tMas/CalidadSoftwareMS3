@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.domain.enums;
+package com.upsjb.ms3.domain.enums;
 
 import java.util.Arrays;
 

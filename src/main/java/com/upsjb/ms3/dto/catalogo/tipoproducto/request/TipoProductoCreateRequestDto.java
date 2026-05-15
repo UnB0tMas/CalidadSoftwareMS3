@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/tipoproducto/request/TipoProductoCreateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/tipoproducto/request/TipoProductoCreateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.tipoproducto.request;
 
 import jakarta.validation.constraints.NotBlank;

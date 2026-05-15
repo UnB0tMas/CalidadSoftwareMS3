@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/request/CompraInventarioConfirmRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/request/CompraInventarioConfirmRequestDto.java
 package com.upsjb.ms3.dto.inventario.compra.request;
 
 import jakarta.validation.constraints.NotBlank;

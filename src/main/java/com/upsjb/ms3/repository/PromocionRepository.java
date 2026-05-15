@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/PromocionRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/PromocionRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.Promocion;

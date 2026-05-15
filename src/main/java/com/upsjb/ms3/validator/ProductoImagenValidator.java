@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/ProductoImagenValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/ProductoImagenValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Producto;
@@ -41,9 +41,7 @@ public class ProductoImagenValidator {
             }
         }
 
-        if (orden != null && orden < 0) {
-            errors.add("orden", "El orden no puede ser negativo.", "INVALID_VALUE", orden);
-        }
+        validateOrden(orden, errors);
 
         errors.throwIfAny("No se puede registrar la imagen del producto.");
 
@@ -60,6 +58,26 @@ public class ProductoImagenValidator {
                     "El SKU ya tiene una imagen principal activa."
             );
         }
+    }
+
+    public void validateUpdate(
+            String altText,
+            String titulo,
+            Integer orden
+    ) {
+        ValidationErrorCollector errors = ValidationErrorCollector.create();
+
+        if (StringNormalizer.hasText(altText) && altText.length() > 250) {
+            errors.add("altText", "El texto alternativo no debe superar 250 caracteres.", "MAX_LENGTH", altText);
+        }
+
+        if (StringNormalizer.hasText(titulo) && titulo.length() > 180) {
+            errors.add("titulo", "El título no debe superar 180 caracteres.", "MAX_LENGTH", titulo);
+        }
+
+        validateOrden(orden, errors);
+
+        errors.throwIfAny("No se puede actualizar la metadata de la imagen.");
     }
 
     public void validateMetadata(
@@ -139,6 +157,12 @@ public class ProductoImagenValidator {
                     "IMAGEN_PRODUCTO_INACTIVA",
                     "La imagen de producto no está activa."
             );
+        }
+    }
+
+    private void validateOrden(Integer orden, ValidationErrorCollector errors) {
+        if (orden != null && orden < 0) {
+            errors.add("orden", "El orden no puede ser negativo.", "INVALID_VALUE", orden);
         }
     }
 }

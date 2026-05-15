@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryClient.java
+// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryClient.java
 package com.upsjb.ms3.integration.cloudinary;
 
 public interface CloudinaryClient {

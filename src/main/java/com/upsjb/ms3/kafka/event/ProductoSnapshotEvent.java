@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/event/ProductoSnapshotEvent.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/event/ProductoSnapshotEvent.java
 package com.upsjb.ms3.kafka.event;
 
 import com.upsjb.ms3.domain.enums.AggregateType;

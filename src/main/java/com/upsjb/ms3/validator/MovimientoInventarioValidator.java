@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/MovimientoInventarioValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/MovimientoInventarioValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -7,12 +7,16 @@ import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.enums.MotivoMovimientoInventario;
 import com.upsjb.ms3.domain.enums.RolSistema;
 import com.upsjb.ms3.domain.enums.TipoMovimientoInventario;
+import com.upsjb.ms3.dto.inventario.movimiento.filter.MovimientoInventarioFilterDto;
+import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
+import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
 import com.upsjb.ms3.util.StockMathUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -86,13 +90,56 @@ public class MovimientoInventarioValidator {
 
         if (tipoMovimiento != null && tipoMovimiento.isRelacionadoVentaOCompra()) {
             if (!StringNormalizer.hasText(referenciaTipo) || !StringNormalizer.hasText(referenciaIdExterno)) {
-                errors.add("referencia", "Los movimientos relacionados a venta o compra requieren referencia externa.", "REQUIRED", referenciaIdExterno);
+                errors.add(
+                        "referencia",
+                        "Los movimientos relacionados a venta o compra requieren referencia externa.",
+                        "REQUIRED",
+                        referenciaIdExterno
+                );
             }
         }
 
         errors.throwIfAny("No se puede registrar el movimiento de inventario.");
 
         validateStockTransition(tipoMovimiento, cantidad, stockAnterior, stockNuevo);
+    }
+
+    public void validateFilter(MovimientoInventarioFilterDto filter) {
+        if (filter == null) {
+            return;
+        }
+
+        validateCodigoMovimientoIfPresent(filter.codigoMovimiento());
+        validateReferenceSearch(filter.referenciaTipo(), filter.referenciaIdExterno());
+
+        DateRangeFilterDto dateRange = filter.fechaMovimiento();
+        validateDateRange(
+                dateRange == null ? null : dateRange.fechaInicio(),
+                dateRange == null ? null : dateRange.fechaFin()
+        );
+    }
+
+    public void validateCodigoMovimiento(String codigoMovimiento) {
+        if (!StringNormalizer.hasText(codigoMovimiento)) {
+            throw new ValidationException(
+                    "MOVIMIENTO_CODIGO_REQUERIDO",
+                    "Debe indicar el código del movimiento solicitado."
+            );
+        }
+
+        validateCodigoMovimientoIfPresent(codigoMovimiento);
+    }
+
+    public void validateReferenceSearch(String referenciaTipo, String referenciaIdExterno) {
+        boolean hasTipo = StringNormalizer.hasText(referenciaTipo);
+        boolean hasReferencia = StringNormalizer.hasText(referenciaIdExterno);
+
+        if (hasTipo != hasReferencia) {
+            throw new ConflictException(
+                    "MOVIMIENTO_REFERENCIA_INCOMPLETA",
+                    "Para buscar por referencia debe indicar tipo e identificador externo."
+            );
+        }
     }
 
     public void validateCompensatoryMovement(
@@ -132,6 +179,28 @@ public class MovimientoInventarioValidator {
             throw new NotFoundException(
                     "MOVIMIENTO_INVENTARIO_INACTIVO",
                     "El movimiento de inventario no está activo."
+            );
+        }
+    }
+
+    private void validateCodigoMovimientoIfPresent(String codigoMovimiento) {
+        if (!StringNormalizer.hasText(codigoMovimiento)) {
+            return;
+        }
+
+        if (StringNormalizer.clean(codigoMovimiento).length() > 100) {
+            throw new ValidationException(
+                    "MOVIMIENTO_CODIGO_INVALIDO",
+                    "El código de movimiento no debe superar 100 caracteres."
+            );
+        }
+    }
+
+    private void validateDateRange(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new ConflictException(
+                    "MOVIMIENTO_RANGO_FECHAS_INVALIDO",
+                    "La fecha fin no puede ser menor que la fecha inicio."
             );
         }
     }

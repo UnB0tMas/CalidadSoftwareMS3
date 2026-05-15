@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/CatalogoLookupService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/CatalogoLookupService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.reference.filter.ReferenceSearchFilterDto;

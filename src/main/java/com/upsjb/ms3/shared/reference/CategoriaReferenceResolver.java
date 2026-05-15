@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.reference;
+package com.upsjb.ms3.shared.reference;
 
 import com.upsjb.ms3.domain.entity.Categoria;
 import java.util.LinkedHashMap;

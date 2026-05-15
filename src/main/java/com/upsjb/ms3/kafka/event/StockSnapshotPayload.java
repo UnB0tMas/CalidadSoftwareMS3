@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/event/StockSnapshotPayload.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/event/StockSnapshotPayload.java
 package com.upsjb.ms3.kafka.event;
 
 import java.math.BigDecimal;

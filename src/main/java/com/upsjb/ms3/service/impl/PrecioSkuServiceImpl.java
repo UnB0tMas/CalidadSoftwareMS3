@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/PrecioSkuServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/PrecioSkuServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
@@ -162,8 +162,12 @@ public class PrecioSkuServiceImpl implements PrecioSkuService {
         precioSkuPolicy.ensureCanViewCurrentPrice(actor);
 
         ProductoSku sku = resolveSku(skuReference);
+        PrecioSkuHistorial precio = findPrecioVigenteRequired(sku.getIdSku());
 
-        return obtenerVigentePorSku(sku.getIdSku());
+        return apiResponseFactory.dtoOk(
+                "Detalle obtenido correctamente.",
+                precioSkuMapper.toResponse(precio)
+        );
     }
 
     @Override
@@ -172,21 +176,7 @@ public class PrecioSkuServiceImpl implements PrecioSkuService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         precioSkuPolicy.ensureCanViewCurrentPrice(actor);
 
-        if (idSku == null) {
-            throw new ValidationException(
-                    "SKU_ID_REQUERIDO",
-                    "Debe indicar el SKU solicitado."
-            );
-        }
-
-        PrecioSkuHistorial precio = precioRepository
-                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(idSku)
-                .orElseThrow(() -> new NotFoundException(
-                        "PRECIO_SKU_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
-
-        precioSkuValidator.requireActive(precio);
+        PrecioSkuHistorial precio = findPrecioVigenteRequired(idSku);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -254,6 +244,16 @@ public class PrecioSkuServiceImpl implements PrecioSkuService {
         return listarHistorial(filter, pageRequest);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existePrecioVigenteActivo(Long idSku) {
+        if (idSku == null) {
+            return false;
+        }
+
+        return precioRepository.existsBySku_IdSkuAndVigenteTrueAndEstadoTrue(idSku);
+    }
+
     private PrecioSkuCreateRequestDto normalizeCreateRequest(PrecioSkuCreateRequestDto request) {
         if (request == null) {
             throw new ValidationException(
@@ -284,6 +284,25 @@ public class PrecioSkuServiceImpl implements PrecioSkuService {
                 firstText(reference.codigoSku(), reference.codigo()),
                 reference.barcode()
         );
+    }
+
+    private PrecioSkuHistorial findPrecioVigenteRequired(Long idSku) {
+        if (idSku == null) {
+            throw new ValidationException(
+                    "SKU_ID_REQUERIDO",
+                    "Debe indicar el SKU solicitado."
+            );
+        }
+
+        PrecioSkuHistorial precio = precioRepository
+                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(idSku)
+                .orElseThrow(() -> new NotFoundException(
+                        "PRECIO_SKU_NO_ENCONTRADO",
+                        "No se encontró el registro solicitado."
+                ));
+
+        precioSkuValidator.requireActive(precio);
+        return precio;
     }
 
     private PrecioSkuHistorial findPrecioRequired(Long idPrecioHistorial) {

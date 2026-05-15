@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/KardexValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/KardexValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.dto.inventario.movimiento.filter.KardexFilterDto;
@@ -14,21 +14,18 @@ public class KardexValidator {
 
     public void validateFilter(KardexFilterDto filter) {
         if (filter == null) {
-            throw new ValidationException(
-                    "KARDEX_FILTRO_REQUERIDO",
-                    "Debe indicar filtros para consultar kardex."
-            );
+            return;
         }
 
         validateReferenceSearch(filter.referenciaTipo(), filter.referenciaIdExterno());
 
         DateRangeFilterDto dateRange = filter.fechaMovimiento();
-        validateFilter(
-                filter.idSku(),
-                filter.idAlmacen(),
+        validateDateRange(
                 dateRange == null ? null : dateRange.fechaInicio(),
                 dateRange == null ? null : dateRange.fechaFin()
         );
+
+        validateCodigoMovimientoIfPresent(filter.codigoMovimiento());
     }
 
     public void validateFilter(
@@ -37,19 +34,7 @@ public class KardexValidator {
             LocalDateTime fechaInicio,
             LocalDateTime fechaFin
     ) {
-        if (idSku == null && idAlmacen == null && fechaInicio == null && fechaFin == null) {
-            throw new ConflictException(
-                    "KARDEX_FILTRO_OBLIGATORIO",
-                    "Debe indicar al menos SKU, almacén o rango de fechas para consultar kardex."
-            );
-        }
-
-        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
-            throw new ConflictException(
-                    "KARDEX_RANGO_FECHAS_INVALIDO",
-                    "La fecha fin no puede ser menor que la fecha inicio."
-            );
-        }
+        validateDateRange(fechaInicio, fechaFin);
     }
 
     public void validateCanViewCost(boolean canViewCost) {
@@ -69,6 +54,39 @@ public class KardexValidator {
             throw new ConflictException(
                     "KARDEX_REFERENCIA_INCOMPLETA",
                     "Para buscar por referencia debe indicar tipo e identificador externo."
+            );
+        }
+    }
+
+    public void validateCodigoMovimiento(String codigoMovimiento) {
+        if (!StringUtils.hasText(codigoMovimiento)) {
+            throw new ValidationException(
+                    "KARDEX_CODIGO_MOVIMIENTO_REQUERIDO",
+                    "Debe indicar el código de movimiento solicitado."
+            );
+        }
+
+        validateCodigoMovimientoIfPresent(codigoMovimiento);
+    }
+
+    private void validateCodigoMovimientoIfPresent(String codigoMovimiento) {
+        if (!StringUtils.hasText(codigoMovimiento)) {
+            return;
+        }
+
+        if (codigoMovimiento.trim().length() > 100) {
+            throw new ValidationException(
+                    "KARDEX_CODIGO_MOVIMIENTO_INVALIDO",
+                    "El código de movimiento no debe superar 100 caracteres."
+            );
+        }
+    }
+
+    private void validateDateRange(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new ConflictException(
+                    "KARDEX_RANGO_FECHAS_INVALIDO",
+                    "La fecha fin no puede ser menor que la fecha inicio."
             );
         }
     }

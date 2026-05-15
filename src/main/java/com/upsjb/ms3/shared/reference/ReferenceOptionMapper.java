@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.reference;
+package com.upsjb.ms3.shared.reference;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

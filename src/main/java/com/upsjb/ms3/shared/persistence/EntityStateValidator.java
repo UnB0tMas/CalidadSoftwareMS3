@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.persistence;
+package com.upsjb.ms3.shared.persistence;
 
 import com.upsjb.ms3.domain.entity.AuditableEntity;
 import com.upsjb.ms3.shared.exception.ConflictException;

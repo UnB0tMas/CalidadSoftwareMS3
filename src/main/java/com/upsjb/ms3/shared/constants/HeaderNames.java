@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.constants;
+package com.upsjb.ms3.shared.constants;
 
 public final class HeaderNames {
 

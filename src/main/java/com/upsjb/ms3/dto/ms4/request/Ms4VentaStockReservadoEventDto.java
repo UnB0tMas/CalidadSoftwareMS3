@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/ms4/request/Ms4VentaStockReservadoEventDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/ms4/request/Ms4VentaStockReservadoEventDto.java
 package com.upsjb.ms3.dto.ms4.request;
 
 import com.upsjb.ms3.domain.enums.Ms4StockEventType;

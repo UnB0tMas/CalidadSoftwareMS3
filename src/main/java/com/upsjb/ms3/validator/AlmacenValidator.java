@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/AlmacenValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/AlmacenValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -14,6 +14,8 @@ public class AlmacenValidator {
     public void validateCreate(
             String codigo,
             String nombre,
+            String direccion,
+            String observacion,
             Boolean permiteVenta,
             Boolean permiteCompra,
             boolean duplicatedCodigo,
@@ -25,6 +27,8 @@ public class AlmacenValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateDireccion(direccion, errors);
+        validateObservacion(observacion, errors);
         validateFlags(permiteVenta, permiteCompra, errors);
 
         errors.throwIfAny("No se puede crear el almacén.");
@@ -50,6 +54,8 @@ public class AlmacenValidator {
             Almacen almacen,
             String codigo,
             String nombre,
+            String direccion,
+            String observacion,
             Boolean permiteVenta,
             Boolean permiteCompra,
             boolean duplicatedCodigo,
@@ -63,6 +69,8 @@ public class AlmacenValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateDireccion(direccion, errors);
+        validateObservacion(observacion, errors);
         validateFlags(permiteVenta, permiteCompra, errors);
 
         errors.throwIfAny("No se puede actualizar el almacén.");
@@ -116,8 +124,15 @@ public class AlmacenValidator {
         }
     }
 
-    public void validateCanActivate(Almacen almacen) {
+    public void validateCanActivate(Almacen almacen, boolean principalDuplicado) {
         requireExists(almacen);
+
+        if (Boolean.TRUE.equals(almacen.getPrincipal()) && principalDuplicado) {
+            throw new ConflictException(
+                    "ALMACEN_PRINCIPAL_DUPLICADO",
+                    "No se puede activar el almacén porque ya existe un almacén principal activo."
+            );
+        }
     }
 
     public void requireActive(Almacen almacen) {
@@ -126,7 +141,7 @@ public class AlmacenValidator {
         if (!almacen.isActivo()) {
             throw new NotFoundException(
                     "ALMACEN_INACTIVO",
-                    "El almacén no está activo."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }
@@ -168,6 +183,18 @@ public class AlmacenValidator {
 
         if (StringNormalizer.clean(nombre).length() > 150) {
             errors.add("nombre", "El nombre no debe superar 150 caracteres.", "MAX_LENGTH", nombre);
+        }
+    }
+
+    private void validateDireccion(String direccion, ValidationErrorCollector errors) {
+        if (StringNormalizer.hasText(direccion) && StringNormalizer.clean(direccion).length() > 300) {
+            errors.add("direccion", "La dirección no debe superar 300 caracteres.", "MAX_LENGTH", direccion);
+        }
+    }
+
+    private void validateObservacion(String observacion, ValidationErrorCollector errors) {
+        if (StringNormalizer.hasText(observacion) && StringNormalizer.clean(observacion).length() > 500) {
+            errors.add("observacion", "La observación no debe superar 500 caracteres.", "MAX_LENGTH", observacion);
         }
     }
 

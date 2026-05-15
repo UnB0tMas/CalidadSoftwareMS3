@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/ReferenceDataService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/ReferenceDataService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
@@ -55,4 +55,18 @@ public interface ReferenceDataService {
     ApiResponseDto<List<SelectOptionDto>> tiposEventoAuditoria();
 
     ApiResponseDto<List<SelectOptionDto>> aggregateTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> estadosRegistro();
+
+    ApiResponseDto<List<SelectOptionDto>> cloudinaryResourceTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> productoEventTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> precioEventTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> promocionEventTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> stockEventTypes();
+
+    ApiResponseDto<List<SelectOptionDto>> ms4StockEventTypes();
 }

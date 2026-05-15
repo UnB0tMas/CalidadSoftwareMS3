@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/Ms4ReconciliacionServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/Ms4ReconciliacionServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -36,10 +36,13 @@ import com.upsjb.ms3.service.contract.EventoDominioOutboxService;
 import com.upsjb.ms3.service.contract.Ms4ReconciliacionService;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
+import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.util.StockMathUtil;
 import com.upsjb.ms3.util.StringNormalizer;
+import com.upsjb.ms3.validator.Ms4StockEventValidator;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +65,7 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     private final MovimientoInventarioRepository movimientoInventarioRepository;
     private final CorrelativoCodigoRepository correlativoCodigoRepository;
     private final KafkaIdempotencyGuard idempotencyGuard;
+    private final Ms4StockEventValidator ms4StockEventValidator;
     private final Ms4StockEventMapper mapper;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
     private final EventoDominioOutboxService eventoDominioOutboxService;
@@ -69,11 +73,18 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     @Override
     @Transactional
     public Ms4StockSyncResultDto procesarReservaPendiente(Ms4StockCommandPayload payload) {
-        validatePayload(payload);
-        idempotencyGuard.ensureNotProcessed(payload);
+        ResolvedCommand command = validateAndResolve(
+                payload,
+                Ms4StockEventType.VENTA_STOCK_RESERVADO_PENDIENTE,
+                true
+        );
 
-        ProductoSku sku = resolveSku(payload);
-        Almacen almacen = resolveAlmacen(payload);
+        if (command.alreadyProcessed()) {
+            return duplicate(payload);
+        }
+
+        ProductoSku sku = command.sku();
+        Almacen almacen = command.almacen();
         StockSku stock = resolveStockForUpdate(sku, almacen);
 
         int cantidad = payload.cantidad();
@@ -82,11 +93,11 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
         if (disponibleAnterior < cantidad) {
             throw new ConflictException(
                     "STOCK_INSUFICIENTE",
-                    "No hay stock disponible suficiente para reservar la venta de MS4."
+                    "No se puede registrar la salida porque el stock disponible es insuficiente."
             );
         }
 
-        stock.setStockReservado(defaultInt(stock.getStockReservado()) + cantidad);
+        stock.setStockReservado(StockMathUtil.reserve(stock.getStockReservado(), cantidad));
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
 
         ReservaStock reserva = new ReservaStock();
@@ -119,8 +130,22 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
         );
         MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
 
-        auditarReserva(savedReserva, savedMovimiento, "PROCESAR_RESERVA_MS4", "Reserva creada correctamente.");
+        auditarOperacion(
+                savedReserva,
+                savedMovimiento,
+                TipoEventoAuditoria.RESERVA_STOCK_CREADA,
+                "PROCESAR_RESERVA_MS4",
+                "Reserva creada correctamente."
+        );
         registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_RESERVADO);
+
+        log.info(
+                "Reserva MS4 procesada. eventId={}, idempotencyKey={}, codigoReserva={}, codigoMovimiento={}",
+                payload.safeEventId(),
+                payload.safeIdempotencyKey(),
+                savedReserva.getCodigoReserva(),
+                savedMovimiento.getCodigoMovimiento()
+        );
 
         return mapper.toSuccessResult(
                 toReservadoDto(payload),
@@ -134,13 +159,27 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     @Override
     @Transactional
     public Ms4StockSyncResultDto procesarConfirmacionPendiente(Ms4StockCommandPayload payload) {
-        validatePayload(payload);
-        idempotencyGuard.ensureNotProcessed(payload);
+        ResolvedCommand command = validateAndResolve(
+                payload,
+                Ms4StockEventType.VENTA_STOCK_CONFIRMADO_PENDIENTE,
+                false
+        );
 
-        ProductoSku sku = resolveSku(payload);
-        Almacen almacen = resolveAlmacen(payload);
+        if (command.alreadyProcessed()) {
+            return duplicate(payload);
+        }
+
+        ProductoSku sku = command.sku();
+        Almacen almacen = command.almacen();
         ReservaStock reserva = resolveReservaForUpdate(payload, sku, almacen);
-        StockSku stock = resolveStockForUpdate(sku, almacen);
+        ms4StockEventValidator.validateReservaMatchesCommand(
+                reserva,
+                sku.getIdSku(),
+                almacen.getIdAlmacen(),
+                payload.referenciaTipo(),
+                payload.safeReferenciaIdExterno(),
+                payload.cantidad()
+        );
 
         if (reserva.getEstadoReserva().isConfirmada()) {
             return duplicate(payload);
@@ -149,11 +188,12 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
         if (!reserva.getEstadoReserva().isReservada()) {
             throw new ConflictException(
                     "RESERVA_NO_CONFIRMABLE",
-                    "Solo una reserva en estado RESERVADA puede confirmarse."
+                    "No se puede confirmar la reserva porque ya fue liberada, vencida o anulada."
             );
         }
 
-        int cantidad = payload.cantidad() == null ? reserva.getCantidad() : payload.cantidad();
+        StockSku stock = resolveStockForUpdate(sku, almacen);
+        int cantidad = resolveCantidad(payload, reserva);
 
         if (defaultInt(stock.getStockReservado()) < cantidad) {
             throw new ConflictException(
@@ -169,10 +209,10 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
             );
         }
 
-        int stockAnterior = defaultInt(stock.getStockFisico());
+        int stockFisicoAnterior = defaultInt(stock.getStockFisico());
 
-        stock.setStockFisico(stockAnterior - cantidad);
-        stock.setStockReservado(defaultInt(stock.getStockReservado()) - cantidad);
+        stock.setStockFisico(StockMathUtil.confirmReservationPhysical(stock.getStockFisico(), cantidad));
+        stock.setStockReservado(StockMathUtil.releaseReserved(stock.getStockReservado(), cantidad));
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
 
         reserva.setEstadoReserva(EstadoReservaStock.CONFIRMADA);
@@ -188,14 +228,28 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
                 TipoMovimientoInventario.CONFIRMACION_VENTA,
                 MotivoMovimientoInventario.CONFIRMACION_VENTA,
                 cantidad,
-                stockAnterior,
+                stockFisicoAnterior,
                 defaultInt(savedStock.getStockFisico()),
                 "Confirmación de stock generada desde MS4."
         );
         MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
 
-        auditarReserva(savedReserva, savedMovimiento, "PROCESAR_CONFIRMACION_MS4", "Reserva confirmada correctamente.");
+        auditarOperacion(
+                savedReserva,
+                savedMovimiento,
+                TipoEventoAuditoria.RESERVA_STOCK_CONFIRMADA,
+                "PROCESAR_CONFIRMACION_MS4",
+                "Reserva confirmada correctamente."
+        );
         registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_RESERVA_CONFIRMADA);
+
+        log.info(
+                "Confirmación MS4 procesada. eventId={}, idempotencyKey={}, codigoReserva={}, codigoMovimiento={}",
+                payload.safeEventId(),
+                payload.safeIdempotencyKey(),
+                savedReserva.getCodigoReserva(),
+                savedMovimiento.getCodigoMovimiento()
+        );
 
         return mapper.toSuccessResult(
                 toConfirmadoDto(payload),
@@ -209,13 +263,27 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     @Override
     @Transactional
     public Ms4StockSyncResultDto procesarLiberacionPendiente(Ms4StockCommandPayload payload) {
-        validatePayload(payload);
-        idempotencyGuard.ensureNotProcessed(payload);
+        ResolvedCommand command = validateAndResolve(
+                payload,
+                Ms4StockEventType.VENTA_STOCK_LIBERADO_PENDIENTE,
+                false
+        );
 
-        ProductoSku sku = resolveSku(payload);
-        Almacen almacen = resolveAlmacen(payload);
+        if (command.alreadyProcessed()) {
+            return duplicate(payload);
+        }
+
+        ProductoSku sku = command.sku();
+        Almacen almacen = command.almacen();
         ReservaStock reserva = resolveReservaForUpdate(payload, sku, almacen);
-        StockSku stock = resolveStockForUpdate(sku, almacen);
+        ms4StockEventValidator.validateReservaMatchesCommand(
+                reserva,
+                sku.getIdSku(),
+                almacen.getIdAlmacen(),
+                payload.referenciaTipo(),
+                payload.safeReferenciaIdExterno(),
+                payload.cantidad()
+        );
 
         if (reserva.getEstadoReserva().isLiberada()) {
             return duplicate(payload);
@@ -224,11 +292,12 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
         if (!reserva.getEstadoReserva().isReservada()) {
             throw new ConflictException(
                     "RESERVA_NO_LIBERABLE",
-                    "Solo una reserva en estado RESERVADA puede liberarse."
+                    "No se puede confirmar la reserva porque ya fue liberada, vencida o anulada."
             );
         }
 
-        int cantidad = payload.cantidad() == null ? reserva.getCantidad() : payload.cantidad();
+        StockSku stock = resolveStockForUpdate(sku, almacen);
+        int cantidad = resolveCantidad(payload, reserva);
 
         if (defaultInt(stock.getStockReservado()) < cantidad) {
             throw new ConflictException(
@@ -239,7 +308,7 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
 
         int disponibleAnterior = stockDisponible(stock);
 
-        stock.setStockReservado(defaultInt(stock.getStockReservado()) - cantidad);
+        stock.setStockReservado(StockMathUtil.releaseReserved(stock.getStockReservado(), cantidad));
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
 
         reserva.setEstadoReserva(EstadoReservaStock.LIBERADA);
@@ -261,8 +330,22 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
         );
         MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
 
-        auditarReserva(savedReserva, savedMovimiento, "PROCESAR_LIBERACION_MS4", "Reserva liberada correctamente.");
+        auditarOperacion(
+                savedReserva,
+                savedMovimiento,
+                TipoEventoAuditoria.RESERVA_STOCK_LIBERADA,
+                "PROCESAR_LIBERACION_MS4",
+                "Reserva liberada correctamente."
+        );
         registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_RESERVA_LIBERADA);
+
+        log.info(
+                "Liberación MS4 procesada. eventId={}, idempotencyKey={}, codigoReserva={}, codigoMovimiento={}",
+                payload.safeEventId(),
+                payload.safeIdempotencyKey(),
+                savedReserva.getCodigoReserva(),
+                savedMovimiento.getCodigoMovimiento()
+        );
 
         return mapper.toSuccessResult(
                 toLiberadoDto(payload),
@@ -276,157 +359,231 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     @Override
     @Transactional
     public Ms4StockSyncResultDto procesarAnulacionPendiente(Ms4StockCommandPayload payload) {
-        validatePayload(payload);
-        idempotencyGuard.ensureNotProcessed(payload);
+        ResolvedCommand command = validateAndResolve(
+                payload,
+                Ms4StockEventType.VENTA_ANULADA_STOCK_PENDIENTE,
+                false
+        );
 
-        ProductoSku sku = resolveSku(payload);
-        Almacen almacen = resolveAlmacen(payload);
+        if (command.alreadyProcessed()) {
+            return duplicate(payload);
+        }
+
+        ProductoSku sku = command.sku();
+        Almacen almacen = command.almacen();
         ReservaStock reserva = resolveReservaForUpdate(payload, sku, almacen);
-        StockSku stock = resolveStockForUpdate(sku, almacen);
+        ms4StockEventValidator.validateReservaMatchesCommand(
+                reserva,
+                sku.getIdSku(),
+                almacen.getIdAlmacen(),
+                payload.referenciaTipo(),
+                payload.safeReferenciaIdExterno(),
+                payload.cantidad()
+        );
 
-        int cantidad = payload.cantidad() == null ? reserva.getCantidad() : payload.cantidad();
+        StockSku stock = resolveStockForUpdate(sku, almacen);
+        int cantidad = resolveCantidad(payload, reserva);
 
         if (reserva.getEstadoReserva().isReservada()) {
-            int disponibleAnterior = stockDisponible(stock);
-
-            if (defaultInt(stock.getStockReservado()) < cantidad) {
-                throw new ConflictException(
-                        "STOCK_RESERVADO_INCONSISTENTE",
-                        "El stock reservado es menor que la cantidad anulada por MS4."
-                );
-            }
-
-            stock.setStockReservado(defaultInt(stock.getStockReservado()) - cantidad);
-            StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
-
-            reserva.setEstadoReserva(EstadoReservaStock.ANULADA);
-            reserva.setLiberadoPorIdUsuarioMs1(resolveActorId(payload));
-            reserva.setLiberadoAt(resolveOccurredAt(payload));
-            ReservaStock savedReserva = reservaStockRepository.saveAndFlush(reserva);
-
-            MovimientoInventario movimiento = createMovimiento(
-                    payload,
-                    sku,
-                    almacen,
-                    savedReserva,
-                    TipoMovimientoInventario.ANULACION_COMPENSATORIA,
-                    MotivoMovimientoInventario.ANULACION_COMPENSATORIA,
-                    cantidad,
-                    disponibleAnterior,
-                    stockDisponible(savedStock),
-                    resolveMotivo(payload, "Anulación de reserva solicitada por MS4.")
-            );
-            MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
-
-            auditarReserva(savedReserva, savedMovimiento, "PROCESAR_ANULACION_MS4", "Reserva liberada correctamente.");
-            registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_RESERVA_LIBERADA);
-
-            return mapper.toSuccessResult(
-                    toAnuladoDto(payload),
-                    savedReserva,
-                    savedMovimiento,
-                    savedStock,
-                    "Anulación de reserva de MS4 procesada correctamente."
-            );
+            return anularReservaReservada(payload, sku, almacen, reserva, stock, cantidad);
         }
 
         if (reserva.getEstadoReserva().isConfirmada()) {
-            int stockAnterior = defaultInt(stock.getStockFisico());
-
-            stock.setStockFisico(stockAnterior + cantidad);
-            StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
-
-            MovimientoInventario movimiento = createMovimiento(
-                    payload,
-                    sku,
-                    almacen,
-                    reserva,
-                    TipoMovimientoInventario.ANULACION_COMPENSATORIA,
-                    MotivoMovimientoInventario.ANULACION_COMPENSATORIA,
-                    cantidad,
-                    stockAnterior,
-                    defaultInt(savedStock.getStockFisico()),
-                    resolveMotivo(payload, "Anulación compensatoria de venta confirmada por MS4.")
-            );
-            MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
-
-            auditarReserva(reserva, savedMovimiento, "PROCESAR_ANULACION_COMPENSATORIA_MS4", "Movimiento de inventario registrado correctamente.");
-            registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_AJUSTADO);
-
-            return mapper.toSuccessResult(
-                    toAnuladoDto(payload),
-                    reserva,
-                    savedMovimiento,
-                    savedStock,
-                    "Anulación compensatoria de stock de MS4 procesada correctamente."
-            );
+            return anularReservaConfirmada(payload, sku, almacen, reserva, stock, cantidad);
         }
 
         return duplicate(payload);
     }
 
-    private void validatePayload(Ms4StockCommandPayload payload) {
-        if (payload == null) {
+    private Ms4StockSyncResultDto anularReservaReservada(
+            Ms4StockCommandPayload payload,
+            ProductoSku sku,
+            Almacen almacen,
+            ReservaStock reserva,
+            StockSku stock,
+            int cantidad
+    ) {
+        if (defaultInt(stock.getStockReservado()) < cantidad) {
             throw new ConflictException(
+                    "STOCK_RESERVADO_INCONSISTENTE",
+                    "El stock reservado es menor que la cantidad anulada por MS4."
+            );
+        }
+
+        int disponibleAnterior = stockDisponible(stock);
+
+        stock.setStockReservado(StockMathUtil.releaseReserved(stock.getStockReservado(), cantidad));
+        StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
+
+        reserva.setEstadoReserva(EstadoReservaStock.ANULADA);
+        reserva.setLiberadoPorIdUsuarioMs1(resolveActorId(payload));
+        reserva.setLiberadoAt(resolveOccurredAt(payload));
+        ReservaStock savedReserva = reservaStockRepository.saveAndFlush(reserva);
+
+        MovimientoInventario movimiento = createMovimiento(
+                payload,
+                sku,
+                almacen,
+                savedReserva,
+                TipoMovimientoInventario.ANULACION_COMPENSATORIA,
+                MotivoMovimientoInventario.ANULACION_COMPENSATORIA,
+                cantidad,
+                disponibleAnterior,
+                stockDisponible(savedStock),
+                resolveMotivo(payload, "Anulación de reserva solicitada por MS4.")
+        );
+        MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
+
+        auditarOperacion(
+                savedReserva,
+                savedMovimiento,
+                TipoEventoAuditoria.RESERVA_STOCK_LIBERADA,
+                "PROCESAR_ANULACION_MS4",
+                "Anulación de reserva de MS4 procesada correctamente."
+        );
+        registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_RESERVA_LIBERADA);
+
+        log.info(
+                "Anulación de reserva reservada MS4 procesada. eventId={}, idempotencyKey={}, codigoReserva={}, codigoMovimiento={}",
+                payload.safeEventId(),
+                payload.safeIdempotencyKey(),
+                savedReserva.getCodigoReserva(),
+                savedMovimiento.getCodigoMovimiento()
+        );
+
+        return mapper.toSuccessResult(
+                toAnuladoDto(payload),
+                savedReserva,
+                savedMovimiento,
+                savedStock,
+                "Anulación de reserva de MS4 procesada correctamente."
+        );
+    }
+
+    private Ms4StockSyncResultDto anularReservaConfirmada(
+            Ms4StockCommandPayload payload,
+            ProductoSku sku,
+            Almacen almacen,
+            ReservaStock reserva,
+            StockSku stock,
+            int cantidad
+    ) {
+        int stockFisicoAnterior = defaultInt(stock.getStockFisico());
+
+        stock.setStockFisico(StockMathUtil.applyEntry(stock.getStockFisico(), cantidad));
+        StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
+
+        reserva.setEstadoReserva(EstadoReservaStock.ANULADA);
+        reserva.setLiberadoPorIdUsuarioMs1(resolveActorId(payload));
+        reserva.setLiberadoAt(resolveOccurredAt(payload));
+        ReservaStock savedReserva = reservaStockRepository.saveAndFlush(reserva);
+
+        MovimientoInventario movimiento = createMovimiento(
+                payload,
+                sku,
+                almacen,
+                savedReserva,
+                TipoMovimientoInventario.ANULACION_COMPENSATORIA,
+                MotivoMovimientoInventario.ANULACION_COMPENSATORIA,
+                cantidad,
+                stockFisicoAnterior,
+                defaultInt(savedStock.getStockFisico()),
+                resolveMotivo(payload, "Anulación compensatoria de venta confirmada por MS4.")
+        );
+        MovimientoInventario savedMovimiento = movimientoInventarioRepository.saveAndFlush(movimiento);
+
+        auditarOperacion(
+                savedReserva,
+                savedMovimiento,
+                TipoEventoAuditoria.MOVIMIENTO_KARDEX_REGISTRADO,
+                "PROCESAR_ANULACION_COMPENSATORIA_MS4",
+                "Movimiento de inventario registrado correctamente."
+        );
+        registrarOutbox(savedStock, savedMovimiento, StockEventType.STOCK_AJUSTADO);
+
+        log.info(
+                "Anulación compensatoria MS4 procesada. eventId={}, idempotencyKey={}, codigoReserva={}, codigoMovimiento={}",
+                payload.safeEventId(),
+                payload.safeIdempotencyKey(),
+                savedReserva.getCodigoReserva(),
+                savedMovimiento.getCodigoMovimiento()
+        );
+
+        return mapper.toSuccessResult(
+                toAnuladoDto(payload),
+                savedReserva,
+                savedMovimiento,
+                savedStock,
+                "Anulación compensatoria de stock de MS4 procesada correctamente."
+        );
+    }
+
+    private ResolvedCommand validateAndResolve(
+            Ms4StockCommandPayload payload,
+            Ms4StockEventType expectedEventType,
+            boolean cantidadObligatoria
+    ) {
+        if (payload == null) {
+            throw new ValidationException(
                     "MS4_PAYLOAD_REQUERIDO",
                     "El payload de MS4 es obligatorio."
             );
         }
 
-        if (payload.eventType() == null) {
-            throw new ConflictException(
-                    "MS4_EVENT_TYPE_REQUERIDO",
-                    "El tipo de evento de MS4 es obligatorio."
-            );
-        }
-
-        if (payload.referenciaTipo() == null || !StringUtils.hasText(payload.safeReferenciaIdExterno())) {
-            throw new ConflictException(
-                    "MS4_REFERENCIA_REQUERIDA",
-                    "La referencia externa de MS4 es obligatoria."
-            );
-        }
-
-        if (payload.cantidad() == null || payload.cantidad() <= 0) {
-            throw new ConflictException(
-                    "MS4_CANTIDAD_INVALIDA",
-                    "La cantidad informada por MS4 debe ser mayor a cero."
-            );
-        }
-    }
-
-    private ProductoSku resolveSku(Ms4StockCommandPayload payload) {
         Long idSku = idempotencyGuard.resolveSkuId(payload.sku()).orElse(null);
+        Long idAlmacen = idempotencyGuard.resolveAlmacenId(payload.almacen()).orElse(null);
 
-        if (idSku == null) {
-            throw new NotFoundException(
-                    "SKU_NO_ENCONTRADO",
-                    "No se encontró el SKU informado por MS4."
-            );
+        ms4StockEventValidator.validateStockCommand(
+                payload.safeIdempotencyKey(),
+                payload.eventType(),
+                expectedEventType,
+                payload.referenciaTipo(),
+                payload.safeReferenciaIdExterno(),
+                idSku,
+                idAlmacen,
+                payload.cantidad(),
+                cantidadObligatoria
+        );
+
+        if (idempotencyGuard.isProcessed(payload)) {
+            return ResolvedCommand.duplicated();
         }
 
-        return productoSkuRepository.findByIdSkuAndEstadoTrue(idSku)
+        ProductoSku sku = productoSkuRepository.findByIdSkuAndEstadoTrue(idSku)
                 .orElseThrow(() -> new NotFoundException(
                         "SKU_NO_ENCONTRADO",
                         "No se encontró el SKU informado por MS4."
                 ));
-    }
 
-    private Almacen resolveAlmacen(Ms4StockCommandPayload payload) {
-        Long idAlmacen = idempotencyGuard.resolveAlmacenId(payload.almacen()).orElse(null);
+        ensureSkuOperativo(sku);
 
-        if (idAlmacen == null) {
-            throw new NotFoundException(
-                    "ALMACEN_NO_ENCONTRADO",
-                    "No se encontró el almacén informado por MS4."
-            );
-        }
-
-        return almacenRepository.findByIdAlmacenAndEstadoTrue(idAlmacen)
+        Almacen almacen = almacenRepository.findByIdAlmacenAndEstadoTrue(idAlmacen)
                 .orElseThrow(() -> new NotFoundException(
                         "ALMACEN_NO_ENCONTRADO",
                         "No se encontró el almacén informado por MS4."
                 ));
+
+        ensureAlmacenPermiteVenta(almacen);
+
+        return new ResolvedCommand(sku, almacen, false);
+    }
+
+    private void ensureSkuOperativo(ProductoSku sku) {
+        if (sku.getEstadoSku() == null || !sku.getEstadoSku().isOperativo()) {
+            throw new ConflictException(
+                    "SKU_NO_OPERATIVO",
+                    "No se puede completar la operación porque el SKU no está operativo."
+            );
+        }
+    }
+
+    private void ensureAlmacenPermiteVenta(Almacen almacen) {
+        if (!Boolean.TRUE.equals(almacen.getPermiteVenta())) {
+            throw new ConflictException(
+                    "ALMACEN_NO_PERMITE_VENTA",
+                    "No se puede completar la operación porque el almacén no permite venta."
+            );
+        }
     }
 
     private StockSku resolveStockForUpdate(ProductoSku sku, Almacen almacen) {
@@ -463,6 +620,26 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
                         "RESERVA_NO_ENCONTRADA",
                         "No se encontró la reserva de stock informada por MS4."
                 ));
+    }
+
+    private int resolveCantidad(Ms4StockCommandPayload payload, ReservaStock reserva) {
+        Integer cantidad = payload.cantidad() == null ? reserva.getCantidad() : payload.cantidad();
+
+        if (cantidad == null || cantidad <= 0) {
+            throw new ConflictException(
+                    "MS4_CANTIDAD_INVALIDA",
+                    "La cantidad informada por MS4 debe ser mayor a cero."
+            );
+        }
+
+        if (reserva.getCantidad() != null && !Objects.equals(reserva.getCantidad(), cantidad)) {
+            throw new ConflictException(
+                    "MS4_CANTIDAD_NO_COINCIDE",
+                    "La cantidad informada por MS4 no coincide con la cantidad reservada."
+            );
+        }
+
+        return cantidad;
     }
 
     private MovimientoInventario createMovimiento(
@@ -603,14 +780,15 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
                 .build();
     }
 
-    private void auditarReserva(
+    private void auditarOperacion(
             ReservaStock reserva,
             MovimientoInventario movimiento,
+            TipoEventoAuditoria tipoEvento,
             String accion,
             String descripcion
     ) {
         auditoriaFuncionalService.registrarExito(
-                TipoEventoAuditoria.MOVIMIENTO_KARDEX_REGISTRADO,
+                tipoEvento,
                 EntidadAuditada.MOVIMIENTO_INVENTARIO,
                 String.valueOf(movimiento.getIdMovimiento()),
                 accion,
@@ -618,8 +796,10 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
                 Map.of(
                         "idReservaStock", reserva.getIdReservaStock(),
                         "codigoReserva", reserva.getCodigoReserva(),
+                        "estadoReserva", reserva.getEstadoReserva().getCode(),
                         "idMovimiento", movimiento.getIdMovimiento(),
                         "codigoMovimiento", movimiento.getCodigoMovimiento(),
+                        "tipoMovimiento", movimiento.getTipoMovimiento().getCode(),
                         "referenciaTipo", movimiento.getReferenciaTipo(),
                         "referenciaIdExterno", movimiento.getReferenciaIdExterno(),
                         "requestId", movimiento.getRequestId(),
@@ -668,11 +848,7 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
     }
 
     private Integer stockDisponible(StockSku stock) {
-        if (stock.getStockDisponible() != null) {
-            return stock.getStockDisponible();
-        }
-
-        return defaultInt(stock.getStockFisico()) - defaultInt(stock.getStockReservado());
+        return StockMathUtil.available(stock.getStockFisico(), stock.getStockReservado());
     }
 
     private int defaultInt(Integer value) {
@@ -781,5 +957,16 @@ public class Ms4ReconciliacionServiceImpl implements Ms4ReconciliacionService {
                 .correlationId(payload.correlationId())
                 .metadataJson(payload.metadataJson())
                 .build();
+    }
+
+    private record ResolvedCommand(
+            ProductoSku sku,
+            Almacen almacen,
+            boolean alreadyProcessed
+    ) {
+
+        private static ResolvedCommand duplicated() {
+            return new ResolvedCommand(null, null, true);
+        }
     }
 }

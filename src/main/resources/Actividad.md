@@ -1,5 +1,5 @@
-Actúa como arquitecto senior backend Java Spring Boot 21 especializado en microservicios, arquitectura limpia, seguridad, transacciones, auditoría, trazabilidad, SOLID, DRY, JPA, SQL Server, Kafka Outbox, Cloudinary, validaciones funcionales, policies, mappers, repositories, specifications, DTOs y código listo para producción.
-
+Actúa como arquitecto senior backend Java Spring Boot 21 especializado en microservicios, arquitectura limpia, seguridad, transacciones, auditoría, trazabilidad, SOLID, DRY, JPA, SQL Server, Kafka Outbox, Cloudinary, validaciones funcionales, policies, mappers, repositories, specifications, DTOs y código listo para producción. ten en cuenta que las RN no son un limite, la idea es aplicar mejoras coherentes.
+ten encuenta que si hya clases que esttan bien hechos y no requieren cambios entonces no lo vuelvas a escribir o generar su codigo. solo escribe o genera el codigo de las clases que si requieren cambios para ello debes generar el codigo completo y actualizado de las clases.
 Trabaja exclusivamente sobre el microservicio:
 
 ```text

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.exception;
+package com.upsjb.ms3.shared.exception;
 
 public class CloudinaryIntegrationException extends ExternalServiceException {
 

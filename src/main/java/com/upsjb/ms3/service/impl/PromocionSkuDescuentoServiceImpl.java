@@ -1,7 +1,8 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionSkuDescuentoServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionSkuDescuentoServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
+import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.Promocion;
 import com.upsjb.ms3.domain.entity.PromocionSkuDescuentoVersion;
@@ -14,6 +15,7 @@ import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
 import com.upsjb.ms3.dto.promocion.filter.PromocionSkuDescuentoFilterDto;
 import com.upsjb.ms3.dto.promocion.request.PromocionSkuDescuentoCreateRequestDto;
 import com.upsjb.ms3.dto.promocion.request.PromocionSkuDescuentoUpdateRequestDto;
+import com.upsjb.ms3.dto.promocion.response.PromocionSkuDescuentoCalculoResponseDto;
 import com.upsjb.ms3.dto.promocion.response.PromocionSkuDescuentoResponseDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;
@@ -31,7 +33,6 @@ import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
 import com.upsjb.ms3.service.contract.PromocionSkuDescuentoService;
 import com.upsjb.ms3.service.support.PromocionPricingSupport;
 import com.upsjb.ms3.service.support.PromocionSnapshotOutboxSupport;
-import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
@@ -47,6 +48,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -187,6 +189,68 @@ public class PromocionSkuDescuentoServiceImpl implements PromocionSkuDescuentoSe
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<PromocionSkuDescuentoCalculoResponseDto> calcular(
+            Long idPromocionVersion,
+            PromocionSkuDescuentoCreateRequestDto request
+    ) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        promocionPolicy.ensureCanManageSkuDiscounts(actor);
+
+        PromocionVersion version = findVersionRequired(idPromocionVersion);
+        PromocionSkuDescuentoCreateRequestDto normalized = normalizeCreateRequest(request);
+        ProductoSku sku = resolveSku(normalized.sku());
+
+        PrecioSkuHistorial precio = promocionPricingSupport.currentPriceRequired(sku);
+        BigDecimal costoEstimado = promocionPricingSupport.costoPromedioEstimado(sku);
+        BigDecimal precioFinal = promocionPricingSupport.resolvePrecioFinal(
+                normalized.tipoDescuento(),
+                normalized.valorDescuento(),
+                precio.getPrecioVenta()
+        );
+        BigDecimal margen = promocionPricingSupport.resolveMargen(precioFinal, costoEstimado);
+
+        promocionSkuDescuentoValidator.validateCreate(
+                version,
+                sku,
+                normalized.tipoDescuento(),
+                normalized.valorDescuento(),
+                precio.getPrecioVenta(),
+                costoEstimado,
+                normalized.limiteUnidades(),
+                normalized.prioridad(),
+                promocionSkuDescuentoRepository.existsByPromocionVersion_IdPromocionVersionAndSku_IdSkuAndEstadoTrue(
+                        version.getIdPromocionVersion(),
+                        sku.getIdSku()
+                )
+        );
+
+        Producto producto = sku.getProducto();
+        Moneda moneda = precio.getMoneda() == null ? Moneda.PEN : precio.getMoneda();
+
+        PromocionSkuDescuentoCalculoResponseDto response = PromocionSkuDescuentoCalculoResponseDto.builder()
+                .idPromocionVersion(version.getIdPromocionVersion())
+                .idSku(sku.getIdSku())
+                .codigoSku(sku.getCodigoSku())
+                .codigoProducto(producto == null ? null : producto.getCodigoProducto())
+                .nombreProducto(producto == null ? null : producto.getNombre())
+                .tipoDescuento(normalized.tipoDescuento())
+                .valorDescuento(normalized.valorDescuento())
+                .precioBase(promocionPricingSupport.toMoney(precio.getPrecioVenta(), moneda))
+                .precioFinalEstimado(promocionPricingSupport.toMoney(precioFinal, moneda))
+                .margenEstimado(promocionPricingSupport.toMoney(margen, moneda))
+                .generaMargenNegativo(margen != null && margen.compareTo(BigDecimal.ZERO) < 0)
+                .limiteUnidades(normalized.limiteUnidades())
+                .prioridad(normalized.prioridad())
+                .build();
+
+        return apiResponseFactory.dtoOk(
+                "Operación realizada correctamente.",
+                response
+        );
+    }
+
+    @Override
     @Transactional
     public ApiResponseDto<PromocionSkuDescuentoResponseDto> actualizar(
             Long idPromocionSkuDescuentoVersion,
@@ -268,21 +332,9 @@ public class PromocionSkuDescuentoServiceImpl implements PromocionSkuDescuentoSe
         PromocionSkuDescuentoVersion descuento = findDescuentoRequired(idPromocionSkuDescuentoVersion);
         requireEstadoFalse(request);
 
+        promocionSkuDescuentoValidator.validateCanInactivate(descuento);
+
         PromocionVersion version = descuento.getPromocionVersion();
-
-        if (version == null || !version.isActivo()) {
-            throw new NotFoundException(
-                    "PROMOCION_VERSION_NO_ENCONTRADA",
-                    "No se encontró el registro solicitado."
-            );
-        }
-
-        if (version.getEstadoPromocion() == null || !version.getEstadoPromocion().isEditable()) {
-            throw new ConflictException(
-                    "PROMOCION_DESCUENTO_NO_EDITABLE",
-                    "No se puede inactivar el descuento porque la versión de promoción no es editable."
-            );
-        }
 
         descuento.inactivar();
 
@@ -404,7 +456,7 @@ public class PromocionSkuDescuentoServiceImpl implements PromocionSkuDescuentoSe
                         DateTimeUtil.nowUtc()
                 )
                 .stream()
-                .map(this::toResponse)
+                .map(this::toPublicResponse)
                 .toList();
 
         return apiResponseFactory.dtoOk(
@@ -501,17 +553,35 @@ public class PromocionSkuDescuentoServiceImpl implements PromocionSkuDescuentoSe
     }
 
     private PromocionSkuDescuentoResponseDto toResponse(PromocionSkuDescuentoVersion descuento) {
-        PrecioSkuHistorial precio = descuento.getSku() == null
-                ? null
-                : promocionPricingSupport.currentPriceRequired(descuento.getSku());
+        Optional<PrecioSkuHistorial> precio = descuento.getSku() == null
+                ? Optional.empty()
+                : promocionPricingSupport.currentPriceOptional(descuento.getSku());
 
-        MoneyResponseDto precioBase = precio == null
-                ? null
-                : promocionPricingSupport.toMoney(precio.getPrecioVenta(), precio.getMoneda());
+        MoneyResponseDto precioBase = precio
+                .map(value -> promocionPricingSupport.toMoney(value.getPrecioVenta(), value.getMoneda()))
+                .orElse(null);
 
-        Moneda moneda = precio == null ? Moneda.PEN : precio.getMoneda();
+        Moneda moneda = precio
+                .map(PrecioSkuHistorial::getMoneda)
+                .orElse(Moneda.PEN);
 
         return promocionSkuDescuentoMapper.toResponse(descuento, precioBase, moneda);
+    }
+
+    private PromocionSkuDescuentoResponseDto toPublicResponse(PromocionSkuDescuentoVersion descuento) {
+        Optional<PrecioSkuHistorial> precio = descuento.getSku() == null
+                ? Optional.empty()
+                : promocionPricingSupport.currentPriceOptional(descuento.getSku());
+
+        MoneyResponseDto precioBase = precio
+                .map(value -> promocionPricingSupport.toMoney(value.getPrecioVenta(), value.getMoneda()))
+                .orElse(null);
+
+        Moneda moneda = precio
+                .map(PrecioSkuHistorial::getMoneda)
+                .orElse(Moneda.PEN);
+
+        return promocionSkuDescuentoMapper.toPublicResponse(descuento, precioBase, moneda);
     }
 
     private Map<String, Object> auditMetadata(

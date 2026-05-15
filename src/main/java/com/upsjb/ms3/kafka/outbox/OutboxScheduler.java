@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxScheduler.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxScheduler.java
 package com.upsjb.ms3.kafka.outbox;
 
 import com.upsjb.ms3.dto.outbox.response.OutboxPublishResultResponseDto;

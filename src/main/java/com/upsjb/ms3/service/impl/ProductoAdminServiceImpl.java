@@ -1,16 +1,20 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoAdminServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoAdminServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
+import com.upsjb.ms3.domain.entity.Atributo;
 import com.upsjb.ms3.domain.entity.Categoria;
 import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.Producto;
+import com.upsjb.ms3.domain.entity.ProductoAtributoValor;
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.TipoProducto;
+import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoProductoPublicacion;
 import com.upsjb.ms3.domain.enums.EstadoProductoRegistro;
 import com.upsjb.ms3.domain.enums.EstadoProductoVenta;
+import com.upsjb.ms3.domain.enums.EstadoReservaStock;
 import com.upsjb.ms3.domain.enums.EstadoSku;
 import com.upsjb.ms3.domain.enums.ProductoEventType;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
@@ -47,6 +51,7 @@ import com.upsjb.ms3.repository.ProductoRepository;
 import com.upsjb.ms3.repository.ProductoSkuRepository;
 import com.upsjb.ms3.repository.ReservaStockRepository;
 import com.upsjb.ms3.repository.StockSkuRepository;
+import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
@@ -61,6 +66,7 @@ import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
+import com.upsjb.ms3.shared.reference.AtributoReferenceResolver;
 import com.upsjb.ms3.shared.reference.CategoriaReferenceResolver;
 import com.upsjb.ms3.shared.reference.MarcaReferenceResolver;
 import com.upsjb.ms3.shared.reference.TipoProductoReferenceResolver;
@@ -68,8 +74,10 @@ import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.ProductoSpecifications;
 import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.StringNormalizer;
+import com.upsjb.ms3.validator.AtributoValidator;
 import com.upsjb.ms3.validator.ProductoPublicacionValidator;
 import com.upsjb.ms3.validator.ProductoValidator;
+import com.upsjb.ms3.validator.TipoProductoAtributoValidator;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -115,6 +123,7 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
     private final ProductoRepository productoRepository;
     private final ProductoSkuRepository productoSkuRepository;
     private final ProductoAtributoValorRepository productoAtributoValorRepository;
+    private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
     private final ProductoImagenCloudinaryRepository productoImagenRepository;
     private final PrecioSkuHistorialRepository precioSkuHistorialRepository;
     private final StockSkuRepository stockSkuRepository;
@@ -123,6 +132,7 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
     private final TipoProductoReferenceResolver tipoProductoReferenceResolver;
     private final CategoriaReferenceResolver categoriaReferenceResolver;
     private final MarcaReferenceResolver marcaReferenceResolver;
+    private final AtributoReferenceResolver atributoReferenceResolver;
 
     private final ProductoMapper productoMapper;
     private final ProductoSkuMapper productoSkuMapper;
@@ -131,6 +141,8 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
 
     private final ProductoValidator productoValidator;
     private final ProductoPublicacionValidator productoPublicacionValidator;
+    private final AtributoValidator atributoValidator;
+    private final TipoProductoAtributoValidator tipoProductoAtributoValidator;
     private final ProductoPolicy productoPolicy;
 
     private final CodigoGeneradorService codigoGeneradorService;
@@ -808,10 +820,80 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
                     productoAtributoValorRepository.save(valor);
                 });
 
+        Set<Long> atributosProcesados = new java.util.HashSet<>();
+
         for (ProductoAtributoValorRequestDto atributoRequest : safeAtributos) {
-            // Se delega la validación funcional fina al service dedicado cuando se consume directamente.
-            // En creación/actualización administrativa se registra mediante mapper y validators básicos en cascada.
+            ProductoAtributoValorRequestDto normalized = normalizeAtributoValorRequest(atributoRequest);
+            Atributo atributo = resolveAtributo(normalized.atributo());
+
+            if (!atributosProcesados.add(atributo.getIdAtributo())) {
+                throw new ConflictException(
+                        "PRODUCTO_ATRIBUTO_DUPLICADO",
+                        "No se puede registrar dos veces el mismo atributo para el producto."
+                );
+            }
+
+            TipoProductoAtributo relation = resolveTipoProductoAtributo(producto, atributo);
+            tipoProductoAtributoValidator.requireActive(relation);
+
+            atributoValidator.validateValueByType(
+                    atributo,
+                    normalized.valorTexto(),
+                    normalized.valorNumero(),
+                    normalized.valorBoolean(),
+                    normalized.valorFecha()
+            );
+
+            ProductoAtributoValor entity = productoAtributoValorMapper.toEntity(normalized, producto, atributo);
+            entity.activar();
+            productoAtributoValorRepository.save(entity);
         }
+
+        productoAtributoValorRepository.flush();
+    }
+
+    private ProductoAtributoValorRequestDto normalizeAtributoValorRequest(ProductoAtributoValorRequestDto request) {
+        if (request == null) {
+            throw new ValidationException(
+                    "PRODUCTO_ATRIBUTO_VALOR_REQUEST_REQUERIDO",
+                    "Debe enviar el valor del atributo."
+            );
+        }
+
+        return ProductoAtributoValorRequestDto.builder()
+                .atributo(request.atributo())
+                .valorTexto(StringNormalizer.truncateOrNull(request.valorTexto(), 500))
+                .valorNumero(request.valorNumero())
+                .valorBoolean(request.valorBoolean())
+                .valorFecha(request.valorFecha())
+                .build();
+    }
+
+    private Atributo resolveAtributo(EntityReferenceDto reference) {
+        if (reference == null) {
+            throw new ValidationException(
+                    "ATRIBUTO_REFERENCIA_REQUERIDA",
+                    "Debe indicar el atributo."
+            );
+        }
+
+        return atributoReferenceResolver.resolve(
+                reference.id(),
+                reference.codigo(),
+                reference.nombre()
+        );
+    }
+
+    private TipoProductoAtributo resolveTipoProductoAtributo(Producto producto, Atributo atributo) {
+        return tipoProductoAtributoRepository
+                .findByTipoProducto_IdTipoProductoAndAtributo_IdAtributoAndEstadoTrue(
+                        producto.getTipoProducto().getIdTipoProducto(),
+                        atributo.getIdAtributo()
+                )
+                .orElseThrow(() -> new ConflictException(
+                        "ATRIBUTO_NO_ASOCIADO_TIPO_PRODUCTO",
+                        "El atributo no está asociado al tipo de producto."
+                ));
     }
 
     private boolean hasActiveSku(Producto producto) {
@@ -842,12 +924,10 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
     }
 
     private boolean hasPendingReservations(Producto producto) {
-        return productoSkuRepository.findByProducto_IdProductoAndEstadoTrueOrderByIdSkuAsc(producto.getIdProducto())
-                .stream()
-                .anyMatch(sku -> reservaStockRepository.existsByReferenciaTipoAndReferenciaIdExternoAndEstadoTrue(
-                        null,
-                        null
-                ));
+        return reservaStockRepository.existsBySku_Producto_IdProductoAndEstadoReservaInAndEstadoTrue(
+                producto.getIdProducto(),
+                List.of(EstadoReservaStock.RESERVADA)
+        );
     }
 
     private void registrarOutboxProducto(Producto producto, ProductoEventType eventType) {

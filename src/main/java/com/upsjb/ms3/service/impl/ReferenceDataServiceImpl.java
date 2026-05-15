@@ -1,7 +1,8 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ReferenceDataServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ReferenceDataServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.enums.AggregateType;
+import com.upsjb.ms3.domain.enums.CloudinaryResourceType;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoCompraInventario;
 import com.upsjb.ms3.domain.enums.EstadoMovimientoInventario;
@@ -10,13 +11,19 @@ import com.upsjb.ms3.domain.enums.EstadoProductoRegistro;
 import com.upsjb.ms3.domain.enums.EstadoProductoVenta;
 import com.upsjb.ms3.domain.enums.EstadoPromocion;
 import com.upsjb.ms3.domain.enums.EstadoPublicacionEvento;
+import com.upsjb.ms3.domain.enums.EstadoRegistro;
 import com.upsjb.ms3.domain.enums.EstadoReservaStock;
 import com.upsjb.ms3.domain.enums.EstadoSku;
 import com.upsjb.ms3.domain.enums.GeneroObjetivo;
 import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.domain.enums.MotivoMovimientoInventario;
+import com.upsjb.ms3.domain.enums.Ms4StockEventType;
+import com.upsjb.ms3.domain.enums.PrecioEventType;
+import com.upsjb.ms3.domain.enums.ProductoEventType;
+import com.upsjb.ms3.domain.enums.PromocionEventType;
 import com.upsjb.ms3.domain.enums.ResultadoAuditoria;
 import com.upsjb.ms3.domain.enums.RolSistema;
+import com.upsjb.ms3.domain.enums.StockEventType;
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
 import com.upsjb.ms3.domain.enums.TipoDescuento;
 import com.upsjb.ms3.domain.enums.TipoDocumentoProveedor;
@@ -48,182 +55,225 @@ public class ReferenceDataServiceImpl implements ReferenceDataService {
     public ApiResponseDto<Map<String, List<SelectOptionDto>>> listarTodo() {
         Map<String, List<SelectOptionDto>> data = new LinkedHashMap<>();
 
-        data.put("estadosProductoRegistro", options(EstadoProductoRegistro.values()));
-        data.put("estadosProductoPublicacion", options(EstadoProductoPublicacion.values()));
-        data.put("estadosProductoVenta", options(EstadoProductoVenta.values()));
-        data.put("estadosSku", options(EstadoSku.values()));
-        data.put("generosObjetivo", options(GeneroObjetivo.values()));
-        data.put("monedas", options(Moneda.values()));
-        data.put("tiposProveedor", options(TipoProveedor.values()));
-        data.put("tiposDocumentoProveedor", options(TipoDocumentoProveedor.values()));
-        data.put("tiposDescuento", options(TipoDescuento.values()));
-        data.put("estadosPromocion", options(EstadoPromocion.values()));
-        data.put("estadosCompraInventario", options(EstadoCompraInventario.values()));
-        data.put("estadosReservaStock", options(EstadoReservaStock.values()));
-        data.put("tiposReferenciaStock", options(TipoReferenciaStock.values()));
-        data.put("tiposMovimientoInventario", options(TipoMovimientoInventario.values()));
-        data.put("motivosMovimientoInventario", options(MotivoMovimientoInventario.values()));
-        data.put("estadosMovimientoInventario", options(EstadoMovimientoInventario.values()));
-        data.put("estadosPublicacionEvento", options(EstadoPublicacionEvento.values()));
-        data.put("tiposDatoAtributo", options(TipoDatoAtributo.values()));
-        data.put("rolesSistema", options(RolSistema.values()));
-        data.put("resultadosAuditoria", options(ResultadoAuditoria.values()));
-        data.put("entidadesAuditadas", options(EntidadAuditada.values()));
-        data.put("tiposEventoAuditoria", options(TipoEventoAuditoria.values()));
-        data.put("aggregateTypes", options(AggregateType.values()));
+        data.put("estadosProductoRegistro", optionList(EstadoProductoRegistro.values()));
+        data.put("estadosProductoPublicacion", optionList(EstadoProductoPublicacion.values()));
+        data.put("estadosProductoVenta", optionList(EstadoProductoVenta.values()));
+        data.put("estadosSku", optionList(EstadoSku.values()));
+        data.put("generosObjetivo", optionList(GeneroObjetivo.values()));
+        data.put("monedas", optionList(Moneda.values()));
+        data.put("tiposProveedor", optionList(TipoProveedor.values()));
+        data.put("tiposDocumentoProveedor", optionList(TipoDocumentoProveedor.values()));
+        data.put("tiposDescuento", optionList(TipoDescuento.values()));
+        data.put("estadosPromocion", optionList(EstadoPromocion.values()));
+        data.put("estadosCompraInventario", optionList(EstadoCompraInventario.values()));
+        data.put("estadosReservaStock", optionList(EstadoReservaStock.values()));
+        data.put("tiposReferenciaStock", optionList(TipoReferenciaStock.values()));
+        data.put("tiposMovimientoInventario", optionList(TipoMovimientoInventario.values()));
+        data.put("motivosMovimientoInventario", optionList(MotivoMovimientoInventario.values()));
+        data.put("estadosMovimientoInventario", optionList(EstadoMovimientoInventario.values()));
+        data.put("estadosPublicacionEvento", optionList(EstadoPublicacionEvento.values()));
+        data.put("tiposDatoAtributo", optionList(TipoDatoAtributo.values()));
+        data.put("rolesSistema", optionList(RolSistema.values()));
+        data.put("resultadosAuditoria", optionList(ResultadoAuditoria.values()));
+        data.put("entidadesAuditadas", optionList(EntidadAuditada.values()));
+        data.put("tiposEventoAuditoria", optionList(TipoEventoAuditoria.values()));
+        data.put("aggregateTypes", optionList(AggregateType.values()));
+        data.put("estadosRegistro", optionList(EstadoRegistro.values()));
+        data.put("cloudinaryResourceTypes", optionList(CloudinaryResourceType.values()));
+        data.put("productoEventTypes", optionList(ProductoEventType.values()));
+        data.put("precioEventTypes", optionList(PrecioEventType.values()));
+        data.put("promocionEventTypes", optionList(PromocionEventType.values()));
+        data.put("stockEventTypes", optionList(StockEventType.values()));
+        data.put("ms4StockEventTypes", optionList(Ms4StockEventType.values()));
 
-        return apiResponseFactory.dtoOk(
-                "Lista obtenida correctamente.",
-                data
-        );
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosProductoRegistro() {
-        return ok(options(EstadoProductoRegistro.values()));
+        return ok(optionList(EstadoProductoRegistro.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosProductoPublicacion() {
-        return ok(options(EstadoProductoPublicacion.values()));
+        return ok(optionList(EstadoProductoPublicacion.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosProductoVenta() {
-        return ok(options(EstadoProductoVenta.values()));
+        return ok(optionList(EstadoProductoVenta.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosSku() {
-        return ok(options(EstadoSku.values()));
+        return ok(optionList(EstadoSku.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> generosObjetivo() {
-        return ok(options(GeneroObjetivo.values()));
+        return ok(optionList(GeneroObjetivo.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> monedas() {
-        return ok(options(Moneda.values()));
+        return ok(optionList(Moneda.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposProveedor() {
-        return ok(options(TipoProveedor.values()));
+        return ok(optionList(TipoProveedor.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposDocumentoProveedor() {
-        return ok(options(TipoDocumentoProveedor.values()));
+        return ok(optionList(TipoDocumentoProveedor.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposDescuento() {
-        return ok(options(TipoDescuento.values()));
+        return ok(optionList(TipoDescuento.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosPromocion() {
-        return ok(options(EstadoPromocion.values()));
+        return ok(optionList(EstadoPromocion.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosCompraInventario() {
-        return ok(options(EstadoCompraInventario.values()));
+        return ok(optionList(EstadoCompraInventario.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosReservaStock() {
-        return ok(options(EstadoReservaStock.values()));
+        return ok(optionList(EstadoReservaStock.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposReferenciaStock() {
-        return ok(options(TipoReferenciaStock.values()));
+        return ok(optionList(TipoReferenciaStock.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposMovimientoInventario() {
-        return ok(options(TipoMovimientoInventario.values()));
+        return ok(optionList(TipoMovimientoInventario.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> motivosMovimientoInventario() {
-        return ok(options(MotivoMovimientoInventario.values()));
+        return ok(optionList(MotivoMovimientoInventario.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosMovimientoInventario() {
-        return ok(options(EstadoMovimientoInventario.values()));
+        return ok(optionList(EstadoMovimientoInventario.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> estadosPublicacionEvento() {
-        return ok(options(EstadoPublicacionEvento.values()));
+        return ok(optionList(EstadoPublicacionEvento.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposDatoAtributo() {
-        return ok(options(TipoDatoAtributo.values()));
+        return ok(optionList(TipoDatoAtributo.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> rolesSistema() {
-        return ok(options(RolSistema.values()));
+        return ok(optionList(RolSistema.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> resultadosAuditoria() {
-        return ok(options(ResultadoAuditoria.values()));
+        return ok(optionList(ResultadoAuditoria.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> entidadesAuditadas() {
-        return ok(options(EntidadAuditada.values()));
+        return ok(optionList(EntidadAuditada.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> tiposEventoAuditoria() {
-        return ok(options(TipoEventoAuditoria.values()));
+        return ok(optionList(TipoEventoAuditoria.values()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<SelectOptionDto>> aggregateTypes() {
-        return ok(options(AggregateType.values()));
+        return ok(optionList(AggregateType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> estadosRegistro() {
+        return ok(optionList(EstadoRegistro.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> cloudinaryResourceTypes() {
+        return ok(optionList(CloudinaryResourceType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> productoEventTypes() {
+        return ok(optionList(ProductoEventType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> precioEventTypes() {
+        return ok(optionList(PrecioEventType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> promocionEventTypes() {
+        return ok(optionList(PromocionEventType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> stockEventTypes() {
+        return ok(optionList(StockEventType.values()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<SelectOptionDto>> ms4StockEventTypes() {
+        return ok(optionList(Ms4StockEventType.values()));
     }
 
     private ApiResponseDto<List<SelectOptionDto>> ok(List<SelectOptionDto> data) {
-        return apiResponseFactory.dtoOk(
-                "Lista obtenida correctamente.",
-                data
-        );
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
 
-    private <E extends Enum<E>> List<SelectOptionDto> options(E[] values) {
+    private <E extends Enum<E>> List<SelectOptionDto> optionList(E[] values) {
         return Arrays.stream(values)
                 .map(this::toOption)
                 .toList();

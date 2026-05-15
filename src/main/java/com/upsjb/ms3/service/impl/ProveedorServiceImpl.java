@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ProveedorServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ProveedorServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Proveedor;
@@ -61,6 +61,7 @@ public class ProveedorServiceImpl implements ProveedorService {
             "apellidos",
             "correo",
             "telefono",
+            "direccion",
             "estado",
             "createdAt",
             "updatedAt"
@@ -68,6 +69,17 @@ public class ProveedorServiceImpl implements ProveedorService {
 
     private static final int DEFAULT_LOOKUP_LIMIT = 20;
     private static final int MAX_LOOKUP_LIMIT = 50;
+    private static final int MAX_SEARCH_LENGTH = 250;
+    private static final int MAX_DOCUMENTO_LENGTH = 30;
+    private static final int MAX_RUC_LENGTH = 20;
+    private static final int MAX_RAZON_SOCIAL_LENGTH = 200;
+    private static final int MAX_NOMBRE_COMERCIAL_LENGTH = 200;
+    private static final int MAX_NOMBRES_LENGTH = 150;
+    private static final int MAX_APELLIDOS_LENGTH = 150;
+    private static final int MAX_CORREO_LENGTH = 180;
+    private static final int MAX_TELEFONO_LENGTH = 30;
+    private static final int MAX_DIRECCION_LENGTH = 300;
+    private static final int MAX_OBSERVACION_LENGTH = 500;
 
     private final ProveedorRepository proveedorRepository;
     private final CompraInventarioRepository compraInventarioRepository;
@@ -94,7 +106,13 @@ public class ProveedorServiceImpl implements ProveedorService {
                 normalized.numeroDocumento(),
                 normalized.ruc(),
                 normalized.razonSocial(),
+                normalized.nombreComercial(),
                 normalized.nombres(),
+                normalized.apellidos(),
+                normalized.correo(),
+                normalized.telefono(),
+                normalized.direccion(),
+                normalized.observacion(),
                 actor.getIdUsuarioMs1(),
                 existsDocumento(normalized.tipoDocumento(), normalized.numeroDocumento()),
                 existsRuc(normalized.ruc())
@@ -145,7 +163,13 @@ public class ProveedorServiceImpl implements ProveedorService {
                 normalized.numeroDocumento(),
                 normalized.ruc(),
                 normalized.razonSocial(),
+                normalized.nombreComercial(),
                 normalized.nombres(),
+                normalized.apellidos(),
+                normalized.correo(),
+                normalized.telefono(),
+                normalized.direccion(),
+                normalized.observacion(),
                 actor.getIdUsuarioMs1(),
                 existsDocumentoExcluding(
                         normalized.tipoDocumento(),
@@ -252,9 +276,9 @@ public class ProveedorServiceImpl implements ProveedorService {
     @Transactional(readOnly = true)
     public ApiResponseDto<ProveedorResponseDto> obtenerPorId(Long idProveedor) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
-        Proveedor entity = findActiveRequired(idProveedor);
+        Proveedor entity = findAnyRequired(idProveedor);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -266,7 +290,7 @@ public class ProveedorServiceImpl implements ProveedorService {
     @Transactional(readOnly = true)
     public ApiResponseDto<ProveedorDetailResponseDto> obtenerDetalle(Long idProveedor) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
         Proveedor entity = findAnyRequired(idProveedor);
         Long cantidadCompras = compraInventarioRepository.countByProveedor_IdProveedorAndEstadoTrue(
@@ -286,7 +310,7 @@ public class ProveedorServiceImpl implements ProveedorService {
             PageRequestDto pageRequest
     ) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
         PageRequestDto safePage = safePageRequest(pageRequest, "createdAt");
 
@@ -314,7 +338,7 @@ public class ProveedorServiceImpl implements ProveedorService {
     @Transactional(readOnly = true)
     public ApiResponseDto<List<ProveedorOptionDto>> lookup(String search, Integer limit) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
         int safeLimit = sanitizeLimit(limit);
 
@@ -328,8 +352,9 @@ public class ProveedorServiceImpl implements ProveedorService {
         );
 
         ProveedorFilterDto filter = ProveedorFilterDto.builder()
-                .search(StringNormalizer.cleanOrNull(search))
+                .search(StringNormalizer.truncateOrNull(search, MAX_SEARCH_LENGTH))
                 .estado(Boolean.TRUE)
+                .incluirTodosLosEstados(Boolean.FALSE)
                 .build();
 
         List<ProveedorOptionDto> response = proveedorRepository.findAll(
@@ -350,7 +375,7 @@ public class ProveedorServiceImpl implements ProveedorService {
     @Transactional(readOnly = true)
     public ApiResponseDto<ProveedorResponseDto> obtenerPorRuc(String ruc) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
         String normalizedRuc = normalizeRuc(ruc);
 
@@ -362,10 +387,7 @@ public class ProveedorServiceImpl implements ProveedorService {
         }
 
         Proveedor entity = proveedorRepository.findByRucAndEstadoTrue(normalizedRuc)
-                .orElseThrow(() -> new NotFoundException(
-                        "PROVEEDOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+                .orElseThrow(this::proveedorNotFound);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -377,7 +399,7 @@ public class ProveedorServiceImpl implements ProveedorService {
     @Transactional(readOnly = true)
     public ApiResponseDto<ProveedorResponseDto> obtenerPorDocumento(String numeroDocumento) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        proveedorPolicy.ensureCanViewAdmin(actor);
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
 
         String normalizedDocumento = normalizeDocumento(null, numeroDocumento);
 
@@ -389,10 +411,42 @@ public class ProveedorServiceImpl implements ProveedorService {
         }
 
         Proveedor entity = proveedorRepository.findByNumeroDocumentoAndEstadoTrue(normalizedDocumento)
-                .orElseThrow(() -> new NotFoundException(
-                        "PROVEEDOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+                .orElseThrow(this::proveedorNotFound);
+
+        return apiResponseFactory.dtoOk(
+                "Detalle obtenido correctamente.",
+                proveedorMapper.toResponse(entity)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<ProveedorResponseDto> obtenerPorDocumento(
+            TipoDocumentoProveedor tipoDocumento,
+            String numeroDocumento
+    ) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        proveedorPolicy.ensureCanViewAdmin(actor, employeeHasInventoryPermission(actor));
+
+        if (tipoDocumento == null) {
+            throw new ValidationException(
+                    "PROVEEDOR_TIPO_DOCUMENTO_REQUERIDO",
+                    "Debe indicar el tipo de documento del proveedor."
+            );
+        }
+
+        String normalizedDocumento = normalizeDocumento(tipoDocumento, numeroDocumento);
+
+        if (!StringNormalizer.hasText(normalizedDocumento)) {
+            throw new ValidationException(
+                    "PROVEEDOR_DOCUMENTO_REQUERIDO",
+                    "Debe indicar el documento del proveedor."
+            );
+        }
+
+        Proveedor entity = proveedorRepository
+                .findByTipoDocumentoAndNumeroDocumentoAndEstadoTrue(tipoDocumento, normalizedDocumento)
+                .orElseThrow(this::proveedorNotFound);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -408,19 +462,23 @@ public class ProveedorServiceImpl implements ProveedorService {
             );
         }
 
+        TipoProveedor tipoProveedor = request.tipoProveedor();
+
         return ProveedorCreateRequestDto.builder()
-                .tipoProveedor(request.tipoProveedor())
-                .tipoDocumento(request.tipoDocumento())
-                .numeroDocumento(normalizeDocumento(request.tipoDocumento(), request.numeroDocumento()))
-                .ruc(normalizeRuc(request.ruc()))
-                .razonSocial(StringNormalizer.truncateOrNull(request.razonSocial(), 200))
-                .nombreComercial(StringNormalizer.truncateOrNull(request.nombreComercial(), 200))
-                .nombres(StringNormalizer.truncateOrNull(request.nombres(), 150))
-                .apellidos(StringNormalizer.truncateOrNull(request.apellidos(), 150))
+                .tipoProveedor(tipoProveedor)
+                .tipoDocumento(isPersonaNatural(tipoProveedor) ? request.tipoDocumento() : null)
+                .numeroDocumento(isPersonaNatural(tipoProveedor)
+                        ? normalizeDocumento(request.tipoDocumento(), request.numeroDocumento())
+                        : null)
+                .ruc(isEmpresa(tipoProveedor) ? normalizeRuc(request.ruc()) : null)
+                .razonSocial(isEmpresa(tipoProveedor) ? clean(request.razonSocial()) : null)
+                .nombreComercial(isEmpresa(tipoProveedor) ? clean(request.nombreComercial()) : null)
+                .nombres(isPersonaNatural(tipoProveedor) ? clean(request.nombres()) : null)
+                .apellidos(isPersonaNatural(tipoProveedor) ? clean(request.apellidos()) : null)
                 .correo(normalizeEmail(request.correo()))
-                .telefono(StringNormalizer.truncateOrNull(request.telefono(), 30))
-                .direccion(StringNormalizer.truncateOrNull(request.direccion(), 300))
-                .observacion(StringNormalizer.truncateOrNull(request.observacion(), 500))
+                .telefono(clean(request.telefono()))
+                .direccion(clean(request.direccion()))
+                .observacion(clean(request.observacion()))
                 .build();
     }
 
@@ -432,19 +490,23 @@ public class ProveedorServiceImpl implements ProveedorService {
             );
         }
 
+        TipoProveedor tipoProveedor = request.tipoProveedor();
+
         return ProveedorUpdateRequestDto.builder()
-                .tipoProveedor(request.tipoProveedor())
-                .tipoDocumento(request.tipoDocumento())
-                .numeroDocumento(normalizeDocumento(request.tipoDocumento(), request.numeroDocumento()))
-                .ruc(normalizeRuc(request.ruc()))
-                .razonSocial(StringNormalizer.truncateOrNull(request.razonSocial(), 200))
-                .nombreComercial(StringNormalizer.truncateOrNull(request.nombreComercial(), 200))
-                .nombres(StringNormalizer.truncateOrNull(request.nombres(), 150))
-                .apellidos(StringNormalizer.truncateOrNull(request.apellidos(), 150))
+                .tipoProveedor(tipoProveedor)
+                .tipoDocumento(isPersonaNatural(tipoProveedor) ? request.tipoDocumento() : null)
+                .numeroDocumento(isPersonaNatural(tipoProveedor)
+                        ? normalizeDocumento(request.tipoDocumento(), request.numeroDocumento())
+                        : null)
+                .ruc(isEmpresa(tipoProveedor) ? normalizeRuc(request.ruc()) : null)
+                .razonSocial(isEmpresa(tipoProveedor) ? clean(request.razonSocial()) : null)
+                .nombreComercial(isEmpresa(tipoProveedor) ? clean(request.nombreComercial()) : null)
+                .nombres(isPersonaNatural(tipoProveedor) ? clean(request.nombres()) : null)
+                .apellidos(isPersonaNatural(tipoProveedor) ? clean(request.apellidos()) : null)
                 .correo(normalizeEmail(request.correo()))
-                .telefono(StringNormalizer.truncateOrNull(request.telefono(), 30))
-                .direccion(StringNormalizer.truncateOrNull(request.direccion(), 300))
-                .observacion(StringNormalizer.truncateOrNull(request.observacion(), 500))
+                .telefono(clean(request.telefono()))
+                .direccion(clean(request.direccion()))
+                .observacion(clean(request.observacion()))
                 .build();
     }
 
@@ -456,16 +518,25 @@ public class ProveedorServiceImpl implements ProveedorService {
             );
         }
 
-        if (!StringNormalizer.hasText(request.motivo())) {
+        String motivo = clean(request.motivo());
+
+        if (!StringNormalizer.hasText(motivo)) {
             throw new ValidationException(
                     "MOTIVO_REQUERIDO",
                     "Debe indicar el motivo de la operación."
             );
         }
 
+        if (motivo.length() > MAX_OBSERVACION_LENGTH) {
+            throw new ValidationException(
+                    "MOTIVO_INVALIDO",
+                    "El motivo no debe superar 500 caracteres."
+            );
+        }
+
         return ProveedorEstadoRequestDto.builder()
                 .estado(request.estado())
-                .motivo(StringNormalizer.truncateOrNull(request.motivo(), 500))
+                .motivo(motivo)
                 .build();
     }
 
@@ -473,23 +544,32 @@ public class ProveedorServiceImpl implements ProveedorService {
         if (filter == null) {
             return ProveedorFilterDto.builder()
                     .estado(Boolean.TRUE)
+                    .incluirTodosLosEstados(Boolean.FALSE)
                     .build();
         }
 
         return ProveedorFilterDto.builder()
-                .search(StringNormalizer.cleanOrNull(filter.search()))
+                .search(StringNormalizer.truncateOrNull(filter.search(), MAX_SEARCH_LENGTH))
                 .tipoProveedor(filter.tipoProveedor())
                 .tipoDocumento(filter.tipoDocumento())
-                .numeroDocumento(normalizeDocumento(filter.tipoDocumento(), filter.numeroDocumento()))
-                .ruc(normalizeRuc(filter.ruc()))
-                .razonSocial(StringNormalizer.cleanOrNull(filter.razonSocial()))
-                .nombreComercial(StringNormalizer.cleanOrNull(filter.nombreComercial()))
-                .nombres(StringNormalizer.cleanOrNull(filter.nombres()))
-                .apellidos(StringNormalizer.cleanOrNull(filter.apellidos()))
-                .correo(normalizeEmail(filter.correo()))
-                .telefono(StringNormalizer.cleanOrNull(filter.telefono()))
-                .estado(filter.estado() == null ? Boolean.TRUE : filter.estado())
+                .numeroDocumento(StringNormalizer.truncateOrNull(
+                        normalizeDocumento(filter.tipoDocumento(), filter.numeroDocumento()),
+                        MAX_DOCUMENTO_LENGTH
+                ))
+                .ruc(StringNormalizer.truncateOrNull(normalizeRuc(filter.ruc()), MAX_RUC_LENGTH))
+                .razonSocial(StringNormalizer.truncateOrNull(filter.razonSocial(), MAX_RAZON_SOCIAL_LENGTH))
+                .nombreComercial(StringNormalizer.truncateOrNull(filter.nombreComercial(), MAX_NOMBRE_COMERCIAL_LENGTH))
+                .nombres(StringNormalizer.truncateOrNull(filter.nombres(), MAX_NOMBRES_LENGTH))
+                .apellidos(StringNormalizer.truncateOrNull(filter.apellidos(), MAX_APELLIDOS_LENGTH))
+                .correo(StringNormalizer.truncateOrNull(normalizeEmail(filter.correo()), MAX_CORREO_LENGTH))
+                .telefono(StringNormalizer.truncateOrNull(filter.telefono(), MAX_TELEFONO_LENGTH))
+                .direccion(StringNormalizer.truncateOrNull(filter.direccion(), MAX_DIRECCION_LENGTH))
+                .creadoPorIdUsuarioMs1(filter.creadoPorIdUsuarioMs1())
+                .actualizadoPorIdUsuarioMs1(filter.actualizadoPorIdUsuarioMs1())
+                .estado(filter.estado())
+                .incluirTodosLosEstados(Boolean.TRUE.equals(filter.incluirTodosLosEstados()))
                 .fechaCreacion(filter.fechaCreacion())
+                .fechaActualizacion(filter.fechaActualizacion())
                 .build();
     }
 
@@ -502,10 +582,7 @@ public class ProveedorServiceImpl implements ProveedorService {
         }
 
         Proveedor entity = proveedorRepository.findByIdProveedorAndEstadoTrue(idProveedor)
-                .orElseThrow(() -> new NotFoundException(
-                        "PROVEEDOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+                .orElseThrow(this::proveedorNotFound);
 
         proveedorValidator.requireActive(entity);
         return entity;
@@ -520,10 +597,7 @@ public class ProveedorServiceImpl implements ProveedorService {
         }
 
         Proveedor entity = proveedorRepository.findById(idProveedor)
-                .orElseThrow(() -> new NotFoundException(
-                        "PROVEEDOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+                .orElseThrow(this::proveedorNotFound);
 
         proveedorValidator.requireExists(entity);
         return entity;
@@ -532,7 +606,15 @@ public class ProveedorServiceImpl implements ProveedorService {
     private boolean employeeCanRegisterEntry(AuthenticatedUserContext actor) {
         return actor != null
                 && actor.isEmpleado()
+                && actor.getIdUsuarioMs1() != null
                 && empleadoInventarioPermisoService.puedeRegistrarEntrada(actor.getIdUsuarioMs1());
+    }
+
+    private boolean employeeHasInventoryPermission(AuthenticatedUserContext actor) {
+        return actor != null
+                && actor.isEmpleado()
+                && actor.getIdUsuarioMs1() != null
+                && empleadoInventarioPermisoService.tienePermisoVigente(actor.getIdUsuarioMs1());
     }
 
     private boolean existsDocumento(TipoDocumentoProveedor tipoDocumento, String numeroDocumento) {
@@ -613,11 +695,7 @@ public class ProveedorServiceImpl implements ProveedorService {
     }
 
     private int sanitizeLimit(Integer limit) {
-        if (limit == null) {
-            return DEFAULT_LOOKUP_LIMIT;
-        }
-
-        if (limit < 1) {
+        if (limit == null || limit < 1) {
             return DEFAULT_LOOKUP_LIMIT;
         }
 
@@ -626,7 +704,7 @@ public class ProveedorServiceImpl implements ProveedorService {
 
     private String normalizeRuc(String value) {
         String digits = StringNormalizer.onlyDigits(value);
-        return digits.isBlank() ? null : StringNormalizer.truncate(digits, 20);
+        return digits.isBlank() ? null : digits;
     }
 
     private String normalizeDocumento(TipoDocumentoProveedor tipoDocumento, String value) {
@@ -638,12 +716,24 @@ public class ProveedorServiceImpl implements ProveedorService {
                 ? StringNormalizer.onlyDigits(value)
                 : StringNormalizer.clean(value);
 
-        return StringNormalizer.truncateOrNull(normalized, 30);
+        return normalized.isBlank() ? null : normalized;
     }
 
     private String normalizeEmail(String value) {
         String cleaned = StringNormalizer.cleanOrNull(value);
         return cleaned == null ? null : cleaned.toLowerCase();
+    }
+
+    private String clean(String value) {
+        return StringNormalizer.cleanOrNull(value);
+    }
+
+    private boolean isEmpresa(TipoProveedor tipoProveedor) {
+        return TipoProveedor.EMPRESA.equals(tipoProveedor);
+    }
+
+    private boolean isPersonaNatural(TipoProveedor tipoProveedor) {
+        return TipoProveedor.PERSONA_NATURAL.equals(tipoProveedor);
     }
 
     private Map<String, Object> auditMetadata(
@@ -683,5 +773,12 @@ public class ProveedorServiceImpl implements ProveedorService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private NotFoundException proveedorNotFound() {
+        return new NotFoundException(
+                "PROVEEDOR_NO_ENCONTRADO",
+                "No se encontró el registro solicitado."
+        );
     }
 }

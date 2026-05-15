@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/ProductoImagenSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/ProductoImagenSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;

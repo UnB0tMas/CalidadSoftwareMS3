@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/movimiento/response/KardexResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/movimiento/response/KardexResponseDto.java
 package com.upsjb.ms3.dto.inventario.movimiento.response;
 
 import com.upsjb.ms3.domain.enums.EstadoMovimientoInventario;

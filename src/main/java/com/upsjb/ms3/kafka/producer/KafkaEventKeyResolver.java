@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaEventKeyResolver.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaEventKeyResolver.java
 package com.upsjb.ms3.kafka.producer;
 
 import com.upsjb.ms3.domain.enums.AggregateType;

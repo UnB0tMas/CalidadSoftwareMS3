@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/AuditoriaFuncionalService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/AuditoriaFuncionalService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
@@ -23,6 +23,30 @@ public interface AuditoriaFuncionalService {
 
     void registrarFallo(
             TipoEventoAuditoria tipoEvento,
+            EntidadAuditada entidad,
+            String idRegistroAfectado,
+            String accion,
+            String descripcion,
+            Map<String, Object> metadata
+    );
+
+    void registrarAccesoDenegado(
+            EntidadAuditada entidad,
+            String idRegistroAfectado,
+            String accion,
+            String descripcion,
+            Map<String, Object> metadata
+    );
+
+    void registrarValidacionFallida(
+            EntidadAuditada entidad,
+            String idRegistroAfectado,
+            String accion,
+            String descripcion,
+            Map<String, Object> metadata
+    );
+
+    void registrarErrorSistema(
             EntidadAuditada entidad,
             String idRegistroAfectado,
             String accion,

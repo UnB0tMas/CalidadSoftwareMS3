@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/request/CompraInventarioUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/request/CompraInventarioUpdateRequestDto.java
 package com.upsjb.ms3.dto.inventario.compra.request;
 
 import com.upsjb.ms3.domain.enums.Moneda;

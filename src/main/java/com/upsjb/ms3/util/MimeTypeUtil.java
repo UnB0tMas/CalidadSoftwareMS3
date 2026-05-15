@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/MimeTypeUtil.java
+// ruta: src/main/java/com/upsjb/ms3/util/MimeTypeUtil.java
 package com.upsjb.ms3.util;
 
 import java.util.Locale;

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.config;
+package com.upsjb.ms3.security.config;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
 import com.upsjb.ms3.security.filter.RequestAuditContextFilter;

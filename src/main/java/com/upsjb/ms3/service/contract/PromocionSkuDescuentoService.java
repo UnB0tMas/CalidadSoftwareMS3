@@ -1,9 +1,10 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/PromocionSkuDescuentoService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/PromocionSkuDescuentoService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.promocion.filter.PromocionSkuDescuentoFilterDto;
 import com.upsjb.ms3.dto.promocion.request.PromocionSkuDescuentoCreateRequestDto;
 import com.upsjb.ms3.dto.promocion.request.PromocionSkuDescuentoUpdateRequestDto;
+import com.upsjb.ms3.dto.promocion.response.PromocionSkuDescuentoCalculoResponseDto;
 import com.upsjb.ms3.dto.promocion.response.PromocionSkuDescuentoResponseDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;
@@ -15,6 +16,11 @@ import java.util.List;
 public interface PromocionSkuDescuentoService {
 
     ApiResponseDto<PromocionSkuDescuentoResponseDto> agregar(
+            Long idPromocionVersion,
+            PromocionSkuDescuentoCreateRequestDto request
+    );
+
+    ApiResponseDto<PromocionSkuDescuentoCalculoResponseDto> calcular(
             Long idPromocionVersion,
             PromocionSkuDescuentoCreateRequestDto request
     );

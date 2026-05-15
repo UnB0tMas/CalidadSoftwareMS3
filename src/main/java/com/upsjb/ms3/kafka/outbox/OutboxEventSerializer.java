@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventSerializer.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventSerializer.java
 package com.upsjb.ms3.kafka.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;

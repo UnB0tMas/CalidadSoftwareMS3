@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/PromocionVersionMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/PromocionVersionMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Promocion;
@@ -23,17 +23,17 @@ public class PromocionVersionMapper {
             return null;
         }
 
+        EstadoPromocion estado = request.estadoPromocion() == null
+                ? EstadoPromocion.BORRADOR
+                : request.estadoPromocion();
+
         PromocionVersion entity = new PromocionVersion();
         entity.setPromocion(promocion);
         entity.setFechaInicio(request.fechaInicio());
         entity.setFechaFin(request.fechaFin());
-        entity.setEstadoPromocion(request.estadoPromocion() == null
-                ? EstadoPromocion.BORRADOR
-                : request.estadoPromocion());
-        entity.setVisiblePublico(request.visiblePublico() == null
-                ? Boolean.TRUE
-                : request.visiblePublico());
-        entity.setVigente(Boolean.TRUE);
+        entity.setEstadoPromocion(estado);
+        entity.setVisiblePublico(request.visiblePublico() == null ? Boolean.TRUE : request.visiblePublico());
+        entity.setVigente(isLifecycleVisible(estado));
         entity.setMotivo(request.motivo());
         entity.setCreadoPorIdUsuarioMs1(creadoPorIdUsuarioMs1);
 
@@ -62,7 +62,9 @@ public class PromocionVersionMapper {
             return;
         }
 
+        entity.setEstadoPromocion(EstadoPromocion.FINALIZADA);
         entity.setVigente(Boolean.FALSE);
+        entity.setVisiblePublico(Boolean.FALSE);
 
         if (motivo != null) {
             entity.setMotivo(motivo);
@@ -96,5 +98,9 @@ public class PromocionVersionMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
+    }
+
+    private boolean isLifecycleVisible(EstadoPromocion estado) {
+        return estado == EstadoPromocion.ACTIVA || estado == EstadoPromocion.PROGRAMADA;
     }
 }

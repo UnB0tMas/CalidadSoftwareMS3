@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/outbox/request/OutboxRetryRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/outbox/request/OutboxRetryRequestDto.java
 package com.upsjb.ms3.dto.outbox.request;
 
 import jakarta.validation.constraints.NotBlank;

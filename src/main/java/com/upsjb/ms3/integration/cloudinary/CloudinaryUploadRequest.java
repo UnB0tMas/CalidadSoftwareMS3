@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryUploadRequest.java
+// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryUploadRequest.java
 package com.upsjb.ms3.integration.cloudinary;
 
 import java.util.ArrayList;

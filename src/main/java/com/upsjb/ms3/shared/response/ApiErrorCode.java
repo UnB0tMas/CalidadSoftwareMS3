@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.response;
+package com.upsjb.ms3.shared.response;
 
 import org.springframework.http.HttpStatus;
 

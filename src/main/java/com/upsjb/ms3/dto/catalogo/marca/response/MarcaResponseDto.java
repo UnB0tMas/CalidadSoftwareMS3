@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/marca/response/MarcaResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/marca/response/MarcaResponseDto.java
 package com.upsjb.ms3.dto.catalogo.marca.response;
 
 import java.time.LocalDateTime;

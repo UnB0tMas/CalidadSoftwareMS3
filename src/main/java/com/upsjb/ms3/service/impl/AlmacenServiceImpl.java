@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/AlmacenServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/AlmacenServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -31,12 +31,12 @@ import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.AlmacenSpecifications;
 import com.upsjb.ms3.util.StringNormalizer;
+import com.upsjb.ms3.validator.AlmacenValidator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
-import com.upsjb.ms3.validator.AlmacenValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +52,7 @@ public class AlmacenServiceImpl implements AlmacenService {
             "idAlmacen",
             "codigo",
             "nombre",
+            "direccion",
             "principal",
             "permiteVenta",
             "permiteCompra",
@@ -86,6 +87,8 @@ public class AlmacenServiceImpl implements AlmacenService {
         almacenValidator.validateCreate(
                 normalized.codigo(),
                 normalized.nombre(),
+                normalized.direccion(),
+                normalized.observacion(),
                 normalized.permiteVenta(),
                 normalized.permiteCompra(),
                 almacenRepository.existsByCodigoIgnoreCaseAndEstadoTrue(normalized.codigo()),
@@ -126,7 +129,7 @@ public class AlmacenServiceImpl implements AlmacenService {
         almacenPolicy.ensureCanUpdate(actor);
 
         Almacen entity = findRequired(idAlmacen);
-        AlmacenUpdateRequestDto normalized = normalizeUpdate(request);
+        AlmacenUpdateRequestDto normalized = normalizeUpdate(request, entity);
 
         boolean principalChangedToTrue = Boolean.TRUE.equals(normalized.principal())
                 && !Boolean.TRUE.equals(entity.getPrincipal());
@@ -135,6 +138,8 @@ public class AlmacenServiceImpl implements AlmacenService {
                 entity,
                 normalized.codigo(),
                 normalized.nombre(),
+                normalized.direccion(),
+                normalized.observacion(),
                 normalized.permiteVenta(),
                 normalized.permiteCompra(),
                 almacenRepository.existsByCodigoIgnoreCaseAndEstadoTrueAndIdAlmacenNot(
@@ -152,11 +157,12 @@ public class AlmacenServiceImpl implements AlmacenService {
         );
 
         Map<String, Object> before = Map.of(
-                "codigo", safe(entity.getCodigo()),
-                "nombre", safe(entity.getNombre()),
-                "principal", Boolean.TRUE.equals(entity.getPrincipal()),
-                "permiteVenta", Boolean.TRUE.equals(entity.getPermiteVenta()),
-                "permiteCompra", Boolean.TRUE.equals(entity.getPermiteCompra())
+                "codigoAnterior", safe(entity.getCodigo()),
+                "nombreAnterior", safe(entity.getNombre()),
+                "direccionAnterior", safe(entity.getDireccion()),
+                "principalAnterior", Boolean.TRUE.equals(entity.getPrincipal()),
+                "permiteVentaAnterior", Boolean.TRUE.equals(entity.getPermiteVenta()),
+                "permiteCompraAnterior", Boolean.TRUE.equals(entity.getPermiteCompra())
         );
 
         almacenMapper.updateEntity(entity, normalized);
@@ -197,7 +203,8 @@ public class AlmacenServiceImpl implements AlmacenService {
             );
         }
 
-        requireMotivo(request.motivo());
+        String motivo = StringNormalizer.cleanOrNull(request.motivo());
+        requireMotivo(motivo);
 
         Almacen entity = findRequired(idAlmacen);
 
@@ -209,7 +216,11 @@ public class AlmacenServiceImpl implements AlmacenService {
         }
 
         if (Boolean.TRUE.equals(request.estado())) {
-            almacenValidator.validateCanActivate(entity);
+            boolean principalDuplicado = Boolean.TRUE.equals(entity.getPrincipal())
+                    && almacenRepository.existsByPrincipalTrueAndEstadoTrueAndIdAlmacenNot(entity.getIdAlmacen());
+
+            almacenValidator.validateCanActivate(entity, principalDuplicado);
+
             entity.activar();
             Almacen saved = almacenRepository.save(entity);
 
@@ -219,7 +230,14 @@ public class AlmacenServiceImpl implements AlmacenService {
                     String.valueOf(saved.getIdAlmacen()),
                     "ACTIVAR_ALMACEN",
                     "Almacén activado correctamente.",
-                    auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                    auditMetadata(saved, actor, Map.of("motivo", motivo))
+            );
+
+            log.info(
+                    "Almacén activado. idAlmacen={}, codigo={}, actor={}",
+                    saved.getIdAlmacen(),
+                    saved.getCodigo(),
+                    actor.actorLabel()
             );
 
             return apiResponseFactory.dtoOk(
@@ -246,7 +264,14 @@ public class AlmacenServiceImpl implements AlmacenService {
                 String.valueOf(saved.getIdAlmacen()),
                 "INACTIVAR_ALMACEN",
                 "Almacén inactivado correctamente.",
-                auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                auditMetadata(saved, actor, Map.of("motivo", motivo))
+        );
+
+        log.info(
+                "Almacén inactivado. idAlmacen={}, codigo={}, actor={}",
+                saved.getIdAlmacen(),
+                saved.getCodigo(),
+                actor.actorLabel()
         );
 
         return apiResponseFactory.dtoOk(
@@ -276,6 +301,7 @@ public class AlmacenServiceImpl implements AlmacenService {
         almacenPolicy.ensureCanViewAdmin(actor);
 
         Almacen entity = findRequired(idAlmacen);
+
         Long cantidadSkusConStock = stockSkuRepository.countDistinctSkuByAlmacen(entity.getIdAlmacen());
         Integer stockFisicoTotal = toInteger(stockSkuRepository.sumStockFisicoByAlmacen(entity.getIdAlmacen()));
         Integer stockReservadoTotal = toInteger(stockSkuRepository.sumStockReservadoByAlmacen(entity.getIdAlmacen()));
@@ -328,6 +354,7 @@ public class AlmacenServiceImpl implements AlmacenService {
         almacenPolicy.ensureCanViewAdmin(actor);
 
         int safeLimit = sanitizeLimit(limit);
+
         Pageable pageable = paginationService.pageable(
                 0,
                 safeLimit,
@@ -338,14 +365,14 @@ public class AlmacenServiceImpl implements AlmacenService {
         );
 
         AlmacenFilterDto filter = AlmacenFilterDto.builder()
-                .search(search)
+                .search(StringNormalizer.cleanOrNull(search))
                 .estado(Boolean.TRUE)
                 .build();
 
         List<AlmacenOptionDto> options = almacenRepository
                 .findAll(AlmacenSpecifications.fromFilter(filter), pageable)
                 .stream()
-                .map(this::toOption)
+                .map(almacenMapper::toOption)
                 .toList();
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", options);
@@ -433,7 +460,7 @@ public class AlmacenServiceImpl implements AlmacenService {
                 .build();
     }
 
-    private AlmacenUpdateRequestDto normalizeUpdate(AlmacenUpdateRequestDto request) {
+    private AlmacenUpdateRequestDto normalizeUpdate(AlmacenUpdateRequestDto request, Almacen current) {
         if (request == null) {
             throw new ValidationException(
                     "ALMACEN_REQUEST_REQUERIDO",
@@ -445,9 +472,9 @@ public class AlmacenServiceImpl implements AlmacenService {
                 .codigo(StringNormalizer.normalizeForCode(request.codigo()))
                 .nombre(StringNormalizer.clean(request.nombre()))
                 .direccion(StringNormalizer.cleanOrNull(request.direccion()))
-                .principal(defaultBoolean(request.principal(), false))
-                .permiteVenta(defaultBoolean(request.permiteVenta(), true))
-                .permiteCompra(defaultBoolean(request.permiteCompra(), true))
+                .principal(defaultBoolean(request.principal(), Boolean.TRUE.equals(current.getPrincipal())))
+                .permiteVenta(defaultBoolean(request.permiteVenta(), Boolean.TRUE.equals(current.getPermiteVenta())))
+                .permiteCompra(defaultBoolean(request.permiteCompra(), Boolean.TRUE.equals(current.getPermiteCompra())))
                 .observacion(StringNormalizer.cleanOrNull(request.observacion()))
                 .build();
     }
@@ -465,27 +492,16 @@ public class AlmacenServiceImpl implements AlmacenService {
         return pageRequest;
     }
 
-    private AlmacenOptionDto toOption(Almacen almacen) {
-        return AlmacenOptionDto.builder()
-                .idAlmacen(almacen.getIdAlmacen())
-                .codigo(almacen.getCodigo())
-                .nombre(almacen.getNombre())
-                .principal(almacen.getPrincipal())
-                .permiteVenta(almacen.getPermiteVenta())
-                .permiteCompra(almacen.getPermiteCompra())
-                .estado(almacen.getEstado())
-                .build();
-    }
-
     private Map<String, Object> auditMetadata(
             Almacen almacen,
             AuthenticatedUserContext actor,
             Map<String, Object> extra
     ) {
-        java.util.LinkedHashMap<String, Object> metadata = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("idAlmacen", almacen.getIdAlmacen());
         metadata.put("codigo", almacen.getCodigo());
         metadata.put("nombre", almacen.getNombre());
+        metadata.put("direccion", almacen.getDireccion());
         metadata.put("principal", Boolean.TRUE.equals(almacen.getPrincipal()));
         metadata.put("permiteVenta", Boolean.TRUE.equals(almacen.getPermiteVenta()));
         metadata.put("permiteCompra", Boolean.TRUE.equals(almacen.getPermiteCompra()));
@@ -500,11 +516,7 @@ public class AlmacenServiceImpl implements AlmacenService {
     }
 
     private int sanitizeLimit(Integer limit) {
-        if (limit == null) {
-            return DEFAULT_LOOKUP_LIMIT;
-        }
-
-        if (limit < 1) {
+        if (limit == null || limit < 1) {
             return DEFAULT_LOOKUP_LIMIT;
         }
 

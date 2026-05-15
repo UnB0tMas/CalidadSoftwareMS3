@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/reference/request/EntityReferenceRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/reference/request/EntityReferenceRequestDto.java
 package com.upsjb.ms3.dto.reference.request;
 
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;

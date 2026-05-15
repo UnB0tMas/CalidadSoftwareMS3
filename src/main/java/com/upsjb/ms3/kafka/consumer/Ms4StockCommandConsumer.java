@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/Ms4StockCommandConsumer.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/Ms4StockCommandConsumer.java
 package com.upsjb.ms3.kafka.consumer;
 
 import com.fasterxml.jackson.core.type.TypeReference;

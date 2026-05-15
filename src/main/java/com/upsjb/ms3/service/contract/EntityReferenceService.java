@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/EntityReferenceService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/EntityReferenceService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.reference.filter.ReferenceSearchFilterDto;
@@ -13,6 +13,26 @@ public interface EntityReferenceService {
     ApiResponseDto<EntityReferenceResolvedDto> resolver(EntityReferenceRequestDto request);
 
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscar(String entidad, ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarTipoProducto(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarCategoria(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarMarca(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarAtributo(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarProducto(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarSku(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarProveedor(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarAlmacen(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarPromocion(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarEmpleadoInventario(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<EntityReferenceDto> resolverTipoProducto(EntityReferenceDto reference);
 

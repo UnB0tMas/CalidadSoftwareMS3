@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoImagenUploadRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoImagenUploadRequestDto.java
 package com.upsjb.ms3.dto.catalogo.producto.request;
 
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;

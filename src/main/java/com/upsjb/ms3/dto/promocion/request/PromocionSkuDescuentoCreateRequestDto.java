@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionSkuDescuentoCreateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionSkuDescuentoCreateRequestDto.java
 package com.upsjb.ms3.dto.promocion.request;
 
 import com.upsjb.ms3.domain.enums.TipoDescuento;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/KafkaPublisherServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/KafkaPublisherServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
@@ -18,6 +18,7 @@ import com.upsjb.ms3.shared.audit.AuditContext;
 import com.upsjb.ms3.shared.audit.AuditContextHolder;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
+import com.upsjb.ms3.util.StringNormalizer;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,15 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
 
         OutboxPublishResultResponseDto result = publicarInterno(idEvento);
 
+        log.info(
+                "Publicación manual Kafka solicitada. actor={}, idEvento={}, success={}, skipped={}, code={}",
+                actor.actorLabel(),
+                idEvento,
+                result.success(),
+                result.skipped(),
+                result.code()
+        );
+
         return apiResponseFactory.dtoOk(
                 Boolean.TRUE.equals(result.success())
                         ? "Evento publicado correctamente en Kafka."
@@ -75,6 +85,16 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
                 Boolean.TRUE.equals(normalized.forzarReintento())
         );
 
+        log.info(
+                "Reintento manual Kafka solicitado. actor={}, idEvento={}, forzarReintento={}, success={}, skipped={}, code={}",
+                actor.actorLabel(),
+                idEvento,
+                normalized.forzarReintento(),
+                result.success(),
+                result.skipped(),
+                result.code()
+        );
+
         return apiResponseFactory.dtoOk(
                 Boolean.TRUE.equals(result.success())
                         ? "Evento reintentado correctamente."
@@ -91,10 +111,13 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
 
         List<OutboxPublishResultResponseDto> results = publicarPendientesInterno();
 
-        return apiResponseFactory.dtoOk(
-                "Operación realizada correctamente.",
-                results
+        log.info(
+                "Publicación manual de lote Kafka solicitada. actor={}, totalEventosProcesados={}",
+                actor.actorLabel(),
+                results.size()
         );
+
+        return apiResponseFactory.dtoOk("Operación realizada correctamente.", results);
     }
 
     @Override
@@ -102,14 +125,18 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
     public OutboxPublishResultResponseDto publicarInterno(Long idEvento) {
         validarIdEvento(idEvento);
 
-        OutboxPublishResult result = outboxEventPublisher.publishLocked(idEvento);
-        OutboxPublishResultResponseDto response = eventoDominioOutboxMapper.toPublishResultResponse(result);
+        try {
+            OutboxPublishResult result = outboxEventPublisher.publishLocked(idEvento);
+            OutboxPublishResultResponseDto response = eventoDominioOutboxMapper.toPublishResultResponse(result);
 
-        auditarResultadoPublicacion(response, "PUBLICAR_EVENTO_KAFKA");
+            auditarResultadoPublicacion(response, "PUBLICAR_EVENTO_KAFKA");
+            logPublicationResult(response, "PUBLICAR_EVENTO_KAFKA");
 
-        logPublicationResult(response, "PUBLICAR_EVENTO_KAFKA");
-
-        return response;
+            return response;
+        } catch (RuntimeException ex) {
+            logTechnicalFailure("PUBLICAR_EVENTO_KAFKA", idEvento, ex);
+            throw ex;
+        }
     }
 
     @Override
@@ -117,32 +144,41 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
     public OutboxPublishResultResponseDto reintentarInterno(Long idEvento, boolean forzarReintento) {
         validarIdEvento(idEvento);
 
-        OutboxPublishResult result = outboxEventPublisher.retry(idEvento, forzarReintento);
-        OutboxPublishResultResponseDto response = eventoDominioOutboxMapper.toPublishResultResponse(result);
+        try {
+            OutboxPublishResult result = outboxEventPublisher.retry(idEvento, forzarReintento);
+            OutboxPublishResultResponseDto response = eventoDominioOutboxMapper.toPublishResultResponse(result);
 
-        auditarReintento(response, forzarReintento);
-        auditarResultadoPublicacion(response, "REINTENTAR_EVENTO_KAFKA");
+            auditarReintento(response, forzarReintento);
+            auditarResultadoPublicacion(response, "REINTENTAR_EVENTO_KAFKA");
+            logPublicationResult(response, "REINTENTAR_EVENTO_KAFKA");
 
-        logPublicationResult(response, "REINTENTAR_EVENTO_KAFKA");
-
-        return response;
+            return response;
+        } catch (RuntimeException ex) {
+            logTechnicalFailure("REINTENTAR_EVENTO_KAFKA", idEvento, ex);
+            throw ex;
+        }
     }
 
     @Override
     @Transactional
     public List<OutboxPublishResultResponseDto> publicarPendientesInterno() {
-        List<OutboxPublishResult> results = outboxEventPublisher.publishNextBatch();
+        try {
+            List<OutboxPublishResult> results = outboxEventPublisher.publishNextBatch();
 
-        List<OutboxPublishResultResponseDto> response = results.stream()
-                .map(eventoDominioOutboxMapper::toPublishResultResponse)
-                .toList();
+            List<OutboxPublishResultResponseDto> response = results.stream()
+                    .map(eventoDominioOutboxMapper::toPublishResultResponse)
+                    .toList();
 
-        response.forEach(result -> {
-            auditarResultadoPublicacion(result, "PUBLICAR_LOTE_EVENTOS_KAFKA");
-            logPublicationResult(result, "PUBLICAR_LOTE_EVENTOS_KAFKA");
-        });
+            response.forEach(result -> {
+                auditarResultadoPublicacion(result, "PUBLICAR_LOTE_EVENTOS_KAFKA");
+                logPublicationResult(result, "PUBLICAR_LOTE_EVENTOS_KAFKA");
+            });
 
-        return response;
+            return response;
+        } catch (RuntimeException ex) {
+            logTechnicalFailure("PUBLICAR_LOTE_EVENTOS_KAFKA", null, ex);
+            throw ex;
+        }
     }
 
     private void validarIdEvento(Long idEvento) {
@@ -163,7 +199,7 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
         }
 
         return OutboxRetryRequestDto.builder()
-                .motivo(request.motivo().trim())
+                .motivo(StringNormalizer.truncate(request.motivo(), 500))
                 .forzarReintento(Boolean.TRUE.equals(request.forzarReintento()))
                 .build();
     }
@@ -282,22 +318,26 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
     }
 
     private void logPublicationResult(OutboxPublishResultResponseDto result, String action) {
+        AuditContext context = AuditContextHolder.getOrEmpty();
+
         if (Boolean.TRUE.equals(result.success())) {
             log.info(
-                    "Kafka outbox publicado. action={}, idEvento={}, eventId={}, topic={}, eventKey={}, partition={}, offset={}",
+                    "Kafka outbox publicado. action={}, idEvento={}, eventId={}, topic={}, eventKey={}, partition={}, offset={}, requestId={}, correlationId={}",
                     action,
                     result.idEvento(),
                     result.eventId(),
                     result.topic(),
                     result.eventKey(),
                     result.partition(),
-                    result.offset()
+                    result.offset(),
+                    context.requestId(),
+                    context.correlationId()
             );
             return;
         }
 
         log.warn(
-                "Kafka outbox no publicado. action={}, idEvento={}, eventId={}, topic={}, eventKey={}, skipped={}, code={}, message={}",
+                "Kafka outbox no publicado. action={}, idEvento={}, eventId={}, topic={}, eventKey={}, skipped={}, code={}, message={}, requestId={}, correlationId={}",
                 action,
                 result.idEvento(),
                 result.eventId(),
@@ -305,7 +345,23 @@ public class KafkaPublisherServiceImpl implements KafkaPublisherService {
                 result.eventKey(),
                 result.skipped(),
                 result.code(),
-                result.message()
+                result.message(),
+                context.requestId(),
+                context.correlationId()
+        );
+    }
+
+    private void logTechnicalFailure(String action, Long idEvento, RuntimeException ex) {
+        AuditContext context = AuditContextHolder.getOrEmpty();
+
+        log.error(
+                "Error técnico al publicar evento Kafka. action={}, idEvento={}, requestId={}, correlationId={}, path={}",
+                action,
+                idEvento,
+                context.requestId(),
+                context.correlationId(),
+                context.requestPath(),
+                ex
         );
     }
 }

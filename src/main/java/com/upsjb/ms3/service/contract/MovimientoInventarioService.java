@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/MovimientoInventarioService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/MovimientoInventarioService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.inventario.movimiento.filter.MovimientoInventarioFilterDto;
@@ -23,8 +23,17 @@ public interface MovimientoInventarioService {
 
     ApiResponseDto<MovimientoInventarioResponseDto> obtenerDetalle(Long idMovimiento, Boolean incluirCostos);
 
+    ApiResponseDto<MovimientoInventarioResponseDto> obtenerPorCodigo(String codigoMovimiento, Boolean incluirCostos);
+
     ApiResponseDto<PageResponseDto<MovimientoInventarioResponseDto>> listar(
             MovimientoInventarioFilterDto filter,
+            PageRequestDto pageRequest,
+            Boolean incluirCostos
+    );
+
+    ApiResponseDto<PageResponseDto<MovimientoInventarioResponseDto>> listarPorReferencia(
+            String referenciaTipo,
+            String referenciaIdExterno,
             PageRequestDto pageRequest,
             Boolean incluirCostos
     );

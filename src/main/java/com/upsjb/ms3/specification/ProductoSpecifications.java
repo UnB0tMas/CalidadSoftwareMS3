@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/ProductoSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/ProductoSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.Producto;

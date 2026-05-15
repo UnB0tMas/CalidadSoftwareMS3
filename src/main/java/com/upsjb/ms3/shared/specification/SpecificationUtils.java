@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.specification;
+package com.upsjb.ms3.shared.specification;
 
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;

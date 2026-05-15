@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/Ms4ReconciliacionService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/Ms4ReconciliacionService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.ms4.response.Ms4StockSyncResultDto;

@@ -1,7 +1,8 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/ProveedorSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/ProveedorSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.Proveedor;
+import com.upsjb.ms3.domain.enums.TipoProveedor;
 import com.upsjb.ms3.dto.proveedor.filter.ProveedorFilterDto;
 import com.upsjb.ms3.shared.specification.BooleanCriteria;
 import com.upsjb.ms3.shared.specification.SpecificationBuilder;
@@ -27,7 +28,8 @@ public final class ProveedorSpecifications {
                         "nombres",
                         "apellidos",
                         "correo",
-                        "telefono"
+                        "telefono",
+                        "direccion"
                 )
                 .equal("tipoProveedor", filter.tipoProveedor())
                 .equal("tipoDocumento", filter.tipoDocumento())
@@ -39,8 +41,12 @@ public final class ProveedorSpecifications {
                 .like("apellidos", filter.apellidos())
                 .like("correo", filter.correo())
                 .like("telefono", filter.telefono())
-                .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
+                .like("direccion", filter.direccion())
+                .equal("creadoPorIdUsuarioMs1", filter.creadoPorIdUsuarioMs1())
+                .equal("actualizadoPorIdUsuarioMs1", filter.actualizadoPorIdUsuarioMs1())
+                .bool("estado", BooleanCriteria.of(resolveEstado(filter)))
                 .range("createdAt", SpecificationFilterSupport.dateRange(filter.fechaCreacion()))
+                .range("updatedAt", SpecificationFilterSupport.dateRange(filter.fechaActualizacion()))
                 .build();
     }
 
@@ -68,12 +74,22 @@ public final class ProveedorSpecifications {
                 .build();
     }
 
-    public static Specification<Proveedor> byTipoProveedorActivo(
-            com.upsjb.ms3.domain.enums.TipoProveedor tipoProveedor
-    ) {
+    public static Specification<Proveedor> byTipoProveedorActivo(TipoProveedor tipoProveedor) {
         return SpecificationBuilder.<Proveedor>create()
                 .activeOnly()
                 .equal("tipoProveedor", tipoProveedor)
                 .build();
+    }
+
+    private static Boolean resolveEstado(ProveedorFilterDto filter) {
+        if (filter == null) {
+            return Boolean.TRUE;
+        }
+
+        if (Boolean.TRUE.equals(filter.incluirTodosLosEstados())) {
+            return null;
+        }
+
+        return filter.estado() == null ? Boolean.TRUE : filter.estado();
     }
 }

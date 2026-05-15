@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/KardexMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/KardexMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/marca/request/MarcaUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/marca/request/MarcaUpdateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.marca.request;
 
 import jakarta.validation.constraints.NotBlank;

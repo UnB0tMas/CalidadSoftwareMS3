@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/response/AtributoDetailResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/atributo/response/AtributoDetailResponseDto.java
 package com.upsjb.ms3.dto.catalogo.atributo.response;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;

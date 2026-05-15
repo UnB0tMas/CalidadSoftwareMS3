@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/promocion/response/PromocionResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/promocion/response/PromocionResponseDto.java
 package com.upsjb.ms3.dto.promocion.response;
 
 import java.time.LocalDateTime;

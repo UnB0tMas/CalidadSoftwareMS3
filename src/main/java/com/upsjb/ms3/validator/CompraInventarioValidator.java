@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/CompraInventarioValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/CompraInventarioValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -11,6 +11,7 @@ import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
 import com.upsjb.ms3.util.MoneyUtil;
+import com.upsjb.ms3.util.StringNormalizer;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
@@ -64,6 +65,14 @@ public class CompraInventarioValidator {
             errors.add("sku", "El SKU debe existir y estar activo.", "INVALID_REFERENCE", null);
         }
 
+        if (sku != null && (sku.getEstadoSku() == null || !sku.getEstadoSku().isOperativo())) {
+            errors.add("sku", "El SKU debe estar operativo para registrar compra.", "INVALID_STATE", sku.getIdSku());
+        }
+
+        if (sku != null && (sku.getProducto() == null || !sku.getProducto().isActivo())) {
+            errors.add("producto", "El producto del SKU debe existir y estar activo.", "INVALID_REFERENCE", null);
+        }
+
         if (almacen == null || !almacen.isActivo()) {
             errors.add("almacen", "El almacén debe existir y estar activo.", "INVALID_REFERENCE", null);
         } else if (!Boolean.TRUE.equals(almacen.getPermiteCompra())) {
@@ -86,10 +95,22 @@ public class CompraInventarioValidator {
             errors.add("impuesto", "El impuesto no puede ser negativo.", "INVALID_VALUE", impuesto);
         }
 
+        if (cantidad != null
+                && cantidad > 0
+                && costoUnitario != null
+                && descuento != null
+                && descuento.compareTo(costoUnitario.multiply(BigDecimal.valueOf(cantidad))) > 0) {
+            errors.add("descuento", "El descuento no puede superar el subtotal del detalle.", "INVALID_VALUE", descuento);
+        }
+
         errors.throwIfAny("El detalle de compra no es válido.");
     }
 
-    public void validateCanConfirm(CompraInventario compra, boolean hasDetails) {
+    public void validateCanConfirm(
+            CompraInventario compra,
+            boolean hasDetails,
+            String motivoConfirmacion
+    ) {
         requireActive(compra);
 
         if (compra.getEstadoCompra() != EstadoCompraInventario.BORRADOR) {
@@ -102,7 +123,14 @@ public class CompraInventarioValidator {
         if (!hasDetails) {
             throw new ConflictException(
                     "COMPRA_SIN_DETALLE",
-                    "No se puede confirmar una compra sin detalle."
+                    "No se puede confirmar la compra porque no tiene detalles."
+            );
+        }
+
+        if (!StringNormalizer.hasText(motivoConfirmacion)) {
+            throw new ConflictException(
+                    "MOTIVO_CONFIRMACION_COMPRA_REQUERIDO",
+                    "Debe indicar el motivo de confirmación de la compra."
             );
         }
     }
@@ -124,7 +152,7 @@ public class CompraInventarioValidator {
             );
         }
 
-        if (motivo == null || motivo.isBlank()) {
+        if (!StringNormalizer.hasText(motivo)) {
             throw new ConflictException(
                     "MOTIVO_ANULACION_OBLIGATORIO",
                     "Debe indicar el motivo de anulación de la compra."
@@ -136,14 +164,14 @@ public class CompraInventarioValidator {
         if (compra == null) {
             throw new NotFoundException(
                     "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                    "Compra de inventario no encontrada."
+                    "No se encontró el registro solicitado."
             );
         }
 
         if (!compra.isActivo()) {
             throw new NotFoundException(
                     "COMPRA_INVENTARIO_INACTIVA",
-                    "La compra de inventario no está activa."
+                    "No se puede completar la operación porque el registro está inactivo."
             );
         }
     }

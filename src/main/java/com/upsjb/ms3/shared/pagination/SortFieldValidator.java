@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.pagination;
+package com.upsjb.ms3.shared.pagination;
 
 import com.upsjb.ms3.shared.exception.ValidationException;
 import java.util.Collection;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/policy/ProductoPolicy.java
+// ruta: src/main/java/com/upsjb/ms3/policy/ProductoPolicy.java
 package com.upsjb.ms3.policy;
 
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
@@ -15,6 +15,11 @@ public class ProductoPolicy {
     public boolean canUpdate(AuthenticatedUserContext actor, boolean employeeCanEditProductBasic) {
         return PolicyGuard.isAdmin(actor)
                 || (PolicyGuard.isEmpleado(actor) && employeeCanEditProductBasic);
+    }
+
+    public boolean canUpdateAttributes(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
+        return PolicyGuard.isAdmin(actor)
+                || (PolicyGuard.isEmpleado(actor) && employeeCanUpdateAttributes);
     }
 
     public boolean canPublish(AuthenticatedUserContext actor) {
@@ -55,6 +60,14 @@ public class ProductoPolicy {
 
     public void ensureCanUpdate(AuthenticatedUserContext actor, boolean employeeCanEditProductBasic) {
         PolicyGuard.ensureCan(canUpdate(actor, employeeCanEditProductBasic), "PRODUCTO_EDITAR_DENEGADO", "editar producto");
+    }
+
+    public void ensureCanUpdateAttributes(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
+        PolicyGuard.ensureCan(
+                canUpdateAttributes(actor, employeeCanUpdateAttributes),
+                "PRODUCTO_ATRIBUTOS_DENEGADO",
+                "actualizar atributos de producto"
+        );
     }
 
     public void ensureCanPublish(AuthenticatedUserContext actor) {

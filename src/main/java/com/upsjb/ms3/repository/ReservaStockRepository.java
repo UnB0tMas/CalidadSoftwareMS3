@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/ReservaStockRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/ReservaStockRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.ReservaStock;
@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -21,15 +23,50 @@ public interface ReservaStockRepository extends
         JpaRepository<ReservaStock, Long>,
         JpaSpecificationExecutor<ReservaStock> {
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
+    @Override
+    Page<ReservaStock> findAll(Specification<ReservaStock> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
+    Optional<ReservaStock> findByIdReservaStock(Long idReservaStock);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<ReservaStock> findByIdReservaStockAndEstadoTrue(Long idReservaStock);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<ReservaStock> findByCodigoReservaIgnoreCaseAndEstadoTrue(String codigoReserva);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<ReservaStock> findByReferenciaTipoAndReferenciaIdExternoAndEstadoTrue(
             TipoReferenciaStock referenciaTipo,
             String referenciaIdExterno
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<ReservaStock> findByReferenciaTipoAndReferenciaIdExternoAndSku_IdSkuAndAlmacen_IdAlmacenAndEstadoTrue(
             TipoReferenciaStock referenciaTipo,
             String referenciaIdExterno,
@@ -41,6 +78,11 @@ public interface ReservaStockRepository extends
 
     boolean existsByAlmacen_IdAlmacenAndEstadoReservaInAndEstadoTrue(
             Long idAlmacen,
+            Collection<EstadoReservaStock> estadosReserva
+    );
+
+    boolean existsBySku_Producto_IdProductoAndEstadoReservaInAndEstadoTrue(
+            Long idProducto,
             Collection<EstadoReservaStock> estadosReserva
     );
 
@@ -57,6 +99,11 @@ public interface ReservaStockRepository extends
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     @Query("""
             select r
             from ReservaStock r
@@ -66,6 +113,11 @@ public interface ReservaStockRepository extends
     Optional<ReservaStock> findActivoByIdForUpdate(@Param("idReservaStock") Long idReservaStock);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     @Query("""
             select r
             from ReservaStock r
@@ -75,6 +127,11 @@ public interface ReservaStockRepository extends
     Optional<ReservaStock> findActivoByCodigoForUpdate(@Param("codigoReserva") String codigoReserva);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     @Query("""
             select r
             from ReservaStock r
@@ -91,20 +148,55 @@ public interface ReservaStockRepository extends
             @Param("idAlmacen") Long idAlmacen
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<ReservaStock> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<ReservaStock> findByEstadoReservaAndEstadoTrue(EstadoReservaStock estadoReserva, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<ReservaStock> findBySku_IdSkuAndEstadoTrue(Long idSku, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<ReservaStock> findByAlmacen_IdAlmacenAndEstadoTrue(Long idAlmacen, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<ReservaStock> findByReferenciaTipoAndEstadoTrue(TipoReferenciaStock referenciaTipo, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<ReservaStock> findByEstadoReservaInAndEstadoTrueOrderByReservadoAtAsc(
             Collection<EstadoReservaStock> estados
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<ReservaStock> findByEstadoReservaAndExpiresAtBeforeAndEstadoTrueOrderByExpiresAtAsc(
             EstadoReservaStock estadoReserva,
             LocalDateTime fechaLimite

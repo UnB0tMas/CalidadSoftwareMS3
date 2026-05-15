@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.exception;
+package com.upsjb.ms3.shared.exception;
 
 import com.upsjb.ms3.shared.audit.AuditContext;
 import com.upsjb.ms3.shared.audit.AuditContextHolder;

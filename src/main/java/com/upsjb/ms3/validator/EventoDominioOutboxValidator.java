@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/EventoDominioOutboxValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/EventoDominioOutboxValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.config.OutboxProperties;

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.idempotency;
+package com.upsjb.ms3.shared.idempotency;
 
 public enum DuplicateEventDecision {
 

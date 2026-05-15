@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/TipoProductoValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/TipoProductoValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.TipoProducto;
@@ -11,9 +11,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class TipoProductoValidator {
 
+    private static final int MAX_CODIGO_LENGTH = 50;
+    private static final int MAX_NOMBRE_LENGTH = 120;
+    private static final int MAX_DESCRIPCION_LENGTH = 300;
+
     public void validateCreate(
             String codigo,
             String nombre,
+            String descripcion,
             boolean duplicatedCodigo,
             boolean duplicatedNombre
     ) {
@@ -21,6 +26,7 @@ public class TipoProductoValidator {
 
         validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateDescripcion(descripcion, errors);
         errors.throwIfAny("No se puede crear el tipo de producto.");
 
         requireNotDuplicated(duplicatedCodigo, "Ya existe un tipo de producto activo con el mismo código.");
@@ -29,14 +35,21 @@ public class TipoProductoValidator {
 
     public void validateUpdate(
             TipoProducto tipoProducto,
+            String codigo,
             String nombre,
+            String descripcion,
+            boolean duplicatedCodigo,
             boolean duplicatedNombre
     ) {
         requireActive(tipoProducto);
+
         ValidationErrorCollector errors = ValidationErrorCollector.create();
+        validateCodigo(codigo, errors);
         validateNombre(nombre, errors);
+        validateDescripcion(descripcion, errors);
         errors.throwIfAny("No se puede actualizar el tipo de producto.");
 
+        requireNotDuplicated(duplicatedCodigo, "Ya existe otro tipo de producto activo con el mismo código.");
         requireNotDuplicated(duplicatedNombre, "Ya existe otro tipo de producto activo con el mismo nombre.");
     }
 
@@ -73,11 +86,11 @@ public class TipoProductoValidator {
         }
     }
 
-    private void requireExists(TipoProducto tipoProducto) {
+    public void requireExists(TipoProducto tipoProducto) {
         if (tipoProducto == null) {
             throw new NotFoundException(
                     "TIPO_PRODUCTO_NO_ENCONTRADO",
-                    "Tipo de producto no encontrado."
+                    "No se encontró el registro solicitado."
             );
         }
     }
@@ -88,7 +101,7 @@ public class TipoProductoValidator {
             return;
         }
 
-        if (StringNormalizer.clean(codigo).length() > 50) {
+        if (StringNormalizer.clean(codigo).length() > MAX_CODIGO_LENGTH) {
             errors.add("codigo", "El código no debe superar 50 caracteres.", "MAX_LENGTH", codigo);
         }
     }
@@ -99,8 +112,23 @@ public class TipoProductoValidator {
             return;
         }
 
-        if (StringNormalizer.clean(nombre).length() > 120) {
+        if (StringNormalizer.clean(nombre).length() > MAX_NOMBRE_LENGTH) {
             errors.add("nombre", "El nombre no debe superar 120 caracteres.", "MAX_LENGTH", nombre);
+        }
+    }
+
+    private void validateDescripcion(String descripcion, ValidationErrorCollector errors) {
+        if (!StringNormalizer.hasText(descripcion)) {
+            return;
+        }
+
+        if (StringNormalizer.clean(descripcion).length() > MAX_DESCRIPCION_LENGTH) {
+            errors.add(
+                    "descripcion",
+                    "La descripción no debe superar 300 caracteres.",
+                    "MAX_LENGTH",
+                    descripcion
+            );
         }
     }
 

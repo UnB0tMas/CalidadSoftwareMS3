@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/EmpleadoInventarioPermisoServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/EmpleadoInventarioPermisoServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.EmpleadoInventarioPermisoHistorial;
@@ -29,12 +29,14 @@ import com.upsjb.ms3.specification.EmpleadoInventarioPermisoSpecifications;
 import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.EmpleadoInventarioPermisoValidator;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,13 +75,21 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     public ApiResponseDto<EmpleadoInventarioPermisoResponseDto> otorgarOActualizar(
             EmpleadoInventarioPermisoUpdateRequestDto request
     ) {
+        if (request == null) {
+            throw new ValidationException(
+                    "PERMISO_INVENTARIO_REQUEST_REQUERIDO",
+                    "Debe enviar los datos del permiso de inventario."
+            );
+        }
+
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         permisoPolicy.ensureCanGrantPermissions(actor);
 
-        EmpleadoSnapshotMs2 empleado = resolveEmpleado(request == null ? null : request.empleado());
+        EmpleadoSnapshotMs2 empleado = resolveEmpleado(request.empleado());
         permisoPolicy.ensureNotSelfGrant(actor, empleado.getIdUsuarioMs1());
 
         LocalDateTime fechaInicio = request.fechaInicio() == null ? LocalDateTime.now() : request.fechaInicio();
+        boolean selfGrant = actor.getIdUsuarioMs1() != null && actor.getIdUsuarioMs1().equals(empleado.getIdUsuarioMs1());
 
         permisoValidator.validateGrantOrReplace(
                 empleado,
@@ -87,26 +97,26 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
                 request.fechaFin(),
                 request.motivo(),
                 actor.getIdUsuarioMs1(),
-                actor.getIdUsuarioMs1() != null && actor.getIdUsuarioMs1().equals(empleado.getIdUsuarioMs1())
+                selfGrant
         );
 
-        Optional<EmpleadoInventarioPermisoHistorial> vigenteActual = permisoRepository
-                .findFirstByEmpleadoSnapshot_IdEmpleadoSnapshotAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPermisoHistorialDesc(
-                        empleado.getIdEmpleadoSnapshot()
-                );
+        Optional<EmpleadoInventarioPermisoHistorial> vigenteActual = findVigenteForUpdate(
+                empleado.getIdEmpleadoSnapshot()
+        );
 
         vigenteActual.ifPresent(current -> {
             permisoMapper.closeVigencia(
                     current,
                     actor.getIdUsuarioMs1(),
                     LocalDateTime.now(),
-                    "Reemplazo de permisos: " + request.motivo()
+                    "Reemplazo de permisos: " + StringNormalizer.truncate(request.motivo(), 450)
             );
-            permisoRepository.save(current);
+            permisoRepository.saveAndFlush(current);
         });
 
         EmpleadoInventarioPermisoHistorial nuevo = permisoMapper.toEntity(request, empleado, actor.getIdUsuarioMs1());
         nuevo.setFechaInicio(fechaInicio);
+        nuevo.setMotivo(StringNormalizer.truncate(request.motivo(), 500));
         nuevo.setVigente(request.fechaFin() == null || request.fechaFin().isAfter(LocalDateTime.now()));
         nuevo.activar();
 
@@ -123,8 +133,16 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
                 metadataPermiso(saved)
         );
 
+        log.info(
+                "Permiso inventario otorgado. idPermisoHistorial={}, idEmpleadoSnapshot={}, idUsuarioMs1={}, actor={}",
+                saved.getIdPermisoHistorial(),
+                empleado.getIdEmpleadoSnapshot(),
+                empleado.getIdUsuarioMs1(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoCreated(
-                "Operación realizada correctamente.",
+                "Permiso de inventario otorgado correctamente.",
                 permisoMapper.toResponse(saved)
         );
     }
@@ -137,9 +155,10 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     ) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         permisoPolicy.ensureCanRevokePermissions(actor);
+        requirePositiveId(idPermisoHistorial, "idPermisoHistorial");
 
         EmpleadoInventarioPermisoHistorial permiso = permisoRepository
-                .findByIdPermisoHistorialAndEstadoTrue(idPermisoHistorial)
+                .findActivoByIdForUpdate(idPermisoHistorial)
                 .orElseThrow(() -> new NotFoundException(
                         "PERMISO_INVENTARIO_NO_ENCONTRADO",
                         "No se encontró el registro solicitado."
@@ -148,7 +167,8 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
         permisoValidator.validateRevoke(
                 permiso,
                 request == null ? null : request.motivo(),
-                actor.getIdUsuarioMs1()
+                actor.getIdUsuarioMs1(),
+                request == null ? null : request.fechaFin()
         );
 
         permisoMapper.closeVigencia(permiso, actor.getIdUsuarioMs1(), request);
@@ -164,8 +184,14 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
                 metadataPermiso(saved)
         );
 
+        log.info(
+                "Permiso inventario revocado. idPermisoHistorial={}, actor={}",
+                saved.getIdPermisoHistorial(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoOk(
-                "Operación realizada correctamente.",
+                "Permiso de inventario revocado correctamente.",
                 permisoMapper.toResponse(saved)
         );
     }
@@ -175,6 +201,7 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     public ApiResponseDto<EmpleadoInventarioPermisoResponseDto> obtenerDetalle(Long idPermisoHistorial) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         permisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idPermisoHistorial, "idPermisoHistorial");
 
         EmpleadoInventarioPermisoHistorial permiso = permisoRepository
                 .findByIdPermisoHistorialAndEstadoTrue(idPermisoHistorial)
@@ -194,6 +221,7 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     public ApiResponseDto<EmpleadoInventarioPermisoResponseDto> obtenerVigentePorUsuarioMs1(Long idUsuarioMs1) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         permisoPolicy.ensureCanViewPermissions(actor);
+        requirePositiveId(idUsuarioMs1, "idUsuarioMs1");
 
         EmpleadoInventarioPermisoHistorial permiso = findVigenteByUsuario(idUsuarioMs1)
                 .orElseThrow(() -> new NotFoundException(
@@ -307,8 +335,20 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
         );
     }
 
+    private Optional<EmpleadoInventarioPermisoHistorial> findVigenteForUpdate(Long idEmpleadoSnapshot) {
+        if (idEmpleadoSnapshot == null || idEmpleadoSnapshot <= 0) {
+            return Optional.empty();
+        }
+
+        return permisoRepository
+                .findVigentesByEmpleadoSnapshotForUpdate(idEmpleadoSnapshot, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .filter(this::isPermissionOperationalOrScheduled);
+    }
+
     private Optional<EmpleadoInventarioPermisoHistorial> findVigenteByUsuario(Long idUsuarioMs1) {
-        if (idUsuarioMs1 == null) {
+        if (idUsuarioMs1 == null || idUsuarioMs1 <= 0) {
             return Optional.empty();
         }
 
@@ -330,6 +370,15 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     }
 
     private boolean isPermissionOperational(EmpleadoInventarioPermisoHistorial permiso) {
+        if (!isPermissionOperationalOrScheduled(permiso)) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        return permiso.getFechaInicio() == null || !permiso.getFechaInicio().isAfter(now);
+    }
+
+    private boolean isPermissionOperationalOrScheduled(EmpleadoInventarioPermisoHistorial permiso) {
         if (permiso == null || !permiso.isActivo() || !Boolean.TRUE.equals(permiso.getVigente())) {
             return false;
         }
@@ -345,14 +394,31 @@ public class EmpleadoInventarioPermisoServiceImpl implements EmpleadoInventarioP
     private Map<String, Object> metadataPermiso(EmpleadoInventarioPermisoHistorial permiso) {
         EmpleadoSnapshotMs2 empleado = permiso.getEmpleadoSnapshot();
 
-        return Map.of(
-                "idPermisoHistorial", permiso.getIdPermisoHistorial(),
-                "idEmpleadoSnapshot", empleado == null ? null : empleado.getIdEmpleadoSnapshot(),
-                "idEmpleadoMs2", empleado == null ? null : empleado.getIdEmpleadoMs2(),
-                "idUsuarioMs1", empleado == null ? null : empleado.getIdUsuarioMs1(),
-                "codigoEmpleado", empleado == null ? null : empleado.getCodigoEmpleado(),
-                "vigente", permiso.getVigente()
-        );
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("idPermisoHistorial", permiso.getIdPermisoHistorial());
+        metadata.put("idEmpleadoSnapshot", empleado == null ? null : empleado.getIdEmpleadoSnapshot());
+        metadata.put("idEmpleadoMs2", empleado == null ? null : empleado.getIdEmpleadoMs2());
+        metadata.put("idUsuarioMs1", empleado == null ? null : empleado.getIdUsuarioMs1());
+        metadata.put("codigoEmpleado", empleado == null ? null : empleado.getCodigoEmpleado());
+        metadata.put("vigente", permiso.getVigente());
+        metadata.put("puedeCrearProductoBasico", permiso.getPuedeCrearProductoBasico());
+        metadata.put("puedeEditarProductoBasico", permiso.getPuedeEditarProductoBasico());
+        metadata.put("puedeRegistrarEntrada", permiso.getPuedeRegistrarEntrada());
+        metadata.put("puedeRegistrarSalida", permiso.getPuedeRegistrarSalida());
+        metadata.put("puedeRegistrarAjuste", permiso.getPuedeRegistrarAjuste());
+        metadata.put("puedeConsultarKardex", permiso.getPuedeConsultarKardex());
+        metadata.put("puedeGestionarImagenes", permiso.getPuedeGestionarImagenes());
+        metadata.put("puedeActualizarAtributos", permiso.getPuedeActualizarAtributos());
+        return metadata;
+    }
+
+    private void requirePositiveId(Long id, String field) {
+        if (id == null || id <= 0) {
+            throw new ValidationException(
+                    "ID_INVALIDO",
+                    "El campo " + field + " debe ser mayor a cero."
+            );
+        }
     }
 
     private PageRequestDto safePageRequest(PageRequestDto pageRequest, String defaultSortBy) {

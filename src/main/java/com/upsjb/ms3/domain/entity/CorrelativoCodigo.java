@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.domain.entity;
+package com.upsjb.ms3.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

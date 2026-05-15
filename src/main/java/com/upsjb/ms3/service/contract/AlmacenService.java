@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/AlmacenService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/AlmacenService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.inventario.almacen.filter.AlmacenFilterDto;

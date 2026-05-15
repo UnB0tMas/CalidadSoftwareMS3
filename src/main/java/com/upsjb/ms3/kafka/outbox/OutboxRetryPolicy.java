@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxRetryPolicy.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxRetryPolicy.java
 package com.upsjb.ms3.kafka.outbox;
 
 import com.upsjb.ms3.config.OutboxProperties;

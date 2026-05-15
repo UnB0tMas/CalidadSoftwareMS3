@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/proveedor/filter/ProveedorFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/proveedor/filter/ProveedorFilterDto.java
 package com.upsjb.ms3.dto.proveedor.filter;
 
 import com.upsjb.ms3.domain.enums.TipoDocumentoProveedor;
@@ -42,9 +42,21 @@ public record ProveedorFilterDto(
         @Size(max = 30, message = "El teléfono no debe superar 30 caracteres.")
         String telefono,
 
+        @Size(max = 300, message = "La dirección no debe superar 300 caracteres.")
+        String direccion,
+
+        Long creadoPorIdUsuarioMs1,
+
+        Long actualizadoPorIdUsuarioMs1,
+
         Boolean estado,
 
+        Boolean incluirTodosLosEstados,
+
         @Valid
-        DateRangeFilterDto fechaCreacion
+        DateRangeFilterDto fechaCreacion,
+
+        @Valid
+        DateRangeFilterDto fechaActualizacion
 ) {
 }

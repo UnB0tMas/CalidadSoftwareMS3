@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/request/CategoriaCreateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/request/CategoriaCreateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.categoria.request;
 
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;

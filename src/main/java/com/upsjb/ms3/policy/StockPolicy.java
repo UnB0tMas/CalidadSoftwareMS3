@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/policy/StockPolicy.java
+// ruta: src/main/java/com/upsjb/ms3/policy/StockPolicy.java
 package com.upsjb.ms3.policy;
 
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
@@ -7,8 +7,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class StockPolicy {
 
-    public boolean canViewInternalStock(AuthenticatedUserContext actor) {
-        return PolicyGuard.isAdmin(actor) || PolicyGuard.isEmpleado(actor);
+    public boolean canViewInternalStock(
+            AuthenticatedUserContext actor,
+            boolean employeeHasInventoryPermission
+    ) {
+        return PolicyGuard.isAdmin(actor)
+                || (PolicyGuard.isEmpleado(actor) && employeeHasInventoryPermission);
     }
 
     public boolean canViewPublicStock() {
@@ -34,23 +38,46 @@ public class StockPolicy {
                 || (PolicyGuard.isEmpleado(actor) && employeeCanRegisterAdjustment);
     }
 
-    public void ensureCanViewInternalStock(AuthenticatedUserContext actor) {
-        PolicyGuard.ensureCan(canViewInternalStock(actor), "STOCK_CONSULTA_INTERNA_DENEGADA", "consultar stock interno");
+    public void ensureCanViewInternalStock(
+            AuthenticatedUserContext actor,
+            boolean employeeHasInventoryPermission
+    ) {
+        PolicyGuard.ensureCan(
+                canViewInternalStock(actor, employeeHasInventoryPermission),
+                "STOCK_CONSULTA_INTERNA_DENEGADA",
+                "consultar stock interno"
+        );
     }
 
     public void ensureCanViewCost(AuthenticatedUserContext actor) {
-        PolicyGuard.ensureCan(canViewCost(actor), "STOCK_COSTO_DENEGADO", "consultar costos de stock");
+        PolicyGuard.ensureCan(
+                canViewCost(actor),
+                "STOCK_COSTO_DENEGADO",
+                "consultar costos de stock"
+        );
     }
 
     public void ensureCanRegisterEntry(AuthenticatedUserContext actor, boolean employeeCanRegisterEntry) {
-        PolicyGuard.ensureCan(canRegisterEntry(actor, employeeCanRegisterEntry), "STOCK_ENTRADA_DENEGADA", "registrar entrada de stock");
+        PolicyGuard.ensureCan(
+                canRegisterEntry(actor, employeeCanRegisterEntry),
+                "STOCK_ENTRADA_DENEGADA",
+                "registrar entrada de stock"
+        );
     }
 
     public void ensureCanRegisterOutput(AuthenticatedUserContext actor, boolean employeeCanRegisterOutput) {
-        PolicyGuard.ensureCan(canRegisterOutput(actor, employeeCanRegisterOutput), "STOCK_SALIDA_DENEGADA", "registrar salida de stock");
+        PolicyGuard.ensureCan(
+                canRegisterOutput(actor, employeeCanRegisterOutput),
+                "STOCK_SALIDA_DENEGADA",
+                "registrar salida de stock"
+        );
     }
 
     public void ensureCanRegisterAdjustment(AuthenticatedUserContext actor, boolean employeeCanRegisterAdjustment) {
-        PolicyGuard.ensureCan(canRegisterAdjustment(actor, employeeCanRegisterAdjustment), "STOCK_AJUSTE_DENEGADO", "registrar ajuste de stock");
+        PolicyGuard.ensureCan(
+                canRegisterAdjustment(actor, employeeCanRegisterAdjustment),
+                "STOCK_AJUSTE_DENEGADO",
+                "registrar ajuste de stock"
+        );
     }
 }

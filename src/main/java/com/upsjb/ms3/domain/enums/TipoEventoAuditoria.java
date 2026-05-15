@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/domain/enums/TipoEventoAuditoria.java
+// ruta: src/main/java/com/upsjb/ms3/domain/enums/TipoEventoAuditoria.java
 package com.upsjb.ms3.domain.enums;
 
 import java.util.Arrays;
@@ -15,6 +15,16 @@ public enum TipoEventoAuditoria {
     SKU_CREADO("SKU_CREADO", "SKU creado"),
     SKU_ACTUALIZADO("SKU_ACTUALIZADO", "SKU actualizado"),
     SKU_INACTIVADO("SKU_INACTIVADO", "SKU inactivado"),
+
+    TIPO_PRODUCTO_CREADO("TIPO_PRODUCTO_CREADO", "Tipo de producto creado"),
+    TIPO_PRODUCTO_ACTUALIZADO("TIPO_PRODUCTO_ACTUALIZADO", "Tipo de producto actualizado"),
+    TIPO_PRODUCTO_ACTIVADO("TIPO_PRODUCTO_ACTIVADO", "Tipo de producto activado"),
+    TIPO_PRODUCTO_INACTIVADO("TIPO_PRODUCTO_INACTIVADO", "Tipo de producto inactivado"),
+
+    TIPO_PRODUCTO_ATRIBUTO_ASIGNADO("TIPO_PRODUCTO_ATRIBUTO_ASIGNADO", "Atributo asignado a tipo de producto"),
+    TIPO_PRODUCTO_ATRIBUTO_ACTUALIZADO("TIPO_PRODUCTO_ATRIBUTO_ACTUALIZADO", "Asociación de atributo a tipo de producto actualizada"),
+    TIPO_PRODUCTO_ATRIBUTO_ACTIVADO("TIPO_PRODUCTO_ATRIBUTO_ACTIVADO", "Asociación de atributo a tipo de producto activada"),
+    TIPO_PRODUCTO_ATRIBUTO_INACTIVADO("TIPO_PRODUCTO_ATRIBUTO_INACTIVADO", "Asociación de atributo a tipo de producto inactivada"),
 
     CATEGORIA_CREADA("CATEGORIA_CREADA", "Categoría creada"),
     CATEGORIA_ACTUALIZADA("CATEGORIA_ACTUALIZADA", "Categoría actualizada"),

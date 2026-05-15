@@ -1,51 +1,39 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/SlugGeneratorServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/SlugGeneratorServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.service.contract.SlugGeneratorService;
+import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.ValidationException;
+import com.upsjb.ms3.util.SlugUtil;
 import com.upsjb.ms3.util.StringNormalizer;
-import java.util.Locale;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 @Service
 public class SlugGeneratorServiceImpl implements SlugGeneratorService {
 
     private static final int MAX_SLUG_LENGTH = 150;
     private static final int MAX_ATTEMPTS = 500;
+    private static final String DEFAULT_FALLBACK = "item";
 
     @Override
     public String generarSlug(String base) {
-        if (!StringUtils.hasText(base)) {
-            throw new ValidationException(
-                    "SLUG_BASE_REQUERIDA",
-                    "El texto base para generar slug es obligatorio."
-            );
+        validateBase(base);
+
+        String slug = SlugUtil.toSlug(base, MAX_SLUG_LENGTH);
+
+        if (!StringNormalizer.hasText(slug) || !SlugUtil.isValidSlug(slug)) {
+            return DEFAULT_FALLBACK;
         }
 
-        String slug = StringNormalizer.removeAccents(base)
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-+", "")
-                .replaceAll("-+$", "");
-
-        if (!StringUtils.hasText(slug)) {
-            slug = "registro";
-        }
-
-        return truncateSlug(slug);
+        return slug;
     }
 
     @Override
     public String generarSlugUnico(String base, Predicate<String> existsPredicate) {
-        if (existsPredicate == null) {
-            throw new ValidationException(
-                    "SLUG_VALIDATOR_REQUERIDO",
-                    "Debe indicar la validación de unicidad del slug."
-            );
-        }
+        validateBase(base);
+        validatePredicate(existsPredicate);
 
         String baseSlug = generarSlug(base);
 
@@ -53,15 +41,15 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
             return baseSlug;
         }
 
-        for (int i = 2; i <= MAX_ATTEMPTS; i++) {
-            String candidate = appendSuffix(baseSlug, i);
+        for (int counter = 2; counter <= MAX_ATTEMPTS; counter++) {
+            String candidate = appendSuffix(baseSlug, counter);
 
             if (!existsPredicate.test(candidate)) {
                 return candidate;
             }
         }
 
-        throw new ValidationException(
+        throw new ConflictException(
                 "SLUG_NO_DISPONIBLE",
                 "No se pudo generar un slug único para el registro solicitado."
         );
@@ -73,12 +61,8 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
             Long excludedId,
             BiPredicate<String, Long> existsPredicate
     ) {
-        if (existsPredicate == null) {
-            throw new ValidationException(
-                    "SLUG_VALIDATOR_REQUERIDO",
-                    "Debe indicar la validación de unicidad del slug."
-            );
-        }
+        validateBase(base);
+        validateBiPredicate(existsPredicate);
 
         String baseSlug = generarSlug(base);
 
@@ -86,18 +70,45 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
             return baseSlug;
         }
 
-        for (int i = 2; i <= MAX_ATTEMPTS; i++) {
-            String candidate = appendSuffix(baseSlug, i);
+        for (int counter = 2; counter <= MAX_ATTEMPTS; counter++) {
+            String candidate = appendSuffix(baseSlug, counter);
 
             if (!existsPredicate.test(candidate, excludedId)) {
                 return candidate;
             }
         }
 
-        throw new ValidationException(
+        throw new ConflictException(
                 "SLUG_NO_DISPONIBLE",
                 "No se pudo generar un slug único para el registro solicitado."
         );
+    }
+
+    private void validateBase(String base) {
+        if (!StringNormalizer.hasText(base)) {
+            throw new ValidationException(
+                    "SLUG_BASE_REQUERIDA",
+                    "El texto base para generar slug es obligatorio."
+            );
+        }
+    }
+
+    private void validatePredicate(Predicate<String> existsPredicate) {
+        if (existsPredicate == null) {
+            throw new ValidationException(
+                    "SLUG_VALIDATOR_REQUERIDO",
+                    "Debe indicar la validación de unicidad del slug."
+            );
+        }
+    }
+
+    private void validateBiPredicate(BiPredicate<String, Long> existsPredicate) {
+        if (existsPredicate == null) {
+            throw new ValidationException(
+                    "SLUG_VALIDATOR_REQUERIDO",
+                    "Debe indicar la validación de unicidad del slug."
+            );
+        }
     }
 
     private String appendSuffix(String baseSlug, int suffix) {
@@ -108,14 +119,10 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
                 ? baseSlug
                 : baseSlug.substring(0, maxBaseLength).replaceAll("-+$", "");
 
-        return normalizedBase + suffixText;
-    }
-
-    private String truncateSlug(String slug) {
-        if (slug.length() <= MAX_SLUG_LENGTH) {
-            return slug;
+        if (!StringNormalizer.hasText(normalizedBase)) {
+            normalizedBase = DEFAULT_FALLBACK;
         }
 
-        return slug.substring(0, MAX_SLUG_LENGTH).replaceAll("-+$", "");
+        return normalizedBase + suffixText;
     }
 }

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.filter;
+package com.upsjb.ms3.security.filter;
 
 import com.upsjb.ms3.domain.enums.RolSistema;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;

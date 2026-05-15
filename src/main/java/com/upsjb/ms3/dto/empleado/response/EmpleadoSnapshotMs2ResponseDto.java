@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/empleado/response/EmpleadoSnapshotMs2ResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/empleado/response/EmpleadoSnapshotMs2ResponseDto.java
 package com.upsjb.ms3.dto.empleado.response;
 
 import java.time.LocalDateTime;

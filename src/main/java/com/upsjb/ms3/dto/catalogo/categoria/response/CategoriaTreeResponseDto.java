@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/response/CategoriaTreeResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/response/CategoriaTreeResponseDto.java
 package com.upsjb.ms3.dto.catalogo.categoria.response;
 
 import java.util.List;

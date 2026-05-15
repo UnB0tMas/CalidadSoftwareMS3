@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventPublisher.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventPublisher.java
 package com.upsjb.ms3.kafka.outbox;
 
 import com.upsjb.ms3.domain.entity.EventoDominioOutbox;
@@ -6,14 +6,17 @@ import com.upsjb.ms3.kafka.producer.KafkaDomainEventPublisher;
 import com.upsjb.ms3.mapper.EventoDominioOutboxMapper;
 import com.upsjb.ms3.repository.EventoDominioOutboxRepository;
 import com.upsjb.ms3.shared.exception.BusinessException;
+import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.EventoDominioOutboxValidator;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class OutboxEventPublisher {
@@ -96,8 +99,18 @@ public class OutboxEventPublisher {
             repository.save(event);
             return result;
         } catch (BusinessException ex) {
-            mapper.markError(event, ex.getMessage());
+            mapper.markError(event, safeErrorMessage(ex.getMessage()));
             repository.save(event);
+
+            log.warn(
+                    "Error funcional al publicar evento outbox. idEvento={}, eventId={}, topic={}, eventKey={}, code={}",
+                    event.getIdEvento(),
+                    event.getEventId(),
+                    event.getTopic(),
+                    event.getEventKey(),
+                    ex.getCode(),
+                    ex
+            );
 
             return OutboxPublishResult.failure(
                     event.getIdEvento(),
@@ -108,8 +121,20 @@ public class OutboxEventPublisher {
                     ex.getMessage()
             );
         } catch (Exception ex) {
-            mapper.markError(event, ex.getMessage());
+            mapper.markError(event, safeErrorMessage(ex.getMessage()));
             repository.save(event);
+
+            log.error(
+                    "Error técnico inesperado al publicar evento outbox. idEvento={}, eventId={}, aggregateType={}, aggregateId={}, eventType={}, topic={}, eventKey={}",
+                    event.getIdEvento(),
+                    event.getEventId(),
+                    event.getAggregateType(),
+                    event.getAggregateId(),
+                    event.getEventType(),
+                    event.getTopic(),
+                    event.getEventKey(),
+                    ex
+            );
 
             return OutboxPublishResult.failure(
                     event.getIdEvento(),
@@ -120,5 +145,14 @@ public class OutboxEventPublisher {
                     "No se pudo publicar el evento en Kafka."
             );
         }
+    }
+
+    private String safeErrorMessage(String message) {
+        String clean = StringNormalizer.cleanOrNull(message);
+        if (clean == null) {
+            return "No se pudo publicar el evento en Kafka.";
+        }
+
+        return StringNormalizer.truncate(clean, 4000);
     }
 }

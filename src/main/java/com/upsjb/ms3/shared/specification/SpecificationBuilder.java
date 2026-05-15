@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.specification;
+package com.upsjb.ms3.shared.specification;
 
 import org.springframework.data.jpa.domain.Specification;
 

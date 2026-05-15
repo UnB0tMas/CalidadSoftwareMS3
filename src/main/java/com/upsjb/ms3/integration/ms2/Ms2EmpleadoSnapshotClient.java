@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2EmpleadoSnapshotClient.java
+// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2EmpleadoSnapshotClient.java
 package com.upsjb.ms3.integration.ms2;
 
 import java.time.LocalDateTime;

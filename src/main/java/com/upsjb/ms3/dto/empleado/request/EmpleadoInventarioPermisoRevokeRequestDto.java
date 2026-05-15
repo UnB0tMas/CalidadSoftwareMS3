@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/empleado/request/EmpleadoInventarioPermisoRevokeRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/empleado/request/EmpleadoInventarioPermisoRevokeRequestDto.java
 package com.upsjb.ms3.dto.empleado.request;
 
 import jakarta.validation.constraints.NotBlank;

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.handler;
+package com.upsjb.ms3.security.handler;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

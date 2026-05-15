@@ -1,11 +1,13 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/TipoProductoMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/TipoProductoMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.TipoProducto;
+import com.upsjb.ms3.dto.catalogo.atributo.response.TipoProductoAtributoResponseDto;
 import com.upsjb.ms3.dto.catalogo.tipoproducto.request.TipoProductoCreateRequestDto;
 import com.upsjb.ms3.dto.catalogo.tipoproducto.request.TipoProductoUpdateRequestDto;
 import com.upsjb.ms3.dto.catalogo.tipoproducto.response.TipoProductoDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.tipoproducto.response.TipoProductoResponseDto;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -55,6 +57,15 @@ public class TipoProductoMapper {
             Long cantidadAtributos,
             Long cantidadProductos
     ) {
+        return toDetailResponse(entity, cantidadAtributos, cantidadProductos, List.of());
+    }
+
+    public TipoProductoDetailResponseDto toDetailResponse(
+            TipoProducto entity,
+            Long cantidadAtributos,
+            Long cantidadProductos,
+            List<TipoProductoAtributoResponseDto> atributos
+    ) {
         if (entity == null) {
             return null;
         }
@@ -67,6 +78,7 @@ public class TipoProductoMapper {
                 .estado(entity.getEstado())
                 .cantidadAtributos(defaultLong(cantidadAtributos))
                 .cantidadProductos(defaultLong(cantidadProductos))
+                .atributos(atributos == null ? List.of() : atributos)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

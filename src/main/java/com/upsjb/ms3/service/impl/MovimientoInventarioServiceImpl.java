@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/MovimientoInventarioServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/MovimientoInventarioServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -49,7 +49,6 @@ import com.upsjb.ms3.shared.reference.AlmacenReferenceResolver;
 import com.upsjb.ms3.shared.reference.ProductoSkuReferenceResolver;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.MovimientoInventarioSpecifications;
-import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.StockMathUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.MovimientoInventarioValidator;
@@ -132,8 +131,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         int stockAnterior = StockMathUtil.zeroIfNull(stock.getStockFisico());
         int stockNuevo = StockMathUtil.applyEntry(stock.getStockFisico(), normalized.cantidad());
 
+        applyCostOnEntry(stock, stockAnterior, normalized.cantidad(), normalized.costoUnitario());
         stock.setStockFisico(stockNuevo);
-        applyCostOnEntry(stock, normalized.cantidad(), normalized.costoUnitario());
+        stockValidator.validateStockState(stock);
 
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
         MovimientoInventario savedMovimiento = saveEntradaMovimiento(
@@ -179,6 +179,7 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         int stockNuevo = StockMathUtil.applyOutput(stock.getStockFisico(), normalized.cantidad());
 
         stock.setStockFisico(stockNuevo);
+        stockValidator.validateStockState(stock);
 
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
         MovimientoInventario savedMovimiento = saveSalidaMovimiento(
@@ -227,11 +228,12 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
             );
         }
 
-        stock.setStockFisico(stockNuevo);
-
         if (normalized.tipoMovimiento().isEntradaFisica()) {
-            applyCostOnEntry(stock, normalized.cantidad(), normalized.costoUnitario());
+            applyCostOnEntry(stock, stockAnterior, normalized.cantidad(), normalized.costoUnitario());
         }
+
+        stock.setStockFisico(stockNuevo);
+        stockValidator.validateStockState(stock);
 
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
         MovimientoInventario savedMovimiento = saveAjusteMovimiento(
@@ -261,7 +263,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
 
     @Override
     @Transactional
-    public ApiResponseDto<MovimientoInventarioResponseDto> registrarCompensacion(MovimientoCompensatorioRequestDto request) {
+    public ApiResponseDto<MovimientoInventarioResponseDto> registrarCompensacion(
+            MovimientoCompensatorioRequestDto request
+    ) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         movimientoPolicy.ensureCanRegisterCompensatoryMovement(actor);
 
@@ -292,6 +296,7 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         }
 
         stock.setStockFisico(stockNuevo);
+        stockValidator.validateStockState(stock);
         StockSku savedStock = stockSkuRepository.saveAndFlush(stock);
 
         MovimientoInventario compensacion = movimientoMapper.toEntity(
@@ -372,6 +377,35 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
 
     @Override
     @Transactional(readOnly = true)
+    public ApiResponseDto<MovimientoInventarioResponseDto> obtenerPorCodigo(
+            String codigoMovimiento,
+            Boolean incluirCostos
+    ) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        movimientoPolicy.ensureCanViewMovements(actor);
+
+        String cleanCodigo = StringNormalizer.cleanOrNull(codigoMovimiento);
+        movimientoValidator.validateCodigoMovimiento(cleanCodigo);
+
+        boolean includeCosts = resolveCostVisibility(actor, incluirCostos);
+
+        MovimientoInventario movimiento = movimientoRepository
+                .findByCodigoMovimientoIgnoreCaseAndEstadoTrue(cleanCodigo)
+                .orElseThrow(() -> new NotFoundException(
+                        "MOVIMIENTO_INVENTARIO_NO_ENCONTRADO",
+                        "No se encontró el registro solicitado."
+                ));
+
+        movimientoValidator.requireActive(movimiento);
+
+        return apiResponseFactory.dtoOk(
+                "Detalle obtenido correctamente.",
+                movimientoMapper.toResponse(movimiento, Moneda.PEN, includeCosts)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ApiResponseDto<PageResponseDto<MovimientoInventarioResponseDto>> listar(
             MovimientoInventarioFilterDto filter,
             PageRequestDto pageRequest,
@@ -379,6 +413,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
     ) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         movimientoPolicy.ensureCanViewMovements(actor);
+
+        MovimientoInventarioFilterDto safeFilter = normalizeFilter(filter);
+        movimientoValidator.validateFilter(safeFilter);
 
         boolean includeCosts = resolveCostVisibility(actor, incluirCostos);
         PageRequestDto safePage = safePageRequest(pageRequest, "createdAt");
@@ -393,7 +430,7 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         );
 
         PageResponseDto<MovimientoInventarioResponseDto> response = paginationService.toPageResponseDto(
-                movimientoRepository.findAll(MovimientoInventarioSpecifications.fromFilter(filter), pageable),
+                movimientoRepository.findAll(MovimientoInventarioSpecifications.fromFilter(safeFilter), pageable),
                 movimiento -> movimientoMapper.toResponse(movimiento, Moneda.PEN, includeCosts)
         );
 
@@ -401,6 +438,28 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
                 "Lista obtenida correctamente.",
                 response
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<PageResponseDto<MovimientoInventarioResponseDto>> listarPorReferencia(
+            String referenciaTipo,
+            String referenciaIdExterno,
+            PageRequestDto pageRequest,
+            Boolean incluirCostos
+    ) {
+        String cleanTipo = StringNormalizer.cleanOrNull(referenciaTipo);
+        String cleanReferencia = StringNormalizer.cleanOrNull(referenciaIdExterno);
+
+        movimientoValidator.validateReferenceSearch(cleanTipo, cleanReferencia);
+
+        MovimientoInventarioFilterDto filter = MovimientoInventarioFilterDto.builder()
+                .referenciaTipo(cleanTipo)
+                .referenciaIdExterno(cleanReferencia)
+                .estado(Boolean.TRUE)
+                .build();
+
+        return listar(filter, pageRequest, incluirCostos);
     }
 
     private MovimientoInventario saveEntradaMovimiento(
@@ -613,6 +672,40 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
                 .build();
     }
 
+    private MovimientoInventarioFilterDto normalizeFilter(MovimientoInventarioFilterDto filter) {
+        if (filter == null) {
+            return MovimientoInventarioFilterDto.builder()
+                    .estado(Boolean.TRUE)
+                    .build();
+        }
+
+        return MovimientoInventarioFilterDto.builder()
+                .idMovimiento(filter.idMovimiento())
+                .search(StringNormalizer.cleanOrNull(filter.search()))
+                .codigoMovimiento(StringNormalizer.cleanOrNull(filter.codigoMovimiento()))
+                .idSku(filter.idSku())
+                .codigoSku(StringNormalizer.cleanOrNull(filter.codigoSku()))
+                .idProducto(filter.idProducto())
+                .codigoProducto(StringNormalizer.cleanOrNull(filter.codigoProducto()))
+                .idAlmacen(filter.idAlmacen())
+                .codigoAlmacen(StringNormalizer.cleanOrNull(filter.codigoAlmacen()))
+                .idCompraDetalle(filter.idCompraDetalle())
+                .idReservaStock(filter.idReservaStock())
+                .tipoMovimiento(filter.tipoMovimiento())
+                .motivoMovimiento(filter.motivoMovimiento())
+                .estadoMovimiento(filter.estadoMovimiento())
+                .referenciaTipo(StringNormalizer.cleanOrNull(filter.referenciaTipo()))
+                .referenciaIdExterno(StringNormalizer.cleanOrNull(filter.referenciaIdExterno()))
+                .actorIdUsuarioMs1(filter.actorIdUsuarioMs1())
+                .actorIdEmpleadoMs2(filter.actorIdEmpleadoMs2())
+                .actorRol(filter.actorRol())
+                .requestId(StringNormalizer.cleanOrNull(filter.requestId()))
+                .correlationId(StringNormalizer.cleanOrNull(filter.correlationId()))
+                .estado(filter.estado() == null ? Boolean.TRUE : filter.estado())
+                .fechaMovimiento(filter.fechaMovimiento())
+                .build();
+    }
+
     private ProductoSku resolveSku(EntityReferenceDto reference) {
         if (reference == null) {
             throw new ValidationException(
@@ -680,14 +773,19 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         return stock;
     }
 
-    private void applyCostOnEntry(StockSku stock, Integer cantidad, BigDecimal costoUnitario) {
+    private void applyCostOnEntry(
+            StockSku stock,
+            Integer stockAnterior,
+            Integer cantidad,
+            BigDecimal costoUnitario
+    ) {
         if (costoUnitario == null) {
             return;
         }
 
         stock.setCostoPromedioActual(
                 StockMathUtil.weightedAverageCost(
-                        stock.getStockFisico(),
+                        stockAnterior,
                         stock.getCostoPromedioActual(),
                         cantidad,
                         costoUnitario
@@ -765,12 +863,12 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
     }
 
     private boolean resolveCostVisibility(AuthenticatedUserContext actor, Boolean incluirCostos) {
-        if (Boolean.TRUE.equals(incluirCostos)) {
-            movimientoPolicy.ensureCanViewCosts(actor);
-            return true;
+        if (!Boolean.TRUE.equals(incluirCostos)) {
+            return false;
         }
 
-        return canViewCosts(actor);
+        movimientoPolicy.ensureCanViewCosts(actor);
+        return true;
     }
 
     private boolean canViewCosts(AuthenticatedUserContext actor) {
@@ -891,11 +989,21 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
                 .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
                 .nombreAlmacen(almacen == null ? null : almacen.getNombre())
-                .idCompraDetalle(movimiento.getCompraDetalle() == null ? null : movimiento.getCompraDetalle().getIdCompraDetalle())
-                .idReservaStock(movimiento.getReservaStock() == null ? null : movimiento.getReservaStock().getIdReservaStock())
-                .codigoReserva(movimiento.getReservaStock() == null ? null : movimiento.getReservaStock().getCodigoReserva())
-                .tipoMovimiento(movimiento.getTipoMovimiento() == null ? null : movimiento.getTipoMovimiento().getCode())
-                .motivoMovimiento(movimiento.getMotivoMovimiento() == null ? null : movimiento.getMotivoMovimiento().getCode())
+                .idCompraDetalle(movimiento.getCompraDetalle() == null
+                        ? null
+                        : movimiento.getCompraDetalle().getIdCompraDetalle())
+                .idReservaStock(movimiento.getReservaStock() == null
+                        ? null
+                        : movimiento.getReservaStock().getIdReservaStock())
+                .codigoReserva(movimiento.getReservaStock() == null
+                        ? null
+                        : movimiento.getReservaStock().getCodigoReserva())
+                .tipoMovimiento(movimiento.getTipoMovimiento() == null
+                        ? null
+                        : movimiento.getTipoMovimiento().getCode())
+                .motivoMovimiento(movimiento.getMotivoMovimiento() == null
+                        ? null
+                        : movimiento.getMotivoMovimiento().getCode())
                 .cantidad(movimiento.getCantidad())
                 .costoUnitario(movimiento.getCostoUnitario())
                 .costoTotal(movimiento.getCostoTotal())
@@ -909,7 +1017,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
                 .actorRol(movimiento.getActorRol() == null ? null : movimiento.getActorRol().getCode())
                 .requestId(movimiento.getRequestId())
                 .correlationId(movimiento.getCorrelationId())
-                .estadoMovimiento(movimiento.getEstadoMovimiento() == null ? null : movimiento.getEstadoMovimiento().getCode())
+                .estadoMovimiento(movimiento.getEstadoMovimiento() == null
+                        ? null
+                        : movimiento.getEstadoMovimiento().getCode())
                 .estado(movimiento.getEstado())
                 .createdAt(movimiento.getCreatedAt())
                 .updatedAt(movimiento.getUpdatedAt())

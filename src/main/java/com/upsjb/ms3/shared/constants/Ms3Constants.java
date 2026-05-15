@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.constants;
+package com.upsjb.ms3.shared.constants;
 
 import java.time.ZoneId;
 

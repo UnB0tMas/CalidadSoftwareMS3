@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/AtributoMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/AtributoMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -8,6 +8,7 @@ import com.upsjb.ms3.dto.catalogo.atributo.request.AtributoUpdateRequestDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoResponseDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.TipoProductoAtributoResponseDto;
+import com.upsjb.ms3.dto.reference.response.AtributoOptionDto;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -63,6 +64,25 @@ public class AtributoMapper {
                 .estado(entity.getEstado())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    public AtributoOptionDto toOption(Atributo entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        return AtributoOptionDto.builder()
+                .idAtributo(entity.getIdAtributo())
+                .codigo(entity.getCodigo())
+                .nombre(entity.getNombre())
+                .tipoDato(entity.getTipoDato())
+                .tipoDatoLabel(tipoDatoLabel(entity.getTipoDato()))
+                .unidadMedida(entity.getUnidadMedida())
+                .requerido(entity.getRequerido())
+                .filtrable(entity.getFiltrable())
+                .visiblePublico(entity.getVisiblePublico())
+                .estado(entity.getEstado())
                 .build();
     }
 

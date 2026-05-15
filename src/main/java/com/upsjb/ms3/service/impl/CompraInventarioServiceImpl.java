@@ -1,22 +1,16 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/CompraInventarioServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/CompraInventarioServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.upsjb.ms3.config.KafkaTopicProperties;
 import com.upsjb.ms3.domain.entity.Almacen;
 import com.upsjb.ms3.domain.entity.CompraInventario;
 import com.upsjb.ms3.domain.entity.CompraInventarioDetalle;
-import com.upsjb.ms3.domain.entity.EventoDominioOutbox;
 import com.upsjb.ms3.domain.entity.MovimientoInventario;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.Proveedor;
 import com.upsjb.ms3.domain.entity.StockSku;
-import com.upsjb.ms3.domain.enums.AggregateType;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoCompraInventario;
-import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.domain.enums.MotivoMovimientoInventario;
 import com.upsjb.ms3.domain.enums.RolSistema;
 import com.upsjb.ms3.domain.enums.StockEventType;
@@ -40,13 +34,10 @@ import com.upsjb.ms3.kafka.event.MovimientoInventarioPayload;
 import com.upsjb.ms3.kafka.event.StockSnapshotEvent;
 import com.upsjb.ms3.kafka.event.StockSnapshotPayload;
 import com.upsjb.ms3.mapper.CompraInventarioMapper;
-import com.upsjb.ms3.mapper.EventoDominioOutboxMapper;
 import com.upsjb.ms3.mapper.MovimientoInventarioMapper;
 import com.upsjb.ms3.policy.CompraInventarioPolicy;
 import com.upsjb.ms3.repository.CompraInventarioDetalleRepository;
 import com.upsjb.ms3.repository.CompraInventarioRepository;
-import com.upsjb.ms3.repository.EventoDominioOutboxRepository;
-import com.upsjb.ms3.repository.EmpleadoInventarioPermisoHistorialRepository;
 import com.upsjb.ms3.repository.MovimientoInventarioRepository;
 import com.upsjb.ms3.repository.StockSkuRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
@@ -54,6 +45,8 @@ import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
 import com.upsjb.ms3.service.contract.CodigoGeneradorService;
 import com.upsjb.ms3.service.contract.CompraInventarioService;
+import com.upsjb.ms3.service.contract.EmpleadoInventarioPermisoService;
+import com.upsjb.ms3.service.contract.EventoDominioOutboxService;
 import com.upsjb.ms3.shared.audit.AuditContext;
 import com.upsjb.ms3.shared.audit.AuditContextHolder;
 import com.upsjb.ms3.shared.exception.ConflictException;
@@ -73,6 +66,7 @@ import com.upsjb.ms3.validator.StockValidator;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -106,25 +100,22 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
     private final CompraInventarioDetalleRepository detalleRepository;
     private final StockSkuRepository stockSkuRepository;
     private final MovimientoInventarioRepository movimientoRepository;
-    private final EventoDominioOutboxRepository outboxRepository;
-    private final EmpleadoInventarioPermisoHistorialRepository permisoRepository;
     private final ProveedorReferenceResolver proveedorReferenceResolver;
     private final ProductoSkuReferenceResolver skuReferenceResolver;
     private final AlmacenReferenceResolver almacenReferenceResolver;
     private final CompraInventarioMapper compraMapper;
     private final MovimientoInventarioMapper movimientoMapper;
-    private final EventoDominioOutboxMapper outboxMapper;
     private final CompraInventarioValidator compraValidator;
     private final StockValidator stockValidator;
     private final MovimientoInventarioValidator movimientoValidator;
     private final CompraInventarioPolicy compraPolicy;
     private final CurrentUserResolver currentUserResolver;
     private final CodigoGeneradorService codigoGeneradorService;
+    private final EmpleadoInventarioPermisoService empleadoInventarioPermisoService;
+    private final EventoDominioOutboxService eventoDominioOutboxService;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
-    private final KafkaTopicProperties kafkaTopicProperties;
-    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -152,6 +143,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
 
         CompraInventario savedCompra = compraRepository.saveAndFlush(compra);
         List<CompraInventarioDetalle> detalles = buildDetalles(savedCompra, detalleRequests);
+
         detalleRepository.saveAllAndFlush(detalles);
         applyTotals(savedCompra, detalles);
 
@@ -164,6 +156,13 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 "CREAR_COMPRA_INVENTARIO",
                 "Compra registrada correctamente.",
                 metadataCompra(updated)
+        );
+
+        log.info(
+                "Compra registrada. idCompra={}, codigoCompra={}, actor={}",
+                updated.getIdCompra(),
+                updated.getCodigoCompra(),
+                actor.actorLabel()
         );
 
         return apiResponseFactory.dtoCreated(
@@ -181,12 +180,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         compraPolicy.ensureCanUpdateDraft(actor, employeeCanRegisterEntry(actor));
 
-        CompraInventario compra = compraRepository.findActivoByIdForUpdate(idCompra)
-                .orElseThrow(() -> new NotFoundException(
-                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
-
+        CompraInventario compra = findForUpdate(idCompra);
         ensureBorrador(compra);
 
         Proveedor proveedor = resolveProveedor(request == null ? null : request.proveedor());
@@ -222,6 +216,13 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 metadataCompra(updated)
         );
 
+        log.info(
+                "Compra actualizada. idCompra={}, codigoCompra={}, actor={}",
+                updated.getIdCompra(),
+                updated.getCodigoCompra(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoOk(
                 "Compra actualizada correctamente.",
                 toDetail(updated)
@@ -237,27 +238,25 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         compraPolicy.ensureCanConfirm(actor, employeeCanRegisterEntry(actor));
 
-        CompraInventario compra = compraRepository.findActivoByIdForUpdate(idCompra)
-                .orElseThrow(() -> new NotFoundException(
-                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
-
+        CompraInventario compra = findForUpdate(idCompra);
         List<CompraInventarioDetalle> detalles =
                 detalleRepository.findByCompra_IdCompraAndEstadoTrueOrderByIdCompraDetalleAsc(compra.getIdCompra());
 
-        compraValidator.validateCanConfirm(compra, !detalles.isEmpty());
+        String motivoConfirmacion = request == null ? null : request.motivo();
+        compraValidator.validateCanConfirm(compra, !detalles.isEmpty(), motivoConfirmacion);
 
         AuditContext auditContext = AuditContextHolder.getOrEmpty();
         String requestId = traceValue(auditContext.requestId());
-        String correlationId = traceValue(auditContext.correlationId());
+        String correlationId = StringNormalizer.hasText(auditContext.correlationId())
+                ? auditContext.correlationId()
+                : requestId;
         RolSistema actorRol = resolveRol(actor);
 
         for (CompraInventarioDetalle detalle : detalles) {
             registrarEntradaPorCompra(
                     compra,
                     detalle,
-                    request == null ? null : request.motivo(),
+                    motivoConfirmacion,
                     actor,
                     actorRol,
                     requestId,
@@ -277,6 +276,14 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 metadataCompra(confirmed)
         );
 
+        log.info(
+                "Compra confirmada. idCompra={}, codigoCompra={}, detalles={}, actor={}",
+                confirmed.getIdCompra(),
+                confirmed.getCodigoCompra(),
+                detalles.size(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoOk(
                 "Compra confirmada correctamente.",
                 toDetail(confirmed)
@@ -292,11 +299,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         compraPolicy.ensureCanAnnul(actor);
 
-        CompraInventario compra = compraRepository.findActivoByIdForUpdate(idCompra)
-                .orElseThrow(() -> new NotFoundException(
-                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        CompraInventario compra = findForUpdate(idCompra);
 
         compraValidator.validateCanAnular(compra, request == null ? null : request.motivo());
         compraMapper.markAnulada(compra);
@@ -312,6 +315,13 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 metadataCompra(saved)
         );
 
+        log.info(
+                "Compra anulada. idCompra={}, codigoCompra={}, actor={}",
+                saved.getIdCompra(),
+                saved.getCodigoCompra(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
                 compraMapper.toResponse(saved)
@@ -324,11 +334,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         compraPolicy.ensureCanViewAdmin(actor);
 
-        CompraInventario compra = compraRepository.findByIdCompraAndEstadoTrue(idCompra)
-                .orElseThrow(() -> new NotFoundException(
-                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        CompraInventario compra = findActive(idCompra);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -342,11 +348,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         compraPolicy.ensureCanViewAdmin(actor);
 
-        CompraInventario compra = compraRepository.findByIdCompraAndEstadoTrue(idCompra)
-                .orElseThrow(() -> new NotFoundException(
-                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        CompraInventario compra = findActive(idCompra);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -379,6 +381,35 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
         );
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", response);
+    }
+
+    private CompraInventario findActive(Long idCompra) {
+        requireId(idCompra);
+
+        return compraRepository.findByIdCompraAndEstadoTrue(idCompra)
+                .orElseThrow(() -> new NotFoundException(
+                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
+                        "No se encontró el registro solicitado."
+                ));
+    }
+
+    private CompraInventario findForUpdate(Long idCompra) {
+        requireId(idCompra);
+
+        return compraRepository.findActivoByIdForUpdate(idCompra)
+                .orElseThrow(() -> new NotFoundException(
+                        "COMPRA_INVENTARIO_NO_ENCONTRADA",
+                        "No se encontró el registro solicitado."
+                ));
+    }
+
+    private void requireId(Long idCompra) {
+        if (idCompra == null) {
+            throw new ValidationException(
+                    "COMPRA_INVENTARIO_ID_REQUERIDO",
+                    "Debe indicar la compra solicitada."
+            );
+        }
     }
 
     private void registrarEntradaPorCompra(
@@ -463,15 +494,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 String.valueOf(savedMovimiento.getIdMovimiento()),
                 "ENTRADA_COMPRA_CONFIRMADA",
                 "Entrada de inventario registrada por confirmación de compra.",
-                Map.of(
-                        "idCompra", compra.getIdCompra(),
-                        "codigoCompra", compra.getCodigoCompra(),
-                        "idSku", sku.getIdSku(),
-                        "codigoSku", sku.getCodigoSku(),
-                        "idAlmacen", almacen.getIdAlmacen(),
-                        "codigoAlmacen", almacen.getCodigo(),
-                        "cantidad", detalle.getCantidad()
-                )
+                metadataEntradaCompra(compra, detalle, sku, almacen)
         );
 
         registerStockOutbox(savedStock, StockEventType.STOCK_SNAPSHOT_ACTUALIZADO, requestId, correlationId);
@@ -648,14 +671,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 Map.of("source", "CompraInventarioService")
         );
 
-        saveOutbox(
-                AggregateType.STOCK,
-                event.aggregateId(),
-                event.eventType(),
-                kafkaTopicProperties.resolveStockSnapshotTopic(),
-                eventKey(stock),
-                event
-        );
+        eventoDominioOutboxService.registrarEvento(event);
     }
 
     private void registerMovimientoOutbox(
@@ -672,34 +688,7 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 Map.of("source", "CompraInventarioService")
         );
 
-        saveOutbox(
-                AggregateType.MOVIMIENTO_INVENTARIO,
-                event.aggregateId(),
-                event.eventType(),
-                kafkaTopicProperties.resolveMovimientoInventarioTopic(),
-                movimiento.getCodigoMovimiento(),
-                event
-        );
-    }
-
-    private void saveOutbox(
-            AggregateType aggregateType,
-            String aggregateId,
-            String eventType,
-            String topic,
-            String eventKey,
-            Object event
-    ) {
-        EventoDominioOutbox outbox = outboxMapper.toEntity(
-                aggregateType,
-                aggregateId,
-                eventType,
-                topic,
-                eventKey,
-                toJson(event)
-        );
-
-        outboxRepository.save(outbox);
+        eventoDominioOutboxService.registrarEvento(event);
     }
 
     private StockSnapshotPayload toStockPayload(StockSku stock) {
@@ -727,7 +716,9 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 .costoPromedioActual(stock.getCostoPromedioActual())
                 .ultimoCostoCompra(stock.getUltimoCostoCompra())
                 .bajoStock(StockMathUtil.isLowStock(disponible, stock.getStockMinimo()))
-                .sobreStock(stock.getStockMaximo() != null && stock.getStockFisico() != null && stock.getStockFisico() > stock.getStockMaximo())
+                .sobreStock(stock.getStockMaximo() != null
+                        && stock.getStockFisico() != null
+                        && stock.getStockFisico() > stock.getStockMaximo())
                 .estado(stock.getEstado())
                 .createdAt(stock.getCreatedAt())
                 .updatedAt(stock.getUpdatedAt())
@@ -750,11 +741,17 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 .idAlmacen(almacen == null ? null : almacen.getIdAlmacen())
                 .codigoAlmacen(almacen == null ? null : almacen.getCodigo())
                 .nombreAlmacen(almacen == null ? null : almacen.getNombre())
-                .idCompraDetalle(movimiento.getCompraDetalle() == null ? null : movimiento.getCompraDetalle().getIdCompraDetalle())
+                .idCompraDetalle(movimiento.getCompraDetalle() == null
+                        ? null
+                        : movimiento.getCompraDetalle().getIdCompraDetalle())
                 .idReservaStock(null)
                 .codigoReserva(null)
-                .tipoMovimiento(movimiento.getTipoMovimiento() == null ? null : movimiento.getTipoMovimiento().getCode())
-                .motivoMovimiento(movimiento.getMotivoMovimiento() == null ? null : movimiento.getMotivoMovimiento().getCode())
+                .tipoMovimiento(movimiento.getTipoMovimiento() == null
+                        ? null
+                        : movimiento.getTipoMovimiento().getCode())
+                .motivoMovimiento(movimiento.getMotivoMovimiento() == null
+                        ? null
+                        : movimiento.getMotivoMovimiento().getCode())
                 .cantidad(movimiento.getCantidad())
                 .costoUnitario(movimiento.getCostoUnitario())
                 .costoTotal(movimiento.getCostoTotal())
@@ -768,7 +765,9 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
                 .actorRol(movimiento.getActorRol() == null ? null : movimiento.getActorRol().getCode())
                 .requestId(movimiento.getRequestId())
                 .correlationId(movimiento.getCorrelationId())
-                .estadoMovimiento(movimiento.getEstadoMovimiento() == null ? null : movimiento.getEstadoMovimiento().getCode())
+                .estadoMovimiento(movimiento.getEstadoMovimiento() == null
+                        ? null
+                        : movimiento.getEstadoMovimiento().getCode())
                 .estado(movimiento.getEstado())
                 .createdAt(movimiento.getCreatedAt())
                 .updatedAt(movimiento.getUpdatedAt())
@@ -780,13 +779,11 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
             return true;
         }
 
-        if (actor.getIdUsuarioMs1() == null) {
+        if (actor.getIdUsuarioMs1() == null || !actor.isEmpleado()) {
             return false;
         }
 
-        return permisoRepository.existsByEmpleadoSnapshot_IdUsuarioMs1AndVigenteTrueAndEstadoTrueAndPuedeRegistrarEntradaTrue(
-                actor.getIdUsuarioMs1()
-        );
+        return empleadoInventarioPermisoService.puedeRegistrarEntrada(actor.getIdUsuarioMs1());
     }
 
     private void ensureBorrador(CompraInventario compra) {
@@ -800,38 +797,50 @@ public class CompraInventarioServiceImpl implements CompraInventarioService {
 
     private List<CompraInventarioDetalleRequestDto> safeDetalles(List<CompraInventarioDetalleRequestDto> detalles) {
         if (detalles == null || detalles.isEmpty()) {
-            throw new ConflictException(
-                    "COMPRA_SIN_DETALLE",
-                    "No se puede confirmar la compra porque no tiene detalles."
+            throw new ValidationException(
+                    "COMPRA_DETALLES_REQUERIDOS",
+                    "La compra debe tener al menos un detalle."
             );
         }
 
-        return detalles;
+        if (detalles.stream().anyMatch(item -> item == null)) {
+            throw new ValidationException(
+                    "COMPRA_DETALLE_INVALIDO",
+                    "Los detalles de compra no deben contener elementos vacíos."
+            );
+        }
+
+        return List.copyOf(detalles);
     }
 
     private Map<String, Object> metadataCompra(CompraInventario compra) {
-        return Map.of(
-                "idCompra", compra.getIdCompra(),
-                "codigoCompra", compra.getCodigoCompra(),
-                "estadoCompra", compra.getEstadoCompra() == null ? null : compra.getEstadoCompra().getCode(),
-                "idProveedor", compra.getProveedor() == null ? null : compra.getProveedor().getIdProveedor(),
-                "total", compra.getTotal()
-        );
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("idCompra", compra.getIdCompra());
+        metadata.put("codigoCompra", compra.getCodigoCompra());
+        metadata.put("estadoCompra", compra.getEstadoCompra() == null ? null : compra.getEstadoCompra().getCode());
+        metadata.put("idProveedor", compra.getProveedor() == null ? null : compra.getProveedor().getIdProveedor());
+        metadata.put("total", compra.getTotal());
+        return metadata;
     }
 
-    private String eventKey(StockSku stock) {
-        String sku = stock.getSku() == null ? "SKU" : stock.getSku().getCodigoSku();
-        String almacen = stock.getAlmacen() == null ? "ALMACEN" : stock.getAlmacen().getCodigo();
-
-        return sku + ":" + almacen;
-    }
-
-    private String toJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("No se pudo serializar el evento Outbox.", ex);
-        }
+    private Map<String, Object> metadataEntradaCompra(
+            CompraInventario compra,
+            CompraInventarioDetalle detalle,
+            ProductoSku sku,
+            Almacen almacen
+    ) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("idCompra", compra.getIdCompra());
+        metadata.put("codigoCompra", compra.getCodigoCompra());
+        metadata.put("idCompraDetalle", detalle.getIdCompraDetalle());
+        metadata.put("idSku", sku.getIdSku());
+        metadata.put("codigoSku", sku.getCodigoSku());
+        metadata.put("idAlmacen", almacen.getIdAlmacen());
+        metadata.put("codigoAlmacen", almacen.getCodigo());
+        metadata.put("cantidad", detalle.getCantidad());
+        metadata.put("costoUnitario", detalle.getCostoUnitario());
+        metadata.put("costoTotal", detalle.getCostoTotal());
+        return metadata;
     }
 
     private String traceValue(String value) {

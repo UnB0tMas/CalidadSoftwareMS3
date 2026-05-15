@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/TipoProductoSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/TipoProductoSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.TipoProducto;
@@ -27,8 +27,9 @@ public final class TipoProductoSpecifications {
                 .textSearch(filter.search(), "codigo", "nombre", "descripcion")
                 .like("codigo", filter.codigo())
                 .like("nombre", filter.nombre())
-                .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
+                .bool("estado", BooleanCriteria.of(resolveEstado(filter)))
                 .range("createdAt", toDateTimeRange(filter.fechaCreacion()))
+                .range("updatedAt", toDateTimeRange(filter.fechaActualizacion()))
                 .build();
     }
 
@@ -48,6 +49,18 @@ public final class TipoProductoSpecifications {
         return SpecificationBuilder.<TipoProducto>create()
                 .like("nombre", nombre)
                 .build();
+    }
+
+    private static Boolean resolveEstado(TipoProductoFilterDto filter) {
+        if (filter == null) {
+            return Boolean.TRUE;
+        }
+
+        if (Boolean.TRUE.equals(filter.incluirTodosLosEstados())) {
+            return null;
+        }
+
+        return filter.estado() == null ? Boolean.TRUE : filter.estado();
     }
 
     private static DateRangeCriteria<LocalDateTime> toDateTimeRange(DateRangeFilterDto filter) {
@@ -71,7 +84,7 @@ public final class TipoProductoSpecifications {
                     return dateTime;
                 }
             } catch (ReflectiveOperationException ignored) {
-                // Se intenta con el siguiente nombre soportado.
+                // Se continúa con el siguiente nombre compatible.
             }
         }
 

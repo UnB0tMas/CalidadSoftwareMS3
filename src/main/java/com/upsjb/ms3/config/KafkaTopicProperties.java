@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.config;
+package com.upsjb.ms3.config;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;

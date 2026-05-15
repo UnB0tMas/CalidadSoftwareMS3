@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaTopicResolver.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaTopicResolver.java
 package com.upsjb.ms3.kafka.producer;
 
 import com.upsjb.ms3.config.KafkaTopicProperties;

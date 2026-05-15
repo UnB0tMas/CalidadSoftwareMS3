@@ -1,8 +1,9 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/PromocionSkuDescuentoValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/PromocionSkuDescuentoValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
 import com.upsjb.ms3.domain.entity.ProductoSku;
+import com.upsjb.ms3.domain.entity.PromocionSkuDescuentoVersion;
 import com.upsjb.ms3.domain.entity.PromocionVersion;
 import com.upsjb.ms3.domain.enums.TipoDescuento;
 import com.upsjb.ms3.shared.exception.ConflictException;
@@ -84,15 +85,40 @@ public class PromocionSkuDescuentoValidator {
 
         errors.throwIfAny("No se puede actualizar el descuento de SKU en la promoción.");
 
-        if (!promocionVersion.getEstadoPromocion().isEditable()) {
-            throw new ConflictException(
-                    "PROMOCION_DESCUENTO_NO_EDITABLE",
-                    "No se puede modificar el descuento porque la versión de promoción no es editable."
+        validateDiscountValue(tipoDescuento, valorDescuento, precioBase);
+        validateMargin(tipoDescuento, valorDescuento, precioBase, costoEstimado);
+    }
+
+    public void validateCanInactivate(PromocionSkuDescuentoVersion descuento) {
+        if (descuento == null) {
+            throw new NotFoundException(
+                    "PROMOCION_DESCUENTO_NO_ENCONTRADO",
+                    "No se encontró el registro solicitado."
             );
         }
 
-        validateDiscountValue(tipoDescuento, valorDescuento, precioBase);
-        validateMargin(tipoDescuento, valorDescuento, precioBase, costoEstimado);
+        if (!descuento.isActivo()) {
+            throw new NotFoundException(
+                    "PROMOCION_DESCUENTO_INACTIVO",
+                    "No se puede completar la operación porque el registro está inactivo."
+            );
+        }
+
+        PromocionVersion version = descuento.getPromocionVersion();
+
+        if (version == null || !version.isActivo()) {
+            throw new NotFoundException(
+                    "PROMOCION_VERSION_NO_ENCONTRADA",
+                    "No se encontró el registro solicitado."
+            );
+        }
+
+        if (version.getEstadoPromocion() == null || !version.getEstadoPromocion().isEditable()) {
+            throw new ConflictException(
+                    "PROMOCION_DESCUENTO_NO_EDITABLE",
+                    "No se puede inactivar el descuento porque la versión de promoción no es editable."
+            );
+        }
     }
 
     public void requireActive(PromocionVersion promocionVersion) {

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/EventoDominioOutboxServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/EventoDominioOutboxServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.EventoDominioOutbox;
@@ -35,6 +35,7 @@ import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.EventoDominioOutboxSpecifications;
 import com.upsjb.ms3.validator.EventoDominioOutboxValidator;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -217,6 +218,145 @@ public class EventoDominioOutboxServiceImpl implements EventoDominioOutboxServic
 
     @Override
     @Transactional
+    public ApiResponseDto<EventoDominioOutboxResponseDto> marcarPublicado(Long idEvento) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        outboxPolicy.ensureCanForcePublish(actor);
+
+        EventoDominioOutbox event = findRequiredForUpdate(idEvento);
+        eventoDominioOutboxMapper.markPublished(event, LocalDateTime.now());
+        EventoDominioOutbox saved = eventoDominioOutboxRepository.save(event);
+
+        registrarAuditoriaExito(
+                TipoEventoAuditoria.EVENTO_KAFKA_PUBLICADO,
+                saved,
+                "MARCAR_EVENTO_OUTBOX_PUBLICADO",
+                "Evento Kafka marcado como publicado correctamente.",
+                eventAuditMetadata(saved)
+        );
+
+        log.info(
+                "Evento outbox marcado como publicado. idEvento={}, eventId={}, actor={}",
+                saved.getIdEvento(),
+                saved.getEventId(),
+                actor.actorLabel()
+        );
+
+        return apiResponseFactory.dtoOk(
+                "Evento publicado correctamente.",
+                eventoDominioOutboxMapper.toResponse(saved, false)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<EventoDominioOutboxResponseDto> marcarError(Long idEvento, String errorPublicacion) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        outboxPolicy.ensureCanForcePublish(actor);
+
+        String safeError = requireErrorMessage(errorPublicacion);
+        EventoDominioOutbox event = findRequiredForUpdate(idEvento);
+        eventoDominioOutboxMapper.markError(event, safeError);
+        EventoDominioOutbox saved = eventoDominioOutboxRepository.save(event);
+
+        registrarAuditoriaExito(
+                TipoEventoAuditoria.EVENTO_KAFKA_FALLIDO,
+                saved,
+                "MARCAR_EVENTO_OUTBOX_ERROR",
+                "Evento Kafka marcado en error correctamente.",
+                eventAuditMetadata(saved)
+        );
+
+        log.warn(
+                "Evento outbox marcado como error. idEvento={}, eventId={}, actor={}, error={}",
+                saved.getIdEvento(),
+                saved.getEventId(),
+                actor.actorLabel(),
+                safeError
+        );
+
+        return apiResponseFactory.dtoOk(
+                "Operación realizada correctamente.",
+                eventoDominioOutboxMapper.toResponse(saved, false)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<EventoDominioOutboxResponseDto> incrementarIntento(Long idEvento) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        outboxPolicy.ensureCanForcePublish(actor);
+
+        EventoDominioOutbox event = findRequiredForUpdate(idEvento);
+        eventoDominioOutboxMapper.incrementAttempt(event);
+        EventoDominioOutbox saved = eventoDominioOutboxRepository.save(event);
+
+        registrarAuditoriaExito(
+                TipoEventoAuditoria.EVENTO_KAFKA_REINTENTADO,
+                saved,
+                "INCREMENTAR_INTENTO_EVENTO_OUTBOX",
+                "Intento de publicación incrementado correctamente.",
+                eventAuditMetadata(saved)
+        );
+
+        log.info(
+                "Intento de evento outbox incrementado. idEvento={}, eventId={}, intentos={}, actor={}",
+                saved.getIdEvento(),
+                saved.getEventId(),
+                saved.getIntentosPublicacion(),
+                actor.actorLabel()
+        );
+
+        return apiResponseFactory.dtoOk(
+                "Operación realizada correctamente.",
+                eventoDominioOutboxMapper.toResponse(saved, false)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<EventoDominioOutboxResponseDto> prepararReintento(Long idEvento, OutboxRetryRequestDto request) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        outboxPolicy.ensureCanRetryOutbox(actor);
+
+        OutboxRetryRequestDto normalized = normalizeRetryRequest(request);
+        if (Boolean.TRUE.equals(normalized.forzarReintento())) {
+            outboxPolicy.ensureCanForcePublish(actor);
+        }
+
+        EventoDominioOutbox event = findRequiredForUpdate(idEvento);
+        eventoDominioOutboxValidator.validateCanRetry(event, Boolean.TRUE.equals(normalized.forzarReintento()));
+        eventoDominioOutboxMapper.markPending(event);
+
+        if (Boolean.TRUE.equals(normalized.forzarReintento())) {
+            eventoDominioOutboxMapper.resetAttempts(event);
+        }
+
+        EventoDominioOutbox saved = eventoDominioOutboxRepository.save(event);
+
+        registrarAuditoriaExito(
+                TipoEventoAuditoria.EVENTO_KAFKA_REINTENTADO,
+                saved,
+                "PREPARAR_REINTENTO_EVENTO_OUTBOX",
+                "Evento Kafka preparado para reintento correctamente.",
+                retryPreparationAuditMetadata(saved, normalized, actor)
+        );
+
+        log.info(
+                "Evento outbox preparado para reintento. idEvento={}, eventId={}, actor={}, forzado={}",
+                saved.getIdEvento(),
+                saved.getEventId(),
+                actor.actorLabel(),
+                normalized.forzarReintento()
+        );
+
+        return apiResponseFactory.dtoOk(
+                "Evento preparado para reintento correctamente.",
+                eventoDominioOutboxMapper.toResponse(saved, false)
+        );
+    }
+
+    @Override
+    @Transactional
     public ApiResponseDto<OutboxPublishResultResponseDto> reintentar(
             Long idEvento,
             OutboxRetryRequestDto request
@@ -313,6 +453,24 @@ public class EventoDominioOutboxServiceImpl implements EventoDominioOutboxServic
         return event;
     }
 
+    private EventoDominioOutbox findRequiredForUpdate(Long idEvento) {
+        if (idEvento == null) {
+            throw new ValidationException(
+                    "OUTBOX_ID_REQUERIDO",
+                    "El identificador del evento outbox es obligatorio."
+            );
+        }
+
+        EventoDominioOutbox event = eventoDominioOutboxRepository.findActivoByIdForUpdate(idEvento)
+                .orElseThrow(() -> new NotFoundException(
+                        "OUTBOX_EVENTO_NO_ENCONTRADO",
+                        "No se encontró el registro solicitado."
+                ));
+
+        eventoDominioOutboxValidator.requireActive(event);
+        return event;
+    }
+
     private OutboxRetryRequestDto normalizeRetryRequest(OutboxRetryRequestDto request) {
         if (request == null || !StringUtils.hasText(request.motivo())) {
             throw new ValidationException(
@@ -325,6 +483,21 @@ public class EventoDominioOutboxServiceImpl implements EventoDominioOutboxServic
                 .motivo(request.motivo().trim())
                 .forzarReintento(Boolean.TRUE.equals(request.forzarReintento()))
                 .build();
+    }
+
+    private String requireErrorMessage(String errorPublicacion) {
+        if (!StringUtils.hasText(errorPublicacion)) {
+            throw new ValidationException(
+                    "OUTBOX_ERROR_REQUERIDO",
+                    "Debe indicar el error de publicación del evento."
+            );
+        }
+
+        String cleaned = errorPublicacion.trim()
+                .replaceAll("[\\r\\n\\t]", " ")
+                .replaceAll("\\s{2,}", " ");
+
+        return cleaned.substring(0, Math.min(cleaned.length(), 4000));
     }
 
     private PageRequestDto safePageRequest(PageRequestDto pageRequest, String defaultSortBy) {
@@ -379,6 +552,21 @@ public class EventoDominioOutboxServiceImpl implements EventoDominioOutboxServic
         metadata.put("topic", event.getTopic());
         metadata.put("eventKey", event.getEventKey());
         metadata.put("estadoPublicacion", event.getEstadoPublicacion() == null ? null : event.getEstadoPublicacion().getCode());
+        metadata.put("intentosPublicacion", event.getIntentosPublicacion());
+        metadata.put("lockedBy", event.getLockedBy());
+        metadata.put("lockedAt", event.getLockedAt());
+        return metadata;
+    }
+
+    private Map<String, Object> retryPreparationAuditMetadata(
+            EventoDominioOutbox event,
+            OutboxRetryRequestDto request,
+            AuthenticatedUserContext actor
+    ) {
+        Map<String, Object> metadata = eventAuditMetadata(event);
+        metadata.put("motivo", request.motivo());
+        metadata.put("forzarReintento", Boolean.TRUE.equals(request.forzarReintento()));
+        metadata.put("actor", actor.actorLabel());
         return metadata;
     }
 

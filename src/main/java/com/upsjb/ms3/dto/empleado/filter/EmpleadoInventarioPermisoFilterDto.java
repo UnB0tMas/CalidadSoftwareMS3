@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/empleado/filter/EmpleadoInventarioPermisoFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/empleado/filter/EmpleadoInventarioPermisoFilterDto.java
 package com.upsjb.ms3.dto.empleado.filter;
 
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;

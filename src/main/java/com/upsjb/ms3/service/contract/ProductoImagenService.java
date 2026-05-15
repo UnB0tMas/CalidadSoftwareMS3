@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/ProductoImagenService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/ProductoImagenService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.catalogo.producto.filter.ProductoImagenFilterDto;

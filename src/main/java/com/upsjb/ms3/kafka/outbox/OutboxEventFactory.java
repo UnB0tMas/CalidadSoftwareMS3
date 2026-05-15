@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventFactory.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxEventFactory.java
 package com.upsjb.ms3.kafka.outbox;
 
 import com.upsjb.ms3.domain.entity.EventoDominioOutbox;

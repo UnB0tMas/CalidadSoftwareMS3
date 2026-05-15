@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/promocion/filter/PromocionFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/promocion/filter/PromocionFilterDto.java
 package com.upsjb.ms3.dto.promocion.filter;
 
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;

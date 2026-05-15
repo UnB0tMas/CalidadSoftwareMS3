@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/shared/PageResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/shared/PageResponseDto.java
 package com.upsjb.ms3.dto.shared;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.principal;
+package com.upsjb.ms3.security.principal;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;

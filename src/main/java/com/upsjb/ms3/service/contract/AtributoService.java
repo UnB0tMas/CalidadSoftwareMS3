@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/AtributoService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/AtributoService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;

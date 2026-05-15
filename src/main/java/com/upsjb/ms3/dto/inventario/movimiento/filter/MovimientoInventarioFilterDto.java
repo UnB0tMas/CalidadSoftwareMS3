@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/movimiento/filter/MovimientoInventarioFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/movimiento/filter/MovimientoInventarioFilterDto.java
 package com.upsjb.ms3.dto.inventario.movimiento.filter;
 
 import com.upsjb.ms3.domain.enums.EstadoMovimientoInventario;

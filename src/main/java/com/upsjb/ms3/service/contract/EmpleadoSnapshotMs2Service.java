@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/EmpleadoSnapshotMs2Service.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/EmpleadoSnapshotMs2Service.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.empleado.filter.EmpleadoSnapshotMs2FilterDto;

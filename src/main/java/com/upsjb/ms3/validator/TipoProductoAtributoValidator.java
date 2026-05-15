@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/TipoProductoAtributoValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/TipoProductoAtributoValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -20,21 +20,9 @@ public class TipoProductoAtributoValidator {
     ) {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
-        if (tipoProducto == null) {
-            errors.add("tipoProducto", "El tipo de producto es obligatorio.", "REQUIRED", null);
-        } else if (!tipoProducto.isActivo()) {
-            errors.add("tipoProducto", "El tipo de producto debe estar activo.", "INACTIVE", tipoProducto.getIdTipoProducto());
-        }
-
-        if (atributo == null) {
-            errors.add("atributo", "El atributo es obligatorio.", "REQUIRED", null);
-        } else if (!atributo.isActivo()) {
-            errors.add("atributo", "El atributo debe estar activo.", "INACTIVE", atributo.getIdAtributo());
-        }
-
-        if (orden != null && orden < 0) {
-            errors.add("orden", "El orden no puede ser negativo.", "INVALID_VALUE", orden);
-        }
+        validateTipoProducto(tipoProducto, errors);
+        validateAtributo(atributo, errors);
+        validateOrden(orden, errors);
 
         errors.throwIfAny("No se puede asociar el atributo al tipo de producto.");
 
@@ -57,6 +45,32 @@ public class TipoProductoAtributoValidator {
         }
     }
 
+    public void validateCanActivate(
+            TipoProductoAtributo relation,
+            boolean duplicatedActiveAssociation
+    ) {
+        requireExists(relation);
+
+        if (relation.isActivo()) {
+            throw new ConflictException(
+                    "TIPO_PRODUCTO_ATRIBUTO_YA_ACTIVO",
+                    "La asociación ya se encuentra activa."
+            );
+        }
+
+        ValidationErrorCollector errors = ValidationErrorCollector.create();
+        validateTipoProducto(relation.getTipoProducto(), errors);
+        validateAtributo(relation.getAtributo(), errors);
+        errors.throwIfAny("No se puede activar la asociación.");
+
+        if (duplicatedActiveAssociation) {
+            throw new ConflictException(
+                    "TIPO_PRODUCTO_ATRIBUTO_DUPLICADO",
+                    "Ya existe una asociación activa para el mismo tipo de producto y atributo."
+            );
+        }
+    }
+
     public void validateCanRemove(TipoProductoAtributo relation, boolean hasProductOrSkuValues) {
         requireActive(relation);
 
@@ -69,18 +83,50 @@ public class TipoProductoAtributoValidator {
     }
 
     public void requireActive(TipoProductoAtributo relation) {
-        if (relation == null) {
-            throw new NotFoundException(
-                    "TIPO_PRODUCTO_ATRIBUTO_NO_ENCONTRADO",
-                    "Asociación de tipo de producto y atributo no encontrada."
-            );
-        }
+        requireExists(relation);
 
         if (!relation.isActivo()) {
             throw new NotFoundException(
                     "TIPO_PRODUCTO_ATRIBUTO_INACTIVO",
                     "La asociación de tipo de producto y atributo no está activa."
             );
+        }
+    }
+
+    public void requireExists(TipoProductoAtributo relation) {
+        if (relation == null) {
+            throw new NotFoundException(
+                    "TIPO_PRODUCTO_ATRIBUTO_NO_ENCONTRADO",
+                    "No se encontró el registro solicitado."
+            );
+        }
+    }
+
+    private void validateTipoProducto(TipoProducto tipoProducto, ValidationErrorCollector errors) {
+        if (tipoProducto == null) {
+            errors.add("tipoProducto", "El tipo de producto es obligatorio.", "REQUIRED", null);
+            return;
+        }
+
+        if (!tipoProducto.isActivo()) {
+            errors.add("tipoProducto", "El tipo de producto debe estar activo.", "INACTIVE", tipoProducto.getIdTipoProducto());
+        }
+    }
+
+    private void validateAtributo(Atributo atributo, ValidationErrorCollector errors) {
+        if (atributo == null) {
+            errors.add("atributo", "El atributo es obligatorio.", "REQUIRED", null);
+            return;
+        }
+
+        if (!atributo.isActivo()) {
+            errors.add("atributo", "El atributo debe estar activo.", "INACTIVE", atributo.getIdAtributo());
+        }
+    }
+
+    private void validateOrden(Integer orden, ValidationErrorCollector errors) {
+        if (orden != null && orden < 0) {
+            errors.add("orden", "El orden no puede ser negativo.", "INVALID_VALUE", orden);
         }
     }
 }

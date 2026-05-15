@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/EmpleadoInventarioPermisoSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/EmpleadoInventarioPermisoSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.EmpleadoInventarioPermisoHistorial;

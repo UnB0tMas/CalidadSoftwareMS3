@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/CodeFormatUtil.java
+// ruta: src/main/java/com/upsjb/ms3/util/CodeFormatUtil.java
 package com.upsjb.ms3.util;
 
 public final class CodeFormatUtil {

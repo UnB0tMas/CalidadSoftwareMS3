@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/CodigoGeneradorService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/CodigoGeneradorService.java
 package com.upsjb.ms3.service.contract;
 
 public interface CodigoGeneradorService {

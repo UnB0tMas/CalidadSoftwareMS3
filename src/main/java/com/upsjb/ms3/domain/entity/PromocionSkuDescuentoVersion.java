@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.domain.entity;
+package com.upsjb.ms3.domain.entity;
 
 import com.upsjb.ms3.domain.enums.TipoDescuento;
 import jakarta.persistence.Column;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/event/ProductoImagenSnapshotPayload.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/event/ProductoImagenSnapshotPayload.java
 package com.upsjb.ms3.kafka.event;
 
 import java.time.LocalDateTime;

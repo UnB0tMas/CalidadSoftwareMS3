@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/shared/ApiResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/shared/ApiResponseDto.java
 package com.upsjb.ms3.dto.shared;
 
 import java.time.LocalDateTime;

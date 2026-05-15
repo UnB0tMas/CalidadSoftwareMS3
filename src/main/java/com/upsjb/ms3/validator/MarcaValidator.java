@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/MarcaValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/MarcaValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Marca;

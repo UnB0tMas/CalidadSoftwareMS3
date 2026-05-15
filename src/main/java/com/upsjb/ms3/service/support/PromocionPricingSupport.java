@@ -14,6 +14,7 @@ import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.util.MoneyUtil;
 import com.upsjb.ms3.util.PercentageUtil;
 import java.math.BigDecimal;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -32,14 +33,22 @@ public class PromocionPricingSupport {
             );
         }
 
-        return precioSkuHistorialRepository
-                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(
-                        sku.getIdSku()
-                )
+        return currentPriceOptional(sku)
                 .orElseThrow(() -> new ConflictException(
                         "SKU_SIN_PRECIO_VIGENTE",
                         "No se puede registrar el descuento porque el SKU no tiene precio vigente."
                 ));
+    }
+
+    public Optional<PrecioSkuHistorial> currentPriceOptional(ProductoSku sku) {
+        if (sku == null || sku.getIdSku() == null) {
+            return Optional.empty();
+        }
+
+        return precioSkuHistorialRepository
+                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(
+                        sku.getIdSku()
+                );
     }
 
     public BigDecimal costoPromedioEstimado(ProductoSku sku) {

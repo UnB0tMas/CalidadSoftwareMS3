@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.exception;
+package com.upsjb.ms3.shared.exception;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/Ms4StockCommandHandler.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/Ms4StockCommandHandler.java
 package com.upsjb.ms3.kafka.consumer;
 
 import com.upsjb.ms3.domain.enums.Ms4StockEventType;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/ProductoAtributoValorMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/ProductoAtributoValorMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -69,6 +69,9 @@ public class ProductoAtributoValorMapper {
                 .tipoDato(atributo == null ? null : atributo.getTipoDato())
                 .tipoDatoLabel(atributo == null ? null : tipoDatoLabel(atributo.getTipoDato()))
                 .unidadMedida(atributo == null ? null : atributo.getUnidadMedida())
+                .atributoRequerido(atributo == null ? null : atributo.getRequerido())
+                .filtrable(atributo == null ? null : atributo.getFiltrable())
+                .visiblePublico(atributo == null ? null : atributo.getVisiblePublico())
                 .valorTexto(entity.getValorTexto())
                 .valorNumero(entity.getValorNumero())
                 .valorBoolean(entity.getValorBoolean())
@@ -87,8 +90,8 @@ public class ProductoAtributoValorMapper {
 
         return switch (entity.getAtributo().getTipoDato()) {
             case TEXTO -> entity.getValorTexto();
-            case NUMERO -> entity.getValorNumero() == null ? null : entity.getValorNumero().toPlainString();
-            case BOOLEAN -> entity.getValorBoolean() == null ? null : entity.getValorBoolean().toString();
+            case NUMERO, DECIMAL -> entity.getValorNumero() == null ? null : entity.getValorNumero().toPlainString();
+            case BOOLEANO -> entity.getValorBoolean() == null ? null : entity.getValorBoolean().toString();
             case FECHA -> entity.getValorFecha() == null ? null : entity.getValorFecha().toString();
         };
     }

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/StockSkuRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/StockSkuRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.StockSku;
@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -17,8 +19,33 @@ public interface StockSkuRepository extends
         JpaRepository<StockSku, Long>,
         JpaSpecificationExecutor<StockSku> {
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
+    @Override
+    Page<StockSku> findAll(Specification<StockSku> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
+    Optional<StockSku> findByIdStock(Long idStock);
+
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<StockSku> findByIdStockAndEstadoTrue(Long idStock);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Optional<StockSku> findBySku_IdSkuAndAlmacen_IdAlmacenAndEstadoTrue(Long idSku, Long idAlmacen);
 
     boolean existsBySku_IdSkuAndAlmacen_IdAlmacenAndEstadoTrue(Long idSku, Long idAlmacen);
@@ -36,6 +63,11 @@ public interface StockSkuRepository extends
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     @Query("""
             select s
             from StockSku s
@@ -45,6 +77,11 @@ public interface StockSkuRepository extends
     Optional<StockSku> findActivoByIdForUpdate(@Param("idStock") Long idStock);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     @Query("""
             select s
             from StockSku s
@@ -57,20 +94,60 @@ public interface StockSkuRepository extends
             @Param("idAlmacen") Long idAlmacen
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<StockSku> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<StockSku> findBySku_IdSkuAndEstadoTrue(Long idSku, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     Page<StockSku> findByAlmacen_IdAlmacenAndEstadoTrue(Long idAlmacen, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<StockSku> findBySku_IdSkuAndEstadoTrueOrderByAlmacen_PrincipalDescAlmacen_NombreAsc(Long idSku);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<StockSku> findByAlmacen_IdAlmacenAndEstadoTrueOrderBySku_CodigoSkuAsc(Long idAlmacen);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<StockSku> findByEstadoTrueAndStockDisponibleGreaterThanOrderBySku_CodigoSkuAsc(Integer stockDisponible);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<StockSku> findByEstadoTrueAndStockDisponibleLessThanEqualOrderByStockDisponibleAsc(Integer stockDisponible);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen"
+    })
     List<StockSku> findByEstadoTrueAndStockFisicoLessThanEqualOrderByStockFisicoAsc(Integer stockFisico);
 
     @Query("""

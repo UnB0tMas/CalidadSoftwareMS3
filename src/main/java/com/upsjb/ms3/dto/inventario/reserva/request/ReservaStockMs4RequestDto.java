@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/reserva/request/ReservaStockMs4RequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/reserva/request/ReservaStockMs4RequestDto.java
 package com.upsjb.ms3.dto.inventario.reserva.request;
 
 import com.upsjb.ms3.domain.enums.RolSistema;

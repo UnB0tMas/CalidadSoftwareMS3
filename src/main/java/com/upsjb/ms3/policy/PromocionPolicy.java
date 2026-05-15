@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/policy/PromocionPolicy.java
+// ruta: src/main/java/com/upsjb/ms3/policy/PromocionPolicy.java
 package com.upsjb.ms3.policy;
 
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;

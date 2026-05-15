@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/CloudinaryServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/CloudinaryServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.config.CloudinaryProperties;
@@ -18,15 +18,19 @@ import com.upsjb.ms3.validator.CloudinaryImageValidator;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class CloudinaryServiceImpl implements CloudinaryService {
 
     private static final String RESOURCE_TYPE_IMAGE = "image";
@@ -122,7 +126,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             return response;
         } catch (CloudinaryException | ValidationException ex) {
             log.warn(
-                    "No se pudo completar la operación de subida a Cloudinary. code={}, message={}",
+                    "No se pudo completar la subida a Cloudinary. code={}, message={}",
                     ex instanceof CloudinaryException cloudinaryException ? cloudinaryException.getCode() : ex.getCode(),
                     ex.getMessage()
             );
@@ -152,8 +156,11 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     public CloudinaryDeleteResponse eliminar(CloudinaryDeleteRequest request) {
         cloudinaryPolicy.ensureCloudinaryEnabled();
 
+        CloudinaryDeleteRequest normalizedRequest = normalizeDeleteRequest(request);
+
         try {
-            CloudinaryDeleteResponse response = cloudinaryClient.delete(request);
+            CloudinaryDeleteResponse response = cloudinaryClient.delete(normalizedRequest);
+            validateDeleteResponse(response);
 
             log.info(
                     "Recurso Cloudinary procesado para eliminación. publicId={}, result={}, deleted={}",
@@ -165,7 +172,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             return response;
         } catch (CloudinaryException | ValidationException ex) {
             log.warn(
-                    "No se pudo completar la operación de eliminación en Cloudinary. code={}, message={}",
+                    "No se pudo completar la eliminación en Cloudinary. code={}, message={}",
                     ex instanceof CloudinaryException cloudinaryException ? cloudinaryException.getCode() : ex.getCode(),
                     ex.getMessage()
             );
@@ -173,7 +180,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         } catch (RuntimeException ex) {
             log.error(
                     "Error técnico inesperado al eliminar recurso de Cloudinary. publicId={}",
-                    request == null ? null : request.publicId(),
+                    normalizedRequest.publicId(),
                     ex
             );
             throw CloudinaryIntegrationException.deleteFailed(ex);
@@ -187,7 +194,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return FileNameUtil.normalizeFolder(
                 cloudinaryProperties.productosFolderPath()
                         + "/"
-                        + StringNormalizer.normalizeForCode(safeCodigoProducto).toLowerCase()
+                        + StringNormalizer.normalizeForCode(safeCodigoProducto).toLowerCase(Locale.ROOT)
         );
     }
 
@@ -199,9 +206,9 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return FileNameUtil.normalizeFolder(
                 cloudinaryProperties.skuFolderPath()
                         + "/"
-                        + StringNormalizer.normalizeForCode(safeCodigoProducto).toLowerCase()
+                        + StringNormalizer.normalizeForCode(safeCodigoProducto).toLowerCase(Locale.ROOT)
                         + "/"
-                        + StringNormalizer.normalizeForCode(safeCodigoSku).toLowerCase()
+                        + StringNormalizer.normalizeForCode(safeCodigoSku).toLowerCase(Locale.ROOT)
         );
     }
 
@@ -263,6 +270,49 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         );
     }
 
+    private CloudinaryDeleteRequest normalizeDeleteRequest(CloudinaryDeleteRequest request) {
+        if (request == null) {
+            throw new ValidationException(
+                    "CLOUDINARY_DELETE_REQUEST_REQUERIDO",
+                    "Debe indicar el recurso Cloudinary a eliminar."
+            );
+        }
+
+        String publicId = FileNameUtil.normalizeFolder(request.publicId());
+        if (!StringNormalizer.hasText(publicId)) {
+            throw new ValidationException(
+                    "CLOUDINARY_PUBLIC_ID_REQUERIDO",
+                    "Debe indicar el public_id de Cloudinary."
+            );
+        }
+
+        String resourceType = StringNormalizer.hasText(request.resourceType())
+                ? request.resourceType().trim()
+                : RESOURCE_TYPE_IMAGE;
+
+        cloudinaryImageValidator.validateResourceType(resourceType);
+
+        return new CloudinaryDeleteRequest(
+                publicId,
+                resourceType,
+                request.invalidate() == null ? cloudinaryProperties.isInvalidateOnDelete() : request.invalidate()
+        );
+    }
+
+    private void validateDeleteResponse(CloudinaryDeleteResponse response) {
+        if (response == null) {
+            throw new CloudinaryIntegrationException("Cloudinary no devolvió respuesta de eliminación.");
+        }
+
+        if (!StringNormalizer.hasText(response.publicId())) {
+            throw new CloudinaryIntegrationException("Cloudinary no devolvió public_id en la eliminación.");
+        }
+
+        if (!StringNormalizer.hasText(response.result())) {
+            throw new CloudinaryIntegrationException("Cloudinary no devolvió resultado de eliminación.");
+        }
+    }
+
     private String buildPublicId(String prefix, MultipartFile archivo) {
         String storedFilename = FileNameUtil.generateStoredFilename(
                 StringNormalizer.normalizeForCode(prefix),
@@ -292,17 +342,40 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         metadata.forEach((key, value) -> {
             String safeKey = StringNormalizer.truncateOrNull(
-                    StringNormalizer.normalizeForCode(key).toLowerCase(),
+                    StringNormalizer.normalizeForCode(key).toLowerCase(Locale.ROOT),
                     60
             );
             String safeValue = StringNormalizer.truncateOrNull(value, 250);
 
-            if (StringNormalizer.hasText(safeKey) && StringNormalizer.hasText(safeValue)) {
+            if (StringNormalizer.hasText(safeKey)
+                    && StringNormalizer.hasText(safeValue)
+                    && !isSensitiveMetadataKey(safeKey)) {
                 safe.put(safeKey, safeValue);
             }
         });
 
         return safe;
+    }
+
+    private boolean isSensitiveMetadataKey(String key) {
+        if (!StringNormalizer.hasText(key)) {
+            return false;
+        }
+
+        String normalized = key.toLowerCase(Locale.ROOT);
+
+        return normalized.contains("authorization")
+                || normalized.contains("token")
+                || normalized.contains("password")
+                || normalized.contains("secret")
+                || normalized.contains("credential")
+                || normalized.contains("api-key")
+                || normalized.contains("api_key")
+                || normalized.contains("apikey")
+                || normalized.contains("internal-service-key")
+                || normalized.contains("internal_service_key")
+                || normalized.contains("private-key")
+                || normalized.contains("private_key");
     }
 
     private List<String> mergeTags(List<String> tags, String defaultTag) {

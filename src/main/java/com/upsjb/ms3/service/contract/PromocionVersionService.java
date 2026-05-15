@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/PromocionVersionService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/PromocionVersionService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.promocion.filter.PromocionVersionFilterDto;
@@ -20,6 +20,21 @@ public interface PromocionVersionService {
     ApiResponseDto<PromocionVersionResponseDto> cambiarEstado(
             Long idPromocionVersion,
             PromocionVersionEstadoRequestDto request
+    );
+
+    ApiResponseDto<PromocionVersionResponseDto> activar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
+    );
+
+    ApiResponseDto<PromocionVersionResponseDto> programar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
+    );
+
+    ApiResponseDto<PromocionVersionResponseDto> finalizar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
     );
 
     ApiResponseDto<PromocionVersionResponseDto> cancelar(

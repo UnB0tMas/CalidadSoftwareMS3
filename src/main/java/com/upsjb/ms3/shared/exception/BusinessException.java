@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.exception;
+package com.upsjb.ms3.shared.exception;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

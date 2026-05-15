@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionVersionServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionVersionServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
@@ -51,6 +51,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -131,14 +132,17 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                 hasOverlappingVersion
         );
 
-        closeCurrentVersion(current, "Reemplazada por nueva versión: " + normalized.motivo());
-
         PromocionVersion version = promocionVersionMapper.toEntity(
                 normalized,
                 promocion,
                 actor.getIdUsuarioMs1()
         );
         version.activar();
+
+        if (normalized.estadoPromocion() == EstadoPromocion.BORRADOR) {
+            version.setVigente(Boolean.FALSE);
+            version.setVisiblePublico(Boolean.FALSE);
+        }
 
         PromocionVersion saved = promocionVersionRepository.saveAndFlush(version);
 
@@ -148,9 +152,16 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
             }
         }
 
-        if (saved.getEstadoPromocion() == EstadoPromocion.ACTIVA
-                || saved.getEstadoPromocion() == EstadoPromocion.PROGRAMADA) {
-            promocionVersionValidator.validateCanActivate(saved, hasDiscounts(saved));
+        if (isPublicLifecycleState(saved.getEstadoPromocion())) {
+            promocionVersionValidator.validateCanActivate(
+                    saved,
+                    saved.getEstadoPromocion(),
+                    hasDiscounts(saved),
+                    DateTimeUtil.nowUtc()
+            );
+            closeOtherCurrentVersion(saved);
+            saved.setVigente(Boolean.TRUE);
+            saved = promocionVersionRepository.saveAndFlush(saved);
         }
 
         auditoriaFuncionalService.registrarExito(
@@ -170,9 +181,10 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
         );
 
         log.info(
-                "Versión de promoción creada. idPromocionVersion={}, idPromocion={}, actor={}",
+                "Versión de promoción creada. idPromocionVersion={}, idPromocion={}, estadoPromocion={}, actor={}",
                 saved.getIdPromocionVersion(),
                 promocion.getIdPromocion(),
+                saved.getEstadoPromocion(),
                 actor.actorLabel()
         );
 
@@ -204,21 +216,36 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
             );
         }
 
+        Map<String, Object> before = versionAuditSnapshot(version);
+
+        promocionVersionValidator.validateCanChangeState(
+                version,
+                normalized.estadoPromocion(),
+                normalized.motivo(),
+                hasDiscounts(version),
+                DateTimeUtil.nowUtc()
+        );
+
+        promocionVersionMapper.applyEstado(version, normalized);
+
         if (normalized.estadoPromocion() == EstadoPromocion.ACTIVA
                 || normalized.estadoPromocion() == EstadoPromocion.PROGRAMADA) {
-            promocionVersionValidator.validateCanActivate(version, hasDiscounts(version));
             closeOtherCurrentVersion(version);
             version.setVigente(Boolean.TRUE);
+            if (normalized.visiblePublico() == null) {
+                version.setVisiblePublico(Boolean.TRUE);
+            }
+        }
+
+        if (normalized.estadoPromocion() == EstadoPromocion.BORRADOR) {
+            version.setVigente(Boolean.FALSE);
+            version.setVisiblePublico(Boolean.FALSE);
         }
 
         if (normalized.estadoPromocion() == EstadoPromocion.FINALIZADA) {
             version.setVigente(Boolean.FALSE);
             version.setVisiblePublico(Boolean.FALSE);
         }
-
-        Map<String, Object> before = versionAuditSnapshot(version);
-
-        promocionVersionMapper.applyEstado(version, normalized);
 
         PromocionVersion saved = promocionVersionRepository.saveAndFlush(version);
 
@@ -242,9 +269,52 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                 "PromocionVersionService"
         );
 
+        log.info(
+                "Estado de versión de promoción cambiado. idPromocionVersion={}, estadoPromocion={}, actor={}",
+                saved.getIdPromocionVersion(),
+                saved.getEstadoPromocion(),
+                actor.actorLabel()
+        );
+
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
                 toVersionResponse(saved)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<PromocionVersionResponseDto> activar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
+    ) {
+        return cambiarEstado(
+                idPromocionVersion,
+                toEstadoRequest(EstadoPromocion.ACTIVA, request, Boolean.TRUE)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<PromocionVersionResponseDto> programar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
+    ) {
+        return cambiarEstado(
+                idPromocionVersion,
+                toEstadoRequest(EstadoPromocion.PROGRAMADA, request, Boolean.TRUE)
+        );
+    }
+
+    @Override
+    @Transactional
+    public ApiResponseDto<PromocionVersionResponseDto> finalizar(
+            Long idPromocionVersion,
+            EstadoChangeRequestDto request
+    ) {
+        return cambiarEstado(
+                idPromocionVersion,
+                toEstadoRequest(EstadoPromocion.FINALIZADA, request, Boolean.FALSE)
         );
     }
 
@@ -262,6 +332,8 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
 
         promocionVersionValidator.validateCanCancel(version, request.motivo());
 
+        Map<String, Object> before = versionAuditSnapshot(version);
+
         version.setEstadoPromocion(EstadoPromocion.CANCELADA);
         version.setVisiblePublico(Boolean.FALSE);
         version.setVigente(Boolean.FALSE);
@@ -275,7 +347,10 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                 String.valueOf(saved.getIdPromocionVersion()),
                 "CANCELAR_PROMOCION_VERSION",
                 "Operación realizada correctamente.",
-                versionAuditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                versionAuditMetadata(saved, actor, Map.of(
+                        "before", before,
+                        "motivo", request.motivo()
+                ))
         );
 
         promocionSnapshotOutboxSupport.registrarSnapshot(
@@ -283,6 +358,12 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                 saved,
                 PromocionEventType.PROMOCION_SNAPSHOT_CANCELADA,
                 "PromocionVersionService"
+        );
+
+        log.info(
+                "Versión de promoción cancelada. idPromocionVersion={}, actor={}",
+                saved.getIdPromocionVersion(),
+                actor.actorLabel()
         );
 
         return apiResponseFactory.dtoOk(
@@ -342,6 +423,9 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
             EntityReferenceDto promocionReference,
             PageRequestDto pageRequest
     ) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        promocionPolicy.ensureCanViewAdmin(actor);
+
         Promocion promocion = resolvePromocion(promocionReference);
 
         PromocionVersionFilterDto filter = PromocionVersionFilterDto.builder()
@@ -404,6 +488,20 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
         return PromocionVersionEstadoRequestDto.builder()
                 .estadoPromocion(request.estadoPromocion())
                 .visiblePublico(request.visiblePublico())
+                .motivo(StringNormalizer.truncateOrNull(request.motivo(), 500))
+                .build();
+    }
+
+    private PromocionVersionEstadoRequestDto toEstadoRequest(
+            EstadoPromocion estadoPromocion,
+            EstadoChangeRequestDto request,
+            Boolean visiblePublico
+    ) {
+        requireMotivo(request);
+
+        return PromocionVersionEstadoRequestDto.builder()
+                .estadoPromocion(estadoPromocion)
+                .visiblePublico(visiblePublico)
                 .motivo(StringNormalizer.truncateOrNull(request.motivo(), 500))
                 .build();
     }
@@ -518,7 +616,7 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
             return;
         }
 
-        closeCurrentVersion(current, "Reemplazada por activación de versión: " + version.getIdPromocionVersion());
+        closeCurrentVersion(current, "Reemplazada por versión: " + version.getIdPromocionVersion());
     }
 
     private boolean hasDiscounts(PromocionVersion version) {
@@ -595,17 +693,35 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
     }
 
     private PromocionSkuDescuentoResponseDto toDescuentoResponse(PromocionSkuDescuentoVersion descuento) {
-        PrecioSkuHistorial precio = descuento.getSku() == null
-                ? null
-                : promocionPricingSupport.currentPriceRequired(descuento.getSku());
+        Optional<PrecioSkuHistorial> precio = descuento.getSku() == null
+                ? Optional.empty()
+                : promocionPricingSupport.currentPriceOptional(descuento.getSku());
 
-        MoneyResponseDto precioBase = precio == null
-                ? null
-                : promocionPricingSupport.toMoney(precio.getPrecioVenta(), precio.getMoneda());
+        MoneyResponseDto precioBase = precio
+                .map(value -> promocionPricingSupport.toMoney(value.getPrecioVenta(), value.getMoneda()))
+                .orElse(null);
 
-        Moneda moneda = precio == null ? Moneda.PEN : precio.getMoneda();
+        Moneda moneda = precio
+                .map(PrecioSkuHistorial::getMoneda)
+                .orElse(Moneda.PEN);
 
         return promocionSkuDescuentoMapper.toResponse(descuento, precioBase, moneda);
+    }
+
+    private PromocionSkuDescuentoResponseDto toDescuentoPublicResponse(PromocionSkuDescuentoVersion descuento) {
+        Optional<PrecioSkuHistorial> precio = descuento.getSku() == null
+                ? Optional.empty()
+                : promocionPricingSupport.currentPriceOptional(descuento.getSku());
+
+        MoneyResponseDto precioBase = precio
+                .map(value -> promocionPricingSupport.toMoney(value.getPrecioVenta(), value.getMoneda()))
+                .orElse(null);
+
+        Moneda moneda = precio
+                .map(PrecioSkuHistorial::getMoneda)
+                .orElse(Moneda.PEN);
+
+        return promocionSkuDescuentoMapper.toPublicResponse(descuento, precioBase, moneda);
     }
 
     private PromocionPublicResponseDto toPublicResponse(PromocionVersion version) {
@@ -616,7 +732,7 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                         version.getIdPromocionVersion()
                 )
                 .stream()
-                .map(this::toDescuentoResponse)
+                .map(this::toDescuentoPublicResponse)
                 .toList();
 
         return PromocionPublicResponseDto.builder()
@@ -685,6 +801,10 @@ public class PromocionVersionServiceImpl implements PromocionVersionService {
                     "Debe indicar el motivo de la operación."
             );
         }
+    }
+
+    private boolean isPublicLifecycleState(EstadoPromocion estadoPromocion) {
+        return estadoPromocion == EstadoPromocion.ACTIVA || estadoPromocion == EstadoPromocion.PROGRAMADA;
     }
 
     private String firstText(String first, String second) {

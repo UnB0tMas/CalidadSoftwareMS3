@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/ProductoSkuRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/ProductoSkuRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.ProductoSku;
@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -14,10 +16,25 @@ public interface ProductoSkuRepository extends
         JpaRepository<ProductoSku, Long>,
         JpaSpecificationExecutor<ProductoSku> {
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
+    @Override
+    Page<ProductoSku> findAll(Specification<ProductoSku> specification, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     Optional<ProductoSku> findByIdSkuAndEstadoTrue(Long idSku);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     Optional<ProductoSku> findByCodigoSkuIgnoreCaseAndEstadoTrue(String codigoSku);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     Optional<ProductoSku> findByBarcodeIgnoreCaseAndEstadoTrue(String barcode);
 
     boolean existsByCodigoSkuIgnoreCaseAndEstadoTrue(String codigoSku);
@@ -36,16 +53,31 @@ public interface ProductoSkuRepository extends
 
     long countByProducto_IdProductoAndEstadoTrueAndEstadoSku(Long idProducto, EstadoSku estadoSku);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     Page<ProductoSku> findByEstadoTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     Page<ProductoSku> findByProducto_IdProductoAndEstadoTrue(Long idProducto, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     List<ProductoSku> findByProducto_IdProductoAndEstadoTrueOrderByIdSkuAsc(Long idProducto);
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     List<ProductoSku> findByProducto_IdProductoAndEstadoTrueAndEstadoSkuOrderByIdSkuAsc(
             Long idProducto,
             EstadoSku estadoSku
     );
 
+    @EntityGraph(attributePaths = {
+            "producto"
+    })
     List<ProductoSku> findByEstadoTrueAndEstadoSkuOrderByIdSkuAsc(EstadoSku estadoSku);
 }

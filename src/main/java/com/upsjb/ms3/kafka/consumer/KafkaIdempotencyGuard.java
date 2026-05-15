@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/KafkaIdempotencyGuard.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/KafkaIdempotencyGuard.java
 package com.upsjb.ms3.kafka.consumer;
 
 import com.upsjb.ms3.domain.enums.Ms4StockEventType;
@@ -81,8 +81,9 @@ public class KafkaIdempotencyGuard {
                     .map(entity -> entity.getIdSku());
         }
 
-        if (StringUtils.hasText(reference.codigo())) {
-            return productoSkuRepository.findByCodigoSkuIgnoreCaseAndEstadoTrue(reference.codigo().trim())
+        String codigoSku = firstText(reference.codigoSku(), reference.codigo());
+        if (StringUtils.hasText(codigoSku)) {
+            return productoSkuRepository.findByCodigoSkuIgnoreCaseAndEstadoTrue(codigoSku.trim())
                     .map(entity -> entity.getIdSku());
         }
 
@@ -104,8 +105,9 @@ public class KafkaIdempotencyGuard {
                     .map(entity -> entity.getIdAlmacen());
         }
 
-        if (StringUtils.hasText(reference.codigo())) {
-            return almacenRepository.findByCodigoIgnoreCaseAndEstadoTrue(reference.codigo().trim())
+        String codigoAlmacen = firstText(reference.codigoAlmacen(), reference.codigo());
+        if (StringUtils.hasText(codigoAlmacen)) {
+            return almacenRepository.findByCodigoIgnoreCaseAndEstadoTrue(codigoAlmacen.trim())
                     .map(entity -> entity.getIdAlmacen());
         }
 
@@ -131,5 +133,13 @@ public class KafkaIdempotencyGuard {
             case VENTA_STOCK_LIBERADO_PENDIENTE -> TipoMovimientoInventario.LIBERACION_RESERVA;
             case VENTA_ANULADA_STOCK_PENDIENTE -> TipoMovimientoInventario.ANULACION_COMPENSATORIA;
         };
+    }
+
+    private String firstText(String first, String second) {
+        if (StringUtils.hasText(first)) {
+            return first;
+        }
+
+        return second;
     }
 }

@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.jwt;
+package com.upsjb.ms3.security.jwt;
 
 import com.upsjb.ms3.security.roles.SecurityRoles;
 import java.util.Collection;

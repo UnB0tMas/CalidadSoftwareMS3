@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/promocion/request/PromocionUpdateRequestDto.java
 package com.upsjb.ms3.dto.promocion.request;
 
 import jakarta.validation.constraints.NotBlank;

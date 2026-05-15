@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/ProductoPublicSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/ProductoPublicSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
@@ -12,6 +12,7 @@ import com.upsjb.ms3.domain.enums.EstadoPromocion;
 import com.upsjb.ms3.domain.enums.EstadoSku;
 import com.upsjb.ms3.dto.catalogo.producto.filter.ProductoPublicFilterDto;
 import com.upsjb.ms3.shared.specification.SpecificationBuilder;
+import com.upsjb.ms3.util.DateTimeUtil;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
@@ -25,9 +26,12 @@ public final class ProductoPublicSpecifications {
     }
 
     public static Specification<Producto> fromFilter(ProductoPublicFilterDto filter) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DateTimeUtil.nowUtc();
 
-        Specification<Producto> spec = basePublic(filter != null && Boolean.TRUE.equals(filter.incluirProgramados()), now);
+        Specification<Producto> spec = basePublic(
+                filter != null && Boolean.TRUE.equals(filter.incluirProgramados()),
+                now
+        );
 
         if (filter == null) {
             return spec;
@@ -77,16 +81,6 @@ public final class ProductoPublicSpecifications {
             predicates.add(cb.isTrue(root.get("estado")));
             predicates.add(cb.isTrue(root.get("visiblePublico")));
             predicates.add(cb.equal(root.get("estadoRegistro"), EstadoProductoRegistro.ACTIVO));
-
-            if (incluirProgramados) {
-                predicates.add(root.get("estadoPublicacion").in(
-                        EstadoProductoPublicacion.PUBLICADO,
-                        EstadoProductoPublicacion.PROGRAMADO
-                ));
-            } else {
-                predicates.add(cb.equal(root.get("estadoPublicacion"), EstadoProductoPublicacion.PUBLICADO));
-            }
-
             predicates.add(root.get("estadoVenta").in(
                     EstadoProductoVenta.VENDIBLE,
                     EstadoProductoVenta.SOLO_VISIBLE,
@@ -94,15 +88,31 @@ public final class ProductoPublicSpecifications {
                     EstadoProductoVenta.PROXIMAMENTE
             ));
 
-            predicates.add(cb.or(
-                    cb.isNull(root.get("fechaPublicacionInicio")),
-                    cb.lessThanOrEqualTo(root.get("fechaPublicacionInicio"), now)
-            ));
+            var publicadoVigente = cb.and(
+                    cb.equal(root.get("estadoPublicacion"), EstadoProductoPublicacion.PUBLICADO),
+                    cb.or(
+                            cb.isNull(root.get("fechaPublicacionInicio")),
+                            cb.lessThanOrEqualTo(root.get("fechaPublicacionInicio"), now)
+                    ),
+                    cb.or(
+                            cb.isNull(root.get("fechaPublicacionFin")),
+                            cb.greaterThanOrEqualTo(root.get("fechaPublicacionFin"), now)
+                    )
+            );
 
-            predicates.add(cb.or(
-                    cb.isNull(root.get("fechaPublicacionFin")),
-                    cb.greaterThanOrEqualTo(root.get("fechaPublicacionFin"), now)
-            ));
+            if (incluirProgramados) {
+                var programadoVisible = cb.and(
+                        cb.equal(root.get("estadoPublicacion"), EstadoProductoPublicacion.PROGRAMADO),
+                        cb.or(
+                                cb.isNull(root.get("fechaPublicacionFin")),
+                                cb.greaterThanOrEqualTo(root.get("fechaPublicacionFin"), now)
+                        )
+                );
+
+                predicates.add(cb.or(publicadoVigente, programadoVisible));
+            } else {
+                predicates.add(publicadoVigente);
+            }
 
             return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };

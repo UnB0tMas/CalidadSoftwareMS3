@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/proveedor/request/ProveedorUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/proveedor/request/ProveedorUpdateRequestDto.java
 package com.upsjb.ms3.dto.proveedor.request;
 
 import com.upsjb.ms3.domain.enums.TipoDocumentoProveedor;

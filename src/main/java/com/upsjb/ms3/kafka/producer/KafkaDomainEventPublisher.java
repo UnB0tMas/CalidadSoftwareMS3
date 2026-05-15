@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaDomainEventPublisher.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaDomainEventPublisher.java
 package com.upsjb.ms3.kafka.producer;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
@@ -38,6 +38,8 @@ public class KafkaDomainEventPublisher {
             return OutboxPublishResult.skipped(
                     event.getIdEvento(),
                     event.getEventId(),
+                    event.getTopic(),
+                    event.getEventKey(),
                     "KAFKA_DISABLED",
                     "Kafka está deshabilitado por configuración."
             );

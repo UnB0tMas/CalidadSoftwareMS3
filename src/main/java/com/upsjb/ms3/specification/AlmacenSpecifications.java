@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/AlmacenSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/AlmacenSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -27,6 +27,7 @@ public final class AlmacenSpecifications {
                 )
                 .like("codigo", filter.codigo())
                 .like("nombre", filter.nombre())
+                .like("direccion", filter.direccion())
                 .bool("principal", BooleanCriteria.of(filter.principal()))
                 .bool("permiteVenta", BooleanCriteria.of(filter.permiteVenta()))
                 .bool("permiteCompra", BooleanCriteria.of(filter.permiteCompra()))

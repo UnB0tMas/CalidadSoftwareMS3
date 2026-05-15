@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/JsonUtil.java
+// ruta: src/main/java/com/upsjb/ms3/util/JsonUtil.java
 package com.upsjb.ms3.util;
 
 import com.fasterxml.jackson.annotation.JsonInclude;

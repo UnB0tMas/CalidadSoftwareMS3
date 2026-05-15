@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/shared/pagination/PaginationService.java
+// ruta: src/main/java/com/upsjb/ms3/shared/pagination/PaginationService.java
 package com.upsjb.ms3.shared.pagination;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;

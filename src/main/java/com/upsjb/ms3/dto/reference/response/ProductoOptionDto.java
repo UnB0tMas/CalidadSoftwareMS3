@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/reference/response/ProductoOptionDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/reference/response/ProductoOptionDto.java
 package com.upsjb.ms3.dto.reference.response;
 
 import com.upsjb.ms3.domain.enums.EstadoProductoPublicacion;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/EmpleadoSnapshotMs2Validator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/EmpleadoSnapshotMs2Validator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.EmpleadoSnapshotMs2;
@@ -28,10 +28,14 @@ public class EmpleadoSnapshotMs2Validator {
 
         if (idEmpleadoMs2 == null) {
             errors.add("idEmpleadoMs2", "El id del empleado MS2 es obligatorio.", "REQUIRED", null);
+        } else if (idEmpleadoMs2 <= 0) {
+            errors.add("idEmpleadoMs2", "El id del empleado MS2 debe ser mayor a cero.", "INVALID_VALUE", idEmpleadoMs2);
         }
 
         if (idUsuarioMs1 == null) {
             errors.add("idUsuarioMs1", "El id de usuario MS1 es obligatorio.", "REQUIRED", null);
+        } else if (idUsuarioMs1 <= 0) {
+            errors.add("idUsuarioMs1", "El id de usuario MS1 debe ser mayor a cero.", "INVALID_VALUE", idUsuarioMs1);
         }
 
         if (!StringNormalizer.hasText(codigoEmpleado)) {

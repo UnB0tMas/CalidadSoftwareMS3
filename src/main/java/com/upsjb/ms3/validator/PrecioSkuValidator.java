@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/PrecioSkuValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/PrecioSkuValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;

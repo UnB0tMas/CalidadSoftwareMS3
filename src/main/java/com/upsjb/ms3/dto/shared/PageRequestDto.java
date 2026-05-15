@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/shared/PageRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/shared/PageRequestDto.java
 package com.upsjb.ms3.dto.shared;
 
 import jakarta.validation.constraints.Max;

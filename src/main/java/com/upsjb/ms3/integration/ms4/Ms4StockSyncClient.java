@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/ms4/Ms4StockSyncClient.java
+// ruta: src/main/java/com/upsjb/ms3/integration/ms4/Ms4StockSyncClient.java
 package com.upsjb.ms3.integration.ms4;
 
 import java.time.LocalDateTime;

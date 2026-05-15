@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/precio/response/PrecioSkuResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/precio/response/PrecioSkuResponseDto.java
 package com.upsjb.ms3.dto.precio.response;
 
 import com.upsjb.ms3.domain.enums.Moneda;

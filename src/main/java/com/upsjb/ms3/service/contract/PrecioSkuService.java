@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/PrecioSkuService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/PrecioSkuService.java
 package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.precio.filter.PrecioSkuFilterDto;
@@ -29,4 +29,6 @@ public interface PrecioSkuService {
             EntityReferenceDto skuReference,
             PageRequestDto pageRequest
     );
+
+    boolean existePrecioVigenteActivo(Long idSku);
 }

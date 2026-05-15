@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.audit;
+package com.upsjb.ms3.shared.audit;
 
 import com.upsjb.ms3.domain.enums.ResultadoAuditoria;
 

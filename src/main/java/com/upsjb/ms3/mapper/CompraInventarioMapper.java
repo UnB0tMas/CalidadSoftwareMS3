@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/CompraInventarioMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/CompraInventarioMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;

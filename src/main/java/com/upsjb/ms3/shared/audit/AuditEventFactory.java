@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.audit;
+package com.upsjb.ms3.shared.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

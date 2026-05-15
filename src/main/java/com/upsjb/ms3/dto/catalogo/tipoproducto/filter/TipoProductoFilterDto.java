@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/tipoproducto/filter/TipoProductoFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/tipoproducto/filter/TipoProductoFilterDto.java
 package com.upsjb.ms3.dto.catalogo.tipoproducto.filter;
 
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
@@ -20,7 +20,12 @@ public record TipoProductoFilterDto(
 
         Boolean estado,
 
+        Boolean incluirTodosLosEstados,
+
         @Valid
-        DateRangeFilterDto fechaCreacion
+        DateRangeFilterDto fechaCreacion,
+
+        @Valid
+        DateRangeFilterDto fechaActualizacion
 ) {
 }

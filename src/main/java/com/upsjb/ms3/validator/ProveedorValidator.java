@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/ProveedorValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/ProveedorValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Proveedor;
@@ -8,10 +8,27 @@ import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
 import com.upsjb.ms3.util.StringNormalizer;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ProveedorValidator {
+
+    private static final int MAX_DOCUMENTO_LENGTH = 30;
+    private static final int MAX_RUC_LENGTH = 20;
+    private static final int MAX_RAZON_SOCIAL_LENGTH = 200;
+    private static final int MAX_NOMBRE_COMERCIAL_LENGTH = 200;
+    private static final int MAX_NOMBRES_LENGTH = 150;
+    private static final int MAX_APELLIDOS_LENGTH = 150;
+    private static final int MAX_CORREO_LENGTH = 180;
+    private static final int MAX_TELEFONO_LENGTH = 30;
+    private static final int MAX_DIRECCION_LENGTH = 300;
+    private static final int MAX_OBSERVACION_LENGTH = 500;
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     public void validateCreate(
             TipoProveedor tipoProveedor,
@@ -19,7 +36,13 @@ public class ProveedorValidator {
             String numeroDocumento,
             String ruc,
             String razonSocial,
+            String nombreComercial,
             String nombres,
+            String apellidos,
+            String correo,
+            String telefono,
+            String direccion,
+            String observacion,
             Long creadoPorIdUsuarioMs1,
             boolean duplicatedDocumento,
             boolean duplicatedRuc
@@ -27,6 +50,19 @@ public class ProveedorValidator {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
         validateTipoProveedor(tipoProveedor, tipoDocumento, numeroDocumento, ruc, razonSocial, nombres, errors);
+        validateCommonLengths(
+                numeroDocumento,
+                ruc,
+                razonSocial,
+                nombreComercial,
+                nombres,
+                apellidos,
+                correo,
+                telefono,
+                direccion,
+                observacion,
+                errors
+        );
 
         if (creadoPorIdUsuarioMs1 == null) {
             errors.add("creadoPorIdUsuarioMs1", "El usuario creador es obligatorio.", "REQUIRED", null);
@@ -44,7 +80,13 @@ public class ProveedorValidator {
             String numeroDocumento,
             String ruc,
             String razonSocial,
+            String nombreComercial,
             String nombres,
+            String apellidos,
+            String correo,
+            String telefono,
+            String direccion,
+            String observacion,
             Long actualizadoPorIdUsuarioMs1,
             boolean duplicatedDocumento,
             boolean duplicatedRuc
@@ -54,6 +96,19 @@ public class ProveedorValidator {
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
         validateTipoProveedor(tipoProveedor, tipoDocumento, numeroDocumento, ruc, razonSocial, nombres, errors);
+        validateCommonLengths(
+                numeroDocumento,
+                ruc,
+                razonSocial,
+                nombreComercial,
+                nombres,
+                apellidos,
+                correo,
+                telefono,
+                direccion,
+                observacion,
+                errors
+        );
 
         if (actualizadoPorIdUsuarioMs1 == null) {
             errors.add("actualizadoPorIdUsuarioMs1", "El usuario actualizador es obligatorio.", "REQUIRED", null);
@@ -174,15 +229,46 @@ public class ProveedorValidator {
                     numeroDocumento
             );
         }
+    }
 
-        if (tipoDocumento.isSoloNumeros()
-                && !normalizedDocument.equals(numeroDocumento.trim())) {
-            errors.add(
-                    "numeroDocumento",
-                    "El número de documento solo debe contener dígitos.",
-                    "INVALID_FORMAT",
-                    numeroDocumento
-            );
+    private void validateCommonLengths(
+            String numeroDocumento,
+            String ruc,
+            String razonSocial,
+            String nombreComercial,
+            String nombres,
+            String apellidos,
+            String correo,
+            String telefono,
+            String direccion,
+            String observacion,
+            ValidationErrorCollector errors
+    ) {
+        validateMax("numeroDocumento", numeroDocumento, MAX_DOCUMENTO_LENGTH, "El número de documento no debe superar 30 caracteres.", errors);
+        validateMax("ruc", ruc, MAX_RUC_LENGTH, "El RUC no debe superar 20 caracteres.", errors);
+        validateMax("razonSocial", razonSocial, MAX_RAZON_SOCIAL_LENGTH, "La razón social no debe superar 200 caracteres.", errors);
+        validateMax("nombreComercial", nombreComercial, MAX_NOMBRE_COMERCIAL_LENGTH, "El nombre comercial no debe superar 200 caracteres.", errors);
+        validateMax("nombres", nombres, MAX_NOMBRES_LENGTH, "Los nombres no deben superar 150 caracteres.", errors);
+        validateMax("apellidos", apellidos, MAX_APELLIDOS_LENGTH, "Los apellidos no deben superar 150 caracteres.", errors);
+        validateMax("correo", correo, MAX_CORREO_LENGTH, "El correo no debe superar 180 caracteres.", errors);
+        validateMax("telefono", telefono, MAX_TELEFONO_LENGTH, "El teléfono no debe superar 30 caracteres.", errors);
+        validateMax("direccion", direccion, MAX_DIRECCION_LENGTH, "La dirección no debe superar 300 caracteres.", errors);
+        validateMax("observacion", observacion, MAX_OBSERVACION_LENGTH, "La observación no debe superar 500 caracteres.", errors);
+
+        if (StringNormalizer.hasText(correo) && !EMAIL_PATTERN.matcher(correo).matches()) {
+            errors.add("correo", "El correo no tiene formato válido.", "INVALID_FORMAT", correo);
+        }
+    }
+
+    private void validateMax(
+            String field,
+            String value,
+            int maxLength,
+            String message,
+            ValidationErrorCollector errors
+    ) {
+        if (StringNormalizer.hasText(value) && StringNormalizer.clean(value).length() > maxLength) {
+            errors.add(field, message, "MAX_LENGTH", value);
         }
     }
 

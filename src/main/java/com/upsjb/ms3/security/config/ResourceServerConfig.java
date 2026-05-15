@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.config;
+package com.upsjb.ms3.security.config;
 
 import com.upsjb.ms3.security.jwt.JwtClaimNames;
 import java.util.ArrayList;

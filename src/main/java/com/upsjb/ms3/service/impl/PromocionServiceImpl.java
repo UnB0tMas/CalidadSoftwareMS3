@@ -1,18 +1,14 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/PromocionServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
-import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.Promocion;
 import com.upsjb.ms3.domain.entity.PromocionSkuDescuentoVersion;
 import com.upsjb.ms3.domain.entity.PromocionVersion;
-import com.upsjb.ms3.domain.entity.StockSku;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoPromocion;
-import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.domain.enums.PromocionEventType;
-import com.upsjb.ms3.domain.enums.TipoDescuento;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
 import com.upsjb.ms3.dto.promocion.filter.PromocionFilterDto;
 import com.upsjb.ms3.dto.promocion.filter.PromocionVersionFilterDto;
@@ -33,27 +29,20 @@ import com.upsjb.ms3.dto.shared.EstadoChangeRequestDto;
 import com.upsjb.ms3.dto.shared.MoneyResponseDto;
 import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
-import com.upsjb.ms3.kafka.event.PromocionSkuDescuentoPayload;
-import com.upsjb.ms3.kafka.event.PromocionSnapshotEvent;
-import com.upsjb.ms3.kafka.event.PromocionSnapshotPayload;
 import com.upsjb.ms3.mapper.PromocionMapper;
 import com.upsjb.ms3.mapper.PromocionSkuDescuentoMapper;
 import com.upsjb.ms3.mapper.PromocionVersionMapper;
 import com.upsjb.ms3.policy.PromocionPolicy;
-import com.upsjb.ms3.repository.PrecioSkuHistorialRepository;
 import com.upsjb.ms3.repository.PromocionRepository;
 import com.upsjb.ms3.repository.PromocionSkuDescuentoVersionRepository;
 import com.upsjb.ms3.repository.PromocionVersionRepository;
-import com.upsjb.ms3.repository.StockSkuRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
 import com.upsjb.ms3.service.contract.CodigoGeneradorService;
-import com.upsjb.ms3.service.contract.EventoDominioOutboxService;
 import com.upsjb.ms3.service.contract.PromocionService;
-import com.upsjb.ms3.shared.audit.AuditContext;
-import com.upsjb.ms3.shared.audit.AuditContextHolder;
-import com.upsjb.ms3.shared.exception.ConflictException;
+import com.upsjb.ms3.service.support.PromocionPricingSupport;
+import com.upsjb.ms3.service.support.PromocionSnapshotOutboxSupport;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
@@ -64,7 +53,6 @@ import com.upsjb.ms3.specification.PromocionSpecifications;
 import com.upsjb.ms3.specification.PromocionVersionSpecifications;
 import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.MoneyUtil;
-import com.upsjb.ms3.util.PercentageUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.PromocionSkuDescuentoValidator;
 import com.upsjb.ms3.validator.PromocionValidator;
@@ -75,7 +63,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -115,9 +102,6 @@ public class PromocionServiceImpl implements PromocionService {
     private final PromocionRepository promocionRepository;
     private final PromocionVersionRepository promocionVersionRepository;
     private final PromocionSkuDescuentoVersionRepository promocionSkuDescuentoRepository;
-    private final PrecioSkuHistorialRepository precioSkuHistorialRepository;
-    private final StockSkuRepository stockSkuRepository;
-
     private final PromocionReferenceResolver promocionReferenceResolver;
     private final ProductoSkuReferenceResolver productoSkuReferenceResolver;
 
@@ -133,7 +117,8 @@ public class PromocionServiceImpl implements PromocionService {
     private final CodigoGeneradorService codigoGeneradorService;
     private final CurrentUserResolver currentUserResolver;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
-    private final EventoDominioOutboxService eventoDominioOutboxService;
+    private final PromocionPricingSupport promocionPricingSupport;
+    private final PromocionSnapshotOutboxSupport promocionSnapshotOutboxSupport;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
 
@@ -172,7 +157,7 @@ public class PromocionServiceImpl implements PromocionService {
                 auditMetadata(saved, actor, Map.of())
         );
 
-        registrarPromocionOutbox(saved, null, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(saved, null, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
 
         log.info(
                 "Promoción creada. idPromocion={}, codigo={}, actor={}",
@@ -220,7 +205,11 @@ public class PromocionServiceImpl implements PromocionService {
                 auditMetadata(saved, actor, Map.of("before", before))
         );
 
-        registrarPromocionOutbox(saved, findCurrentVersionOrNull(saved), PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(
+                saved,
+                findCurrentVersionOrNull(saved),
+                PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA
+        );
 
         return apiResponseFactory.dtoOk(
                 "Promoción actualizada correctamente.",
@@ -257,7 +246,7 @@ public class PromocionServiceImpl implements PromocionService {
                 auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
         );
 
-        registrarPromocionOutbox(saved, null, PromocionEventType.PROMOCION_SNAPSHOT_CANCELADA);
+        registrarPromocionSnapshot(saved, null, PromocionEventType.PROMOCION_SNAPSHOT_CANCELADA);
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
@@ -375,7 +364,10 @@ public class PromocionServiceImpl implements PromocionService {
 
         PromocionVersion current = findCurrentVersionOrNull(promocion);
         if (current != null) {
-            promocionVersionMapper.closeVersion(current, "Reemplazada por nueva versión: " + normalized.motivo());
+            promocionVersionMapper.closeVersion(
+                    current,
+                    "Reemplazada por nueva versión: " + normalized.motivo()
+            );
             promocionVersionRepository.save(current);
         }
 
@@ -398,7 +390,9 @@ public class PromocionServiceImpl implements PromocionService {
                 || saved.getEstadoPromocion() == EstadoPromocion.PROGRAMADA) {
             promocionVersionValidator.validateCanActivate(
                     saved,
-                    hasDiscounts(saved)
+                    saved.getEstadoPromocion(),
+                    hasDiscounts(saved),
+                    DateTimeUtil.nowUtc()
             );
         }
 
@@ -411,7 +405,7 @@ public class PromocionServiceImpl implements PromocionService {
                 versionAuditMetadata(saved, actor, Map.of())
         );
 
-        registrarPromocionOutbox(promocion, saved, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(promocion, saved, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
 
         return apiResponseFactory.dtoCreated(
                 "Promoción versionada correctamente.",
@@ -441,19 +435,19 @@ public class PromocionServiceImpl implements PromocionService {
             );
         }
 
-        if (normalized.estadoPromocion() == EstadoPromocion.ACTIVA
-                || normalized.estadoPromocion() == EstadoPromocion.PROGRAMADA) {
-            promocionVersionValidator.validateCanActivate(version, hasDiscounts(version));
-        }
+        boolean hasDiscounts = hasDiscounts(version);
+        promocionVersionValidator.validateCanChangeState(
+                version,
+                normalized.estadoPromocion(),
+                normalized.motivo(),
+                hasDiscounts,
+                DateTimeUtil.nowUtc()
+        );
 
         Map<String, Object> before = versionAuditSnapshot(version);
 
         promocionVersionMapper.applyEstado(version, normalized);
-
-        if (normalized.estadoPromocion() == EstadoPromocion.FINALIZADA) {
-            version.setVigente(Boolean.FALSE);
-            version.setVisiblePublico(Boolean.FALSE);
-        }
+        applyVersionLifecycleFlags(version, normalized.estadoPromocion(), normalized.visiblePublico());
 
         PromocionVersion saved = promocionVersionRepository.saveAndFlush(version);
 
@@ -470,7 +464,7 @@ public class PromocionServiceImpl implements PromocionService {
                 ? PromocionEventType.PROMOCION_SNAPSHOT_FINALIZADA
                 : PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA;
 
-        registrarPromocionOutbox(saved.getPromocion(), saved, eventType);
+        registrarPromocionSnapshot(saved.getPromocion(), saved, eventType);
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
@@ -508,7 +502,7 @@ public class PromocionServiceImpl implements PromocionService {
                 versionAuditMetadata(saved, actor, Map.of("motivo", request.motivo()))
         );
 
-        registrarPromocionOutbox(saved.getPromocion(), saved, PromocionEventType.PROMOCION_SNAPSHOT_CANCELADA);
+        registrarPromocionSnapshot(saved.getPromocion(), saved, PromocionEventType.PROMOCION_SNAPSHOT_CANCELADA);
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
@@ -582,7 +576,7 @@ public class PromocionServiceImpl implements PromocionService {
                 descuentoAuditMetadata(descuento, actor, Map.of())
         );
 
-        registrarPromocionOutbox(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
 
         return apiResponseFactory.dtoCreated(
                 "Operación realizada correctamente.",
@@ -604,9 +598,9 @@ public class PromocionServiceImpl implements PromocionService {
 
         PromocionVersion version = descuento.getPromocionVersion();
         ProductoSku sku = descuento.getSku();
-        PrecioSkuHistorial precio = currentPriceRequired(sku);
-        BigDecimal costoEstimado = costoPromedioEstimado(sku);
-        BigDecimal precioFinal = resolvePrecioFinal(
+        PrecioSkuHistorial precio = promocionPricingSupport.currentPriceRequired(sku);
+        BigDecimal costoEstimado = promocionPricingSupport.costoPromedioEstimado(sku);
+        BigDecimal precioFinal = promocionPricingSupport.resolvePrecioFinal(
                 normalized.tipoDescuento(),
                 normalized.valorDescuento(),
                 precio.getPrecioVenta()
@@ -617,7 +611,9 @@ public class PromocionServiceImpl implements PromocionService {
                 normalized.tipoDescuento(),
                 normalized.valorDescuento(),
                 precio.getPrecioVenta(),
-                costoEstimado
+                costoEstimado,
+                normalized.limiteUnidades(),
+                normalized.prioridad()
         );
 
         Map<String, Object> before = descuentoAuditSnapshot(descuento);
@@ -626,7 +622,7 @@ public class PromocionServiceImpl implements PromocionService {
                 .tipoDescuento(normalized.tipoDescuento())
                 .valorDescuento(normalized.valorDescuento())
                 .precioFinalEstimado(precioFinal)
-                .margenEstimado(resolveMargen(precioFinal, costoEstimado))
+                .margenEstimado(promocionPricingSupport.resolveMargen(precioFinal, costoEstimado))
                 .limiteUnidades(normalized.limiteUnidades())
                 .prioridad(normalized.prioridad())
                 .build();
@@ -644,7 +640,7 @@ public class PromocionServiceImpl implements PromocionService {
                 descuentoAuditMetadata(saved, actor, Map.of("before", before))
         );
 
-        registrarPromocionOutbox(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
@@ -664,14 +660,9 @@ public class PromocionServiceImpl implements PromocionService {
         PromocionSkuDescuentoVersion descuento = findDescuentoRequired(idPromocionSkuDescuentoVersion);
         requireEstadoFalse(request);
 
-        PromocionVersion version = descuento.getPromocionVersion();
-        if (version == null || !version.getEstadoPromocion().isEditable()) {
-            throw new ConflictException(
-                    "PROMOCION_DESCUENTO_NO_EDITABLE",
-                    "No se puede inactivar el descuento porque la versión de promoción no es editable."
-            );
-        }
+        promocionSkuDescuentoValidator.validateCanInactivate(descuento);
 
+        PromocionVersion version = descuento.getPromocionVersion();
         descuento.inactivar();
 
         PromocionSkuDescuentoVersion saved = promocionSkuDescuentoRepository.saveAndFlush(descuento);
@@ -685,7 +676,7 @@ public class PromocionServiceImpl implements PromocionService {
                 descuentoAuditMetadata(saved, actor, Map.of("motivo", request.motivo()))
         );
 
-        registrarPromocionOutbox(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
+        registrarPromocionSnapshot(version.getPromocion(), version, PromocionEventType.PROMOCION_SNAPSHOT_ACTUALIZADA);
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
@@ -919,9 +910,9 @@ public class PromocionServiceImpl implements PromocionService {
         PromocionSkuDescuentoCreateRequestDto normalized = normalizeDescuentoCreateRequest(request);
         ProductoSku sku = resolveSku(normalized.sku());
 
-        PrecioSkuHistorial precio = currentPriceRequired(sku);
-        BigDecimal costoEstimado = costoPromedioEstimado(sku);
-        BigDecimal precioFinal = resolvePrecioFinal(
+        PrecioSkuHistorial precio = promocionPricingSupport.currentPriceRequired(sku);
+        BigDecimal costoEstimado = promocionPricingSupport.costoPromedioEstimado(sku);
+        BigDecimal precioFinal = promocionPricingSupport.resolvePrecioFinal(
                 normalized.tipoDescuento(),
                 normalized.valorDescuento(),
                 precio.getPrecioVenta()
@@ -947,7 +938,7 @@ public class PromocionServiceImpl implements PromocionService {
                 .tipoDescuento(normalized.tipoDescuento())
                 .valorDescuento(normalized.valorDescuento())
                 .precioFinalEstimado(precioFinal)
-                .margenEstimado(resolveMargen(precioFinal, costoEstimado))
+                .margenEstimado(promocionPricingSupport.resolveMargen(precioFinal, costoEstimado))
                 .limiteUnidades(normalized.limiteUnidades())
                 .prioridad(normalized.prioridad())
                 .build();
@@ -962,66 +953,6 @@ public class PromocionServiceImpl implements PromocionService {
         return flush
                 ? promocionSkuDescuentoRepository.saveAndFlush(entity)
                 : promocionSkuDescuentoRepository.save(entity);
-    }
-
-    private PrecioSkuHistorial currentPriceRequired(ProductoSku sku) {
-        if (sku == null || sku.getIdSku() == null) {
-            throw new ValidationException(
-                    "SKU_REFERENCIA_REQUERIDA",
-                    "Debe indicar el SKU."
-            );
-        }
-
-        return precioSkuHistorialRepository
-                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(
-                        sku.getIdSku()
-                )
-                .orElseThrow(() -> new ConflictException(
-                        "SKU_SIN_PRECIO_VIGENTE",
-                        "No se puede registrar el descuento porque el SKU no tiene precio vigente."
-                ));
-    }
-
-    private BigDecimal costoPromedioEstimado(ProductoSku sku) {
-        if (sku == null || sku.getIdSku() == null) {
-            return null;
-        }
-
-        return stockSkuRepository
-                .findBySku_IdSkuAndEstadoTrueOrderByAlmacen_PrincipalDescAlmacen_NombreAsc(sku.getIdSku())
-                .stream()
-                .map(StockSku::getCostoPromedioActual)
-                .filter(value -> value != null && value.compareTo(BigDecimal.ZERO) > 0)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private BigDecimal resolvePrecioFinal(
-            TipoDescuento tipoDescuento,
-            BigDecimal valorDescuento,
-            BigDecimal precioBase
-    ) {
-        if (tipoDescuento == null || valorDescuento == null || precioBase == null) {
-            return null;
-        }
-
-        if (tipoDescuento.isPorcentaje()) {
-            return PercentageUtil.applyDiscount(precioBase, valorDescuento);
-        }
-
-        if (tipoDescuento.isMontoFijo()) {
-            return MoneyUtil.applyDiscountAmount(precioBase, valorDescuento);
-        }
-
-        return MoneyUtil.normalize(valorDescuento);
-    }
-
-    private BigDecimal resolveMargen(BigDecimal precioFinal, BigDecimal costoEstimado) {
-        if (precioFinal == null || costoEstimado == null) {
-            return null;
-        }
-
-        return MoneyUtil.normalize(precioFinal.subtract(costoEstimado));
     }
 
     private boolean hasDiscounts(PromocionVersion version) {
@@ -1047,21 +978,18 @@ public class PromocionServiceImpl implements PromocionService {
     }
 
     private PromocionSkuDescuentoResponseDto toDescuentoResponse(PromocionSkuDescuentoVersion descuento) {
-        PrecioSkuHistorial precio = descuento.getSku() == null
-                ? null
-                : precioSkuHistorialRepository
-                .findFirstBySku_IdSkuAndVigenteTrueAndEstadoTrueOrderByFechaInicioDescIdPrecioHistorialDesc(
-                        descuento.getSku().getIdSku()
-                )
+        PrecioSkuHistorial precio = promocionPricingSupport.currentPriceOptional(descuento.getSku())
                 .orElse(null);
 
         MoneyResponseDto precioBase = precio == null
                 ? null
-                : toMoney(precio.getPrecioVenta(), precio.getMoneda());
+                : promocionPricingSupport.toMoney(precio.getPrecioVenta(), precio.getMoneda());
 
-        Moneda moneda = precio == null ? Moneda.PEN : precio.getMoneda();
-
-        return promocionSkuDescuentoMapper.toResponse(descuento, precioBase, moneda);
+        return promocionSkuDescuentoMapper.toResponse(
+                descuento,
+                precioBase,
+                precio == null ? null : precio.getMoneda()
+        );
     }
 
     private PromocionPublicResponseDto toPublicResponse(PromocionVersion version) {
@@ -1088,101 +1016,37 @@ public class PromocionServiceImpl implements PromocionService {
                 .build();
     }
 
-    private MoneyResponseDto toMoney(BigDecimal amount, Moneda moneda) {
-        if (amount == null || moneda == null) {
-            return null;
-        }
-
-        BigDecimal normalized = MoneyUtil.normalize(amount);
-
-        return MoneyResponseDto.builder()
-                .amount(normalized)
-                .currency(moneda.getCode())
-                .formatted(moneda.getSymbol() + " " + normalized)
-                .build();
-    }
-
-    private void registrarPromocionOutbox(
+    private void registrarPromocionSnapshot(
             Promocion promocion,
             PromocionVersion version,
             PromocionEventType eventType
     ) {
-        AuditContext context = AuditContextHolder.getOrEmpty();
-
-        PromocionSnapshotEvent event = PromocionSnapshotEvent.of(
+        promocionSnapshotOutboxSupport.registrarSnapshot(
+                promocion,
+                version,
                 eventType,
-                promocion.getIdPromocion(),
-                traceValue(context.requestId()),
-                traceValue(context.correlationId()),
-                toPromocionSnapshotPayload(promocion, version),
-                Map.of("source", "PromocionService")
+                "PromocionService"
         );
-
-        eventoDominioOutboxService.registrarEvento(event);
     }
 
-    private PromocionSnapshotPayload toPromocionSnapshotPayload(Promocion promocion, PromocionVersion version) {
-        PromocionVersion effectiveVersion = version == null
-                ? findCurrentVersionOrNull(promocion)
-                : version;
+    private void applyVersionLifecycleFlags(
+            PromocionVersion version,
+            EstadoPromocion estadoPromocion,
+            Boolean visiblePublico
+    ) {
+        if (estadoPromocion == EstadoPromocion.ACTIVA || estadoPromocion == EstadoPromocion.PROGRAMADA) {
+            version.setVigente(Boolean.TRUE);
+            version.setVisiblePublico(visiblePublico == null ? Boolean.TRUE : visiblePublico);
+            return;
+        }
 
-        List<PromocionSkuDescuentoPayload> descuentos = effectiveVersion == null
-                ? List.of()
-                : promocionSkuDescuentoRepository
-                .findByPromocionVersion_IdPromocionVersionAndEstadoTrueOrderByPrioridadAscIdPromocionSkuDescuentoVersionAsc(
-                        effectiveVersion.getIdPromocionVersion()
-                )
-                .stream()
-                .map(this::toDescuentoPayload)
-                .toList();
+        if (estadoPromocion == EstadoPromocion.FINALIZADA || estadoPromocion == EstadoPromocion.BORRADOR) {
+            version.setVigente(Boolean.FALSE);
+        }
 
-        return PromocionSnapshotPayload.builder()
-                .idPromocion(promocion.getIdPromocion())
-                .codigo(promocion.getCodigo())
-                .nombre(promocion.getNombre())
-                .descripcion(promocion.getDescripcion())
-                .creadoPorIdUsuarioMs1(promocion.getCreadoPorIdUsuarioMs1())
-                .idPromocionVersion(effectiveVersion == null ? null : effectiveVersion.getIdPromocionVersion())
-                .fechaInicio(effectiveVersion == null ? null : effectiveVersion.getFechaInicio())
-                .fechaFin(effectiveVersion == null ? null : effectiveVersion.getFechaFin())
-                .estadoPromocion(effectiveVersion == null || effectiveVersion.getEstadoPromocion() == null
-                        ? null
-                        : effectiveVersion.getEstadoPromocion().getCode())
-                .visiblePublico(effectiveVersion == null ? null : effectiveVersion.getVisiblePublico())
-                .vigente(effectiveVersion == null ? null : effectiveVersion.getVigente())
-                .motivo(effectiveVersion == null ? null : effectiveVersion.getMotivo())
-                .estado(promocion.getEstado())
-                .createdAt(promocion.getCreatedAt())
-                .updatedAt(promocion.getUpdatedAt())
-                .descuentos(descuentos)
-                .build();
-    }
-
-    private PromocionSkuDescuentoPayload toDescuentoPayload(PromocionSkuDescuentoVersion descuento) {
-        ProductoSku sku = descuento.getSku();
-        Producto producto = sku == null ? null : sku.getProducto();
-        PromocionVersion version = descuento.getPromocionVersion();
-        Promocion promocion = version == null ? null : version.getPromocion();
-
-        return PromocionSkuDescuentoPayload.builder()
-                .idPromocionSkuDescuentoVersion(descuento.getIdPromocionSkuDescuentoVersion())
-                .idPromocionVersion(version == null ? null : version.getIdPromocionVersion())
-                .idPromocion(promocion == null ? null : promocion.getIdPromocion())
-                .idSku(sku == null ? null : sku.getIdSku())
-                .codigoSku(sku == null ? null : sku.getCodigoSku())
-                .idProducto(producto == null ? null : producto.getIdProducto())
-                .codigoProducto(producto == null ? null : producto.getCodigoProducto())
-                .nombreProducto(producto == null ? null : producto.getNombre())
-                .tipoDescuento(descuento.getTipoDescuento() == null ? null : descuento.getTipoDescuento().getCode())
-                .valorDescuento(descuento.getValorDescuento())
-                .precioFinalEstimado(descuento.getPrecioFinalEstimado())
-                .margenEstimado(descuento.getMargenEstimado())
-                .limiteUnidades(descuento.getLimiteUnidades())
-                .prioridad(descuento.getPrioridad())
-                .estado(descuento.getEstado())
-                .createdAt(descuento.getCreatedAt())
-                .updatedAt(descuento.getUpdatedAt())
-                .build();
+        if (estadoPromocion == EstadoPromocion.FINALIZADA) {
+            version.setVisiblePublico(Boolean.FALSE);
+        }
     }
 
     private Map<String, Object> auditMetadata(
@@ -1235,7 +1099,10 @@ public class PromocionServiceImpl implements PromocionService {
         metadata.put("codigoPromocion", promocion == null ? null : promocion.getCodigo());
         metadata.put("fechaInicio", version.getFechaInicio());
         metadata.put("fechaFin", version.getFechaFin());
-        metadata.put("estadoPromocion", version.getEstadoPromocion() == null ? null : version.getEstadoPromocion().getCode());
+        metadata.put(
+                "estadoPromocion",
+                version.getEstadoPromocion() == null ? null : version.getEstadoPromocion().getCode()
+        );
         metadata.put("visiblePublico", version.getVisiblePublico());
         metadata.put("vigente", version.getVigente());
         metadata.put("estado", version.getEstado());
@@ -1268,7 +1135,10 @@ public class PromocionServiceImpl implements PromocionService {
         metadata.put("idPromocionVersion", version == null ? null : version.getIdPromocionVersion());
         metadata.put("idSku", sku == null ? null : sku.getIdSku());
         metadata.put("codigoSku", sku == null ? null : sku.getCodigoSku());
-        metadata.put("tipoDescuento", descuento.getTipoDescuento() == null ? null : descuento.getTipoDescuento().getCode());
+        metadata.put(
+                "tipoDescuento",
+                descuento.getTipoDescuento() == null ? null : descuento.getTipoDescuento().getCode()
+        );
         metadata.put("valorDescuento", descuento.getValorDescuento());
         metadata.put("precioFinalEstimado", descuento.getPrecioFinalEstimado());
         metadata.put("limiteUnidades", descuento.getLimiteUnidades());
@@ -1313,9 +1183,5 @@ public class PromocionServiceImpl implements PromocionService {
 
     private String firstText(String first, String second) {
         return StringNormalizer.hasText(first) ? first : second;
-    }
-
-    private String traceValue(String value) {
-        return StringNormalizer.hasText(value) ? value : UUID.randomUUID().toString();
     }
 }

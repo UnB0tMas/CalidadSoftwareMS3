@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/StringNormalizer.java
+// ruta: src/main/java/com/upsjb/ms3/util/StringNormalizer.java
 package com.upsjb.ms3.util;
 
 import java.text.Normalizer;

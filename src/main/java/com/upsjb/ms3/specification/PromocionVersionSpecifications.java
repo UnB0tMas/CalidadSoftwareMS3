@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/PromocionVersionSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/PromocionVersionSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.PromocionVersion;
@@ -25,8 +25,16 @@ public final class PromocionVersionSpecifications {
         }
 
         return SpecificationBuilder.<PromocionVersion>create()
+                .textSearch(
+                        filter.search(),
+                        "promocion.codigo",
+                        "promocion.nombre",
+                        "promocion.descripcion",
+                        "motivo"
+                )
                 .equal("promocion.idPromocion", filter.idPromocion())
                 .like("promocion.codigo", filter.codigoPromocion())
+                .like("promocion.nombre", filter.nombrePromocion())
                 .equal("estadoPromocion", filter.estadoPromocion())
                 .bool("visiblePublico", BooleanCriteria.of(filter.visiblePublico()))
                 .bool("vigente", BooleanCriteria.of(filter.vigente()))

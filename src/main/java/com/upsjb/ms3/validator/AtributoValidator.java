@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/AtributoValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/AtributoValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -166,12 +166,34 @@ public class AtributoValidator {
     }
 
     public void validateCanActivate(Atributo atributo) {
+        validateCanActivate(atributo, false, false);
+    }
+
+    public void validateCanActivate(
+            Atributo atributo,
+            boolean duplicatedCodigo,
+            boolean duplicatedNombre
+    ) {
         requireExists(atributo);
 
         if (atributo.isActivo()) {
             throw new ConflictException(
                     "ATRIBUTO_YA_ACTIVO",
                     "El atributo ya se encuentra activo."
+            );
+        }
+
+        if (duplicatedCodigo) {
+            throw new ConflictException(
+                    "ATRIBUTO_CODIGO_DUPLICADO",
+                    "No se puede activar el atributo porque ya existe otro atributo activo con el mismo código."
+            );
+        }
+
+        if (duplicatedNombre) {
+            throw new ConflictException(
+                    "ATRIBUTO_NOMBRE_DUPLICADO",
+                    "No se puede activar el atributo porque ya existe otro atributo activo con el mismo nombre."
             );
         }
     }

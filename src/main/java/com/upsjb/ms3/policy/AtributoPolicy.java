@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/policy/AtributoPolicy.java
+// ruta: src/main/java/com/upsjb/ms3/policy/AtributoPolicy.java
 package com.upsjb.ms3.policy;
 
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
@@ -8,7 +8,12 @@ import org.springframework.stereotype.Component;
 public class AtributoPolicy {
 
     public boolean canCreate(AuthenticatedUserContext actor) {
-        return PolicyGuard.isAdmin(actor);
+        return canCreate(actor, false);
+    }
+
+    public boolean canCreate(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
+        return PolicyGuard.isAdmin(actor)
+                || (PolicyGuard.isEmpleado(actor) && employeeCanUpdateAttributes);
     }
 
     public boolean canUpdate(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
@@ -28,12 +33,28 @@ public class AtributoPolicy {
         return PolicyGuard.isAdmin(actor) || PolicyGuard.isEmpleado(actor);
     }
 
+    public boolean canViewPublic(AuthenticatedUserContext actor) {
+        return true;
+    }
+
     public void ensureCanCreate(AuthenticatedUserContext actor) {
-        PolicyGuard.ensureCan(canCreate(actor), "ATRIBUTO_CREAR_DENEGADO", "crear atributo");
+        ensureCanCreate(actor, false);
+    }
+
+    public void ensureCanCreate(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
+        PolicyGuard.ensureCan(
+                canCreate(actor, employeeCanUpdateAttributes),
+                "ATRIBUTO_CREAR_DENEGADO",
+                "crear atributo"
+        );
     }
 
     public void ensureCanUpdate(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
-        PolicyGuard.ensureCan(canUpdate(actor, employeeCanUpdateAttributes), "ATRIBUTO_EDITAR_DENEGADO", "editar atributo");
+        PolicyGuard.ensureCan(
+                canUpdate(actor, employeeCanUpdateAttributes),
+                "ATRIBUTO_EDITAR_DENEGADO",
+                "editar atributo"
+        );
     }
 
     public void ensureCanAssignToProductType(AuthenticatedUserContext actor, boolean employeeCanUpdateAttributes) {
@@ -45,10 +66,26 @@ public class AtributoPolicy {
     }
 
     public void ensureCanChangeState(AuthenticatedUserContext actor) {
-        PolicyGuard.ensureCan(canChangeState(actor), "ATRIBUTO_ESTADO_DENEGADO", "cambiar estado de atributo");
+        PolicyGuard.ensureCan(
+                canChangeState(actor),
+                "ATRIBUTO_ESTADO_DENEGADO",
+                "cambiar estado de atributo"
+        );
     }
 
     public void ensureCanViewAdmin(AuthenticatedUserContext actor) {
-        PolicyGuard.ensureCan(canViewAdmin(actor), "ATRIBUTO_CONSULTA_DENEGADA", "consultar atributos administrativos");
+        PolicyGuard.ensureCan(
+                canViewAdmin(actor),
+                "ATRIBUTO_CONSULTA_DENEGADA",
+                "consultar atributos administrativos"
+        );
+    }
+
+    public void ensureCanViewPublic(AuthenticatedUserContext actor) {
+        PolicyGuard.ensureCan(
+                canViewPublic(actor),
+                "ATRIBUTO_CONSULTA_PUBLICA_DENEGADA",
+                "consultar atributos públicos"
+        );
     }
 }

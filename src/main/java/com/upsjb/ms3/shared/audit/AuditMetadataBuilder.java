@@ -1,4 +1,5 @@
-﻿package com.upsjb.ms3.shared.audit;
+// ruta: src/main/java/com/upsjb/ms3/shared/audit/AuditMetadataBuilder.java
+package com.upsjb.ms3.shared.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.util.StringUtils;
 
@@ -30,7 +32,8 @@ public final class AuditMetadataBuilder {
             return this;
         }
 
-        values.put(normalizeKey(key), sanitizeValue(value));
+        String normalizedKey = normalizeKey(key);
+        values.put(normalizedKey, sanitizeValueForKey(normalizedKey, value));
         return this;
     }
 
@@ -62,11 +65,12 @@ public final class AuditMetadataBuilder {
             return this;
         }
 
+        String normalizedField = normalizeKey(field);
         Map<String, Object> change = new LinkedHashMap<>();
-        change.put("before", sanitizeValue(before));
-        change.put("after", sanitizeValue(after));
+        change.put("before", sanitizeValueForKey(normalizedField, before));
+        change.put("after", sanitizeValueForKey(normalizedField, after));
 
-        values.put("change." + normalizeKey(field), change);
+        values.put("change." + normalizedField, change);
         return this;
     }
 
@@ -108,6 +112,18 @@ public final class AuditMetadataBuilder {
         return normalized.substring(0, Math.min(normalized.length(), MAX_KEY_LENGTH));
     }
 
+    private Object sanitizeValueForKey(String key, Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (isSensitiveKey(key)) {
+            return MASK;
+        }
+
+        return sanitizeValue(value);
+    }
+
     private Object sanitizeValue(Object value) {
         if (value == null) {
             return null;
@@ -126,7 +142,11 @@ public final class AuditMetadataBuilder {
             Map<String, Object> sanitizedMap = new LinkedHashMap<>();
             map.forEach((mapKey, mapValue) -> {
                 if (mapKey != null) {
-                    sanitizedMap.put(normalizeKey(String.valueOf(mapKey)), sanitizeValue(mapValue));
+                    String normalizedNestedKey = normalizeKey(String.valueOf(mapKey));
+                    sanitizedMap.put(
+                            normalizedNestedKey,
+                            sanitizeValueForKey(normalizedNestedKey, mapValue)
+                    );
                 }
             });
             return sanitizedMap;
@@ -138,5 +158,27 @@ public final class AuditMetadataBuilder {
                 .replaceAll("\\s{2,}", " ");
 
         return sanitized.substring(0, Math.min(sanitized.length(), MAX_VALUE_LENGTH));
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (!StringUtils.hasText(key)) {
+            return false;
+        }
+
+        String normalized = key.toLowerCase(Locale.ROOT);
+
+        return normalized.contains("authorization")
+                || normalized.contains("token")
+                || normalized.contains("password")
+                || normalized.contains("passwd")
+                || normalized.contains("secret")
+                || normalized.contains("apikey")
+                || normalized.contains("api_key")
+                || normalized.contains("api-key")
+                || normalized.contains("credential")
+                || normalized.contains("privatekey")
+                || normalized.contains("private_key")
+                || normalized.contains("internalservicekey")
+                || normalized.contains("internal_service_key");
     }
 }

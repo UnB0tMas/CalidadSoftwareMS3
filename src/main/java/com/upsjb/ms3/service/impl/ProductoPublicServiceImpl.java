@@ -1,6 +1,7 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoPublicServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoPublicServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
+import com.upsjb.ms3.config.AppPropertiesConfig;
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
@@ -34,13 +35,13 @@ import com.upsjb.ms3.repository.ProductoImagenCloudinaryRepository;
 import com.upsjb.ms3.repository.ProductoRepository;
 import com.upsjb.ms3.repository.ProductoSkuRepository;
 import com.upsjb.ms3.repository.PromocionSkuDescuentoVersionRepository;
-import com.upsjb.ms3.repository.StockSkuRepository;
 import com.upsjb.ms3.service.contract.ProductoPublicService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.ProductoPublicSpecifications;
+import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.MoneyUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import java.math.BigDecimal;
@@ -78,7 +79,6 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
     private final ProductoAtributoValorRepository productoAtributoValorRepository;
     private final PrecioSkuHistorialRepository precioSkuHistorialRepository;
     private final PromocionSkuDescuentoVersionRepository promocionSkuDescuentoRepository;
-    private final StockSkuRepository stockSkuRepository;
 
     private final ProductoMapper productoMapper;
     private final ProductoSkuMapper productoSkuMapper;
@@ -87,6 +87,7 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
     private final ProductoPolicy productoPolicy;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
+    private final AppPropertiesConfig appPropertiesConfig;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,7 +97,9 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
     ) {
         productoPolicy.canViewPublic();
 
+        ProductoPublicFilterDto safeFilter = normalizeFilter(filter);
         PageRequestDto safePage = safePageRequest(pageRequest);
+
         Pageable pageable = paginationService.pageable(
                 safePage.page(),
                 safePage.size(),
@@ -107,7 +110,7 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
         );
 
         PageResponseDto<ProductoPublicResponseDto> response = paginationService.toPageResponseDto(
-                productoRepository.findAll(ProductoPublicSpecifications.fromFilter(filter), pageable),
+                productoRepository.findAll(ProductoPublicSpecifications.fromFilter(safeFilter), pageable),
                 this::toPublicResponse
         );
 
@@ -140,6 +143,38 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
                 "Detalle obtenido correctamente.",
                 toPublicDetailResponse(producto)
         );
+    }
+
+    private ProductoPublicFilterDto normalizeFilter(ProductoPublicFilterDto filter) {
+        if (filter == null) {
+            return ProductoPublicFilterDto.builder()
+                    .incluirProgramados(canShowProgrammedProducts())
+                    .build();
+        }
+
+        BigDecimal precioMin = MoneyUtil.normalizeNullable(filter.precioMin());
+        BigDecimal precioMax = MoneyUtil.normalizeNullable(filter.precioMax());
+
+        if (precioMin != null && precioMax != null && precioMax.compareTo(precioMin) < 0) {
+            throw new ValidationException(
+                    "RANGO_PRECIO_INVALIDO",
+                    "El precio máximo no puede ser menor que el precio mínimo."
+            );
+        }
+
+        return ProductoPublicFilterDto.builder()
+                .search(StringNormalizer.truncateOrNull(filter.search(), 250))
+                .categoriaSlug(StringNormalizer.truncateOrNull(filter.categoriaSlug(), 240))
+                .marcaSlug(StringNormalizer.truncateOrNull(filter.marcaSlug(), 180))
+                .generoObjetivo(filter.generoObjetivo())
+                .temporada(StringNormalizer.truncateOrNull(filter.temporada(), 80))
+                .deporte(StringNormalizer.truncateOrNull(filter.deporte(), 80))
+                .precioMin(precioMin)
+                .precioMax(precioMax)
+                .soloVendibles(filter.soloVendibles())
+                .conPromocion(filter.conPromocion())
+                .incluirProgramados(Boolean.TRUE.equals(filter.incluirProgramados()) && canShowProgrammedProducts())
+                .build();
     }
 
     private ProductoPublicResponseDto toPublicResponse(Producto producto) {
@@ -216,19 +251,35 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
             return false;
         }
 
-        if (producto.getEstadoPublicacion() != EstadoProductoPublicacion.PUBLICADO
-                && producto.getEstadoPublicacion() != EstadoProductoPublicacion.PROGRAMADO) {
+        if (producto.getEstadoVenta() == null || !producto.getEstadoVenta().isVisiblePublico()) {
             return false;
         }
 
-        if (producto.getEstadoVenta() == null) {
-            return false;
-        }
+        LocalDateTime now = DateTimeUtil.nowUtc();
 
-        return producto.getEstadoVenta() == EstadoProductoVenta.VENDIBLE
-                || producto.getEstadoVenta() == EstadoProductoVenta.SOLO_VISIBLE
-                || producto.getEstadoVenta() == EstadoProductoVenta.AGOTADO
-                || producto.getEstadoVenta() == EstadoProductoVenta.PROXIMAMENTE;
+        return isPublicadoVigente(producto, now) || isProgramadoVisible(producto, now);
+    }
+
+    private boolean isPublicadoVigente(Producto producto, LocalDateTime now) {
+        return producto.getEstadoPublicacion() == EstadoProductoPublicacion.PUBLICADO
+                && isPublicationStarted(producto, now)
+                && isPublicationNotExpired(producto, now);
+    }
+
+    private boolean isProgramadoVisible(Producto producto, LocalDateTime now) {
+        return canShowProgrammedProducts()
+                && producto.getEstadoPublicacion() == EstadoProductoPublicacion.PROGRAMADO
+                && isPublicationNotExpired(producto, now);
+    }
+
+    private boolean isPublicationStarted(Producto producto, LocalDateTime now) {
+        return producto.getFechaPublicacionInicio() == null
+                || !producto.getFechaPublicacionInicio().isAfter(now);
+    }
+
+    private boolean isPublicationNotExpired(Producto producto, LocalDateTime now) {
+        return producto.getFechaPublicacionFin() == null
+                || !producto.getFechaPublicacionFin().isBefore(now);
     }
 
     private List<ProductoSku> activeSkus(Producto producto) {
@@ -319,10 +370,8 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
             return null;
         }
 
-        LocalDateTime now = LocalDateTime.now();
-
         return precioSkuHistorialRepository
-                .findPreciosAplicablesBySkuAndFecha(sku.getIdSku(), now)
+                .findPreciosAplicablesBySkuAndFecha(sku.getIdSku(), DateTimeUtil.nowUtc())
                 .stream()
                 .filter(precio -> Boolean.TRUE.equals(precio.getVigente()))
                 .findFirst()
@@ -334,13 +383,11 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
             return null;
         }
 
-        LocalDateTime now = LocalDateTime.now();
-
         return promocionSkuDescuentoRepository
                 .findDescuentosAplicablesBySkuAt(
                         sku.getIdSku(),
                         List.of(EstadoPromocion.ACTIVA, EstadoPromocion.PROGRAMADA),
-                        now
+                        DateTimeUtil.nowUtc()
                 )
                 .stream()
                 .findFirst()
@@ -429,6 +476,12 @@ public class ProductoPublicServiceImpl implements ProductoPublicService {
         }
 
         return pageRequest;
+    }
+
+    private boolean canShowProgrammedProducts() {
+        return appPropertiesConfig != null
+                && appPropertiesConfig.getCatalog() != null
+                && appPropertiesConfig.getCatalog().isPublicShowProgrammedProducts();
     }
 
     @Builder

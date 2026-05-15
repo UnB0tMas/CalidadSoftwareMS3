@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.domain.value;
+package com.upsjb.ms3.domain.value;
 
 import java.io.Serializable;
 import java.util.Objects;

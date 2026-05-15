@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.code;
+package com.upsjb.ms3.shared.code;
 
 import org.springframework.stereotype.Component;
 

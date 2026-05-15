@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoUpdateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.producto.request;
 
 import com.upsjb.ms3.domain.enums.GeneroObjetivo;

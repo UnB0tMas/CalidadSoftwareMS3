@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/response/CompraInventarioResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/compra/response/CompraInventarioResponseDto.java
 package com.upsjb.ms3.dto.inventario.compra.response;
 
 import com.upsjb.ms3.domain.enums.EstadoCompraInventario;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/event/MovimientoInventarioEvent.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/event/MovimientoInventarioEvent.java
 package com.upsjb.ms3.kafka.event;
 
 import com.upsjb.ms3.domain.enums.AggregateType;

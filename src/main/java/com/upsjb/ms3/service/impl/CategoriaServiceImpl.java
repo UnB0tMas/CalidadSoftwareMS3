@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/CategoriaServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/CategoriaServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Categoria;
@@ -15,7 +15,6 @@ import com.upsjb.ms3.dto.reference.response.CategoriaOptionDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;
 import com.upsjb.ms3.dto.shared.EstadoChangeRequestDto;
-import com.upsjb.ms3.dto.shared.IdCodigoNombreResponseDto;
 import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
 import com.upsjb.ms3.mapper.CategoriaMapper;
@@ -30,18 +29,17 @@ import com.upsjb.ms3.service.contract.CategoriaService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
+import com.upsjb.ms3.shared.reference.CategoriaReferenceResolver;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.CategoriaSpecifications;
 import com.upsjb.ms3.util.StringNormalizer;
-import java.util.ArrayList;
+import com.upsjb.ms3.validator.CategoriaValidator;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
-import com.upsjb.ms3.validator.CategoriaValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -67,6 +65,7 @@ public class CategoriaServiceImpl implements CategoriaService {
 
     private static final int DEFAULT_LOOKUP_LIMIT = 20;
     private static final int MAX_LOOKUP_LIMIT = 50;
+    private static final int CATEGORY_SLUG_MAX_LENGTH = 180;
 
     private final CategoriaRepository categoriaRepository;
     private final ProductoRepository productoRepository;
@@ -74,6 +73,7 @@ public class CategoriaServiceImpl implements CategoriaService {
     private final CategoriaMapper categoriaMapper;
     private final CategoriaValidator categoriaValidator;
     private final CategoriaPolicy categoriaPolicy;
+    private final CategoriaReferenceResolver categoriaReferenceResolver;
     private final CurrentUserResolver currentUserResolver;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
     private final PaginationService paginationService;
@@ -140,14 +140,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         Integer nivel = categoriaPadre == null ? 1 : safeNivel(categoriaPadre) + 1;
         boolean wouldCreateCycle = wouldCreateCycle(entity, categoriaPadre);
 
-        Map<String, Object> before = Map.of(
-                "codigo", safe(entity.getCodigo()),
-                "nombre", safe(entity.getNombre()),
-                "slug", safe(entity.getSlug()),
-                "idCategoriaPadre", entity.getCategoriaPadre() == null ? "" : entity.getCategoriaPadre().getIdCategoria(),
-                "nivel", safeNivel(entity),
-                "orden", entity.getOrden() == null ? 0 : entity.getOrden()
-        );
+        Map<String, Object> before = beforeSnapshot(entity);
 
         categoriaValidator.validateUpdate(
                 entity,
@@ -173,6 +166,7 @@ public class CategoriaServiceImpl implements CategoriaService {
 
         categoriaMapper.updateEntity(entity, normalized, categoriaPadre, slug, nivel);
         refreshChildrenLevels(entity);
+
         Categoria saved = categoriaRepository.save(entity);
 
         auditoriaFuncionalService.registrarExito(
@@ -181,7 +175,7 @@ public class CategoriaServiceImpl implements CategoriaService {
                 String.valueOf(saved.getIdCategoria()),
                 "ACTUALIZAR_CATEGORIA",
                 "Categoría actualizada correctamente.",
-                auditMetadata(saved, actor, before)
+                auditMetadata(saved, actor, Map.of("before", before))
         );
 
         log.info(
@@ -319,7 +313,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         );
 
         PageResponseDto<CategoriaResponseDto> response = paginationService.toPageResponseDto(
-                categoriaRepository.findAll(CategoriaSpecifications.fromFilter(filter), pageable),
+                categoriaRepository.findAll(CategoriaSpecifications.fromFilter(normalizeFilter(filter)), pageable),
                 categoriaMapper::toResponse
         );
 
@@ -342,7 +336,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         );
 
         CategoriaFilterDto filter = CategoriaFilterDto.builder()
-                .search(search)
+                .search(StringNormalizer.cleanOrNull(search))
                 .estado(Boolean.TRUE)
                 .build();
 
@@ -362,7 +356,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         categoriaPolicy.ensureCanViewAdmin(actor);
 
         List<Categoria> categorias = Boolean.FALSE.equals(soloActivas)
-                ? categoriaRepository.findAll()
+                ? categoriaRepository.findAllByOrderByNivelAscOrdenAscNombreAsc()
                 : categoriaRepository.findByEstadoTrueOrderByNivelAscOrdenAscNombreAsc();
 
         List<CategoriaTreeResponseDto> tree = buildTree(categorias);
@@ -407,36 +401,11 @@ public class CategoriaServiceImpl implements CategoriaService {
             return null;
         }
 
-        if (reference.id() != null) {
-            return categoriaRepository.findByIdCategoriaAndEstadoTrue(reference.id())
-                    .orElseThrow(() -> categoriaNotFound(reference.id()));
-        }
-
-        if (StringNormalizer.hasText(reference.codigo())) {
-            return categoriaRepository.findByCodigoIgnoreCaseAndEstadoTrue(reference.codigo().trim())
-                    .orElseThrow(() -> categoriaNotFound(reference.codigo()));
-        }
-
-        if (StringNormalizer.hasText(reference.slug())) {
-            return categoriaRepository.findBySlugIgnoreCaseAndEstadoTrue(reference.slug().trim())
-                    .orElseThrow(() -> categoriaNotFound(reference.slug()));
-        }
-
-        if (StringNormalizer.hasText(reference.nombre())) {
-            return categoriaRepository.findByNombreIgnoreCaseAndEstadoTrue(reference.nombre().trim())
-                    .orElseThrow(() -> categoriaNotFound(reference.nombre()));
-        }
-
-        throw new ValidationException(
-                "CATEGORIA_PADRE_REFERENCIA_INVALIDA",
-                "Debe indicar una referencia válida para la categoría padre."
-        );
-    }
-
-    private NotFoundException categoriaNotFound(Object reference) {
-        return new NotFoundException(
-                "CATEGORIA_PADRE_NO_ENCONTRADA",
-                "No se encontró la categoría padre solicitada: " + reference
+        return categoriaReferenceResolver.resolve(
+                reference.id(),
+                cleanReference(reference.codigo()),
+                cleanReference(reference.slug()),
+                cleanReference(reference.nombre())
         );
     }
 
@@ -484,17 +453,99 @@ public class CategoriaServiceImpl implements CategoriaService {
                 .build();
     }
 
+    private CategoriaFilterDto normalizeFilter(CategoriaFilterDto filter) {
+        if (filter == null) {
+            return CategoriaFilterDto.builder()
+                    .estado(Boolean.TRUE)
+                    .build();
+        }
+
+        return CategoriaFilterDto.builder()
+                .search(StringNormalizer.truncateOrNull(filter.search(), 250))
+                .codigo(StringNormalizer.truncateOrNull(StringNormalizer.normalizeForCode(filter.codigo()), 50))
+                .nombre(StringNormalizer.truncateOrNull(filter.nombre(), 150))
+                .slug(StringNormalizer.truncateOrNull(filter.slug(), 180))
+                .idCategoriaPadre(filter.idCategoriaPadre())
+                .nivel(filter.nivel())
+                .estado(filter.estado())
+                .fechaCreacion(filter.fechaCreacion())
+                .build();
+    }
+
     private String generateUniqueSlug(String nombre, Long excludingId) {
-        String base = SlugValue.fromName(nombre).raw();
+        String base = buildBaseSlug(nombre);
         String candidate = base;
         long suffix = 2L;
 
         while (slugExists(candidate, excludingId)) {
-            candidate = SlugValue.of(base).withSuffix(suffix).raw();
+            candidate = appendSlugSuffix(base, suffix);
             suffix++;
         }
 
         return candidate;
+    }
+
+    private String buildBaseSlug(String nombre) {
+        try {
+            return trimSlugToColumn(SlugValue.fromName(nombre).raw());
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException(
+                    "CATEGORIA_SLUG_INVALIDO",
+                    "El nombre de la categoría no permite generar un slug válido."
+            );
+        }
+    }
+
+    private String appendSlugSuffix(String base, long suffix) {
+        String suffixText = "-" + suffix;
+        int maxBaseLength = CATEGORY_SLUG_MAX_LENGTH - suffixText.length();
+
+        if (maxBaseLength < 3) {
+            throw new ValidationException(
+                    "CATEGORIA_SLUG_INVALIDO",
+                    "No se pudo generar un slug único para la categoría."
+            );
+        }
+
+        String safeBase = base.length() > maxBaseLength
+                ? trimTrailingHyphen(base.substring(0, maxBaseLength))
+                : base;
+
+        return safeBase + suffixText;
+    }
+
+    private String trimSlugToColumn(String slug) {
+        if (!StringNormalizer.hasText(slug)) {
+            throw new ValidationException(
+                    "CATEGORIA_SLUG_INVALIDO",
+                    "No se pudo generar un slug válido para la categoría."
+            );
+        }
+
+        if (slug.length() <= CATEGORY_SLUG_MAX_LENGTH) {
+            return slug;
+        }
+
+        String truncated = trimTrailingHyphen(slug.substring(0, CATEGORY_SLUG_MAX_LENGTH));
+
+        if (truncated.length() < 3) {
+            throw new ValidationException(
+                    "CATEGORIA_SLUG_INVALIDO",
+                    "No se pudo generar un slug válido para la categoría."
+            );
+        }
+
+        return truncated;
+    }
+
+    private String trimTrailingHyphen(String value) {
+        String result = value == null ? "" : value;
+
+        while (result.endsWith("-")) {
+            result = result.substring(0, result.length() - 1);
+        }
+
+        return result;
     }
 
     private boolean slugExists(String slug, Long excludingId) {
@@ -621,6 +672,19 @@ public class CategoriaServiceImpl implements CategoriaService {
         }
     }
 
+    private Map<String, Object> beforeSnapshot(Categoria categoria) {
+        LinkedHashMap<String, Object> before = new LinkedHashMap<>();
+        before.put("codigo", categoria.getCodigo());
+        before.put("nombre", categoria.getNombre());
+        before.put("slug", categoria.getSlug());
+        before.put("idCategoriaPadre", categoria.getCategoriaPadre() == null
+                ? null
+                : categoria.getCategoriaPadre().getIdCategoria());
+        before.put("nivel", categoria.getNivel());
+        before.put("orden", categoria.getOrden());
+        return before;
+    }
+
     private Map<String, Object> auditMetadata(
             Categoria categoria,
             AuthenticatedUserContext actor,
@@ -646,7 +710,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         return metadata;
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value;
+    private String cleanReference(String value) {
+        return StringNormalizer.cleanOrNull(value);
     }
 }

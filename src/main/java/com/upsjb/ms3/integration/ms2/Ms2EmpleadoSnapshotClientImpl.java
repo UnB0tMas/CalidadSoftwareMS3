@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2EmpleadoSnapshotClientImpl.java
+// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2EmpleadoSnapshotClientImpl.java
 package com.upsjb.ms3.integration.ms2;
 
 import com.fasterxml.jackson.core.type.TypeReference;

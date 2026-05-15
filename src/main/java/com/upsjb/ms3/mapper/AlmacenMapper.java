@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/AlmacenMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/AlmacenMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -6,6 +6,7 @@ import com.upsjb.ms3.dto.inventario.almacen.request.AlmacenCreateRequestDto;
 import com.upsjb.ms3.dto.inventario.almacen.request.AlmacenUpdateRequestDto;
 import com.upsjb.ms3.dto.inventario.almacen.response.AlmacenDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.almacen.response.AlmacenResponseDto;
+import com.upsjb.ms3.dto.reference.response.AlmacenOptionDto;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -36,9 +37,9 @@ public class AlmacenMapper {
         entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
         entity.setDireccion(request.direccion());
-        entity.setPrincipal(defaultBoolean(request.principal(), false));
-        entity.setPermiteVenta(defaultBoolean(request.permiteVenta(), true));
-        entity.setPermiteCompra(defaultBoolean(request.permiteCompra(), true));
+        entity.setPrincipal(defaultBoolean(request.principal(), Boolean.FALSE));
+        entity.setPermiteVenta(defaultBoolean(request.permiteVenta(), Boolean.TRUE));
+        entity.setPermiteCompra(defaultBoolean(request.permiteCompra(), Boolean.TRUE));
         entity.setObservacion(request.observacion());
     }
 
@@ -89,6 +90,23 @@ public class AlmacenMapper {
                 .stockDisponibleTotal(defaultInteger(stockDisponibleTotal))
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    public AlmacenOptionDto toOption(Almacen entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        return AlmacenOptionDto.builder()
+                .idAlmacen(entity.getIdAlmacen())
+                .codigo(entity.getCodigo())
+                .nombre(entity.getNombre())
+                .direccion(entity.getDireccion())
+                .principal(entity.getPrincipal())
+                .permiteVenta(entity.getPermiteVenta())
+                .permiteCompra(entity.getPermiteCompra())
+                .estado(entity.getEstado())
                 .build();
     }
 

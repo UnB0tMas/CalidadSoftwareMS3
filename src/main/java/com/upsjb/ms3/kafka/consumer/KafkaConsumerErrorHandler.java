@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/KafkaConsumerErrorHandler.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/KafkaConsumerErrorHandler.java
 package com.upsjb.ms3.kafka.consumer;
 
 import com.upsjb.ms3.kafka.producer.KafkaTopicResolver;

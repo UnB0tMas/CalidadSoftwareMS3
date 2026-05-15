@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/util/FileNameUtil.java
+// ruta: src/main/java/com/upsjb/ms3/util/FileNameUtil.java
 package com.upsjb.ms3.util;
 
 import java.time.format.DateTimeFormatter;

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/PromocionVersionValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/PromocionVersionValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Promocion;
@@ -7,6 +7,7 @@ import com.upsjb.ms3.domain.enums.EstadoPromocion;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
+import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
@@ -46,6 +47,13 @@ public class PromocionVersionValidator {
 
         if (estadoPromocion == null) {
             errors.add("estadoPromocion", "El estado de promoción es obligatorio.", "REQUIRED", null);
+        } else if (estadoPromocion == EstadoPromocion.FINALIZADA || estadoPromocion == EstadoPromocion.CANCELADA) {
+            errors.add(
+                    "estadoPromocion",
+                    "Una nueva versión de promoción no puede crearse finalizada ni cancelada.",
+                    "INVALID_STATE",
+                    estadoPromocion
+            );
         }
 
         if (!StringNormalizer.hasText(motivo)) {
@@ -73,13 +81,91 @@ public class PromocionVersionValidator {
         }
     }
 
-    public void validateCanActivate(PromocionVersion version, boolean hasDiscounts) {
+    public void validateCanChangeState(
+            PromocionVersion version,
+            EstadoPromocion targetState,
+            String motivo,
+            boolean hasDiscounts
+    ) {
+        validateCanChangeState(version, targetState, motivo, hasDiscounts, DateTimeUtil.nowUtc());
+    }
+
+    public void validateCanChangeState(
+            PromocionVersion version,
+            EstadoPromocion targetState,
+            String motivo,
+            boolean hasDiscounts,
+            LocalDateTime now
+    ) {
         requireActive(version);
 
-        if (!version.getEstadoPromocion().isEditable()) {
+        if (targetState == null) {
             throw new ConflictException(
-                    "PROMOCION_VERSION_NO_EDITABLE",
-                    "La versión de promoción no se puede activar en su estado actual."
+                    "PROMOCION_ESTADO_REQUERIDO",
+                    "Debe indicar el estado de promoción."
+            );
+        }
+
+        if (!StringNormalizer.hasText(motivo)) {
+            throw new ConflictException(
+                    "MOTIVO_OBLIGATORIO",
+                    "Debe indicar el motivo de la operación."
+            );
+        }
+
+        if (version.getEstadoPromocion() != null && version.getEstadoPromocion().isFinalizada()) {
+            throw new ConflictException(
+                    "PROMOCION_VERSION_FINALIZADA",
+                    "La versión de promoción ya se encuentra finalizada o cancelada."
+            );
+        }
+
+        if (targetState == EstadoPromocion.ACTIVA || targetState == EstadoPromocion.PROGRAMADA) {
+            validateCanActivate(version, targetState, hasDiscounts, now);
+            return;
+        }
+
+        if (targetState == EstadoPromocion.CANCELADA) {
+            validateCanCancel(version, motivo);
+            return;
+        }
+
+        if (targetState == EstadoPromocion.FINALIZADA) {
+            validateCanFinalize(version);
+            return;
+        }
+
+        if (targetState == EstadoPromocion.BORRADOR && version.getEstadoPromocion() == EstadoPromocion.ACTIVA) {
+            throw new ConflictException(
+                    "PROMOCION_ACTIVA_NO_REGRESA_BORRADOR",
+                    "No se puede regresar una promoción activa a borrador."
+            );
+        }
+    }
+
+    public void validateCanActivate(PromocionVersion version, boolean hasDiscounts) {
+        validateCanActivate(version, EstadoPromocion.ACTIVA, hasDiscounts, DateTimeUtil.nowUtc());
+    }
+
+    public void validateCanActivate(
+            PromocionVersion version,
+            EstadoPromocion targetState,
+            boolean hasDiscounts,
+            LocalDateTime now
+    ) {
+        requireActive(version);
+
+        if (targetState != EstadoPromocion.ACTIVA && targetState != EstadoPromocion.PROGRAMADA) {
+            throw new ConflictException(
+                    "PROMOCION_ESTADO_PUBLICACION_INVALIDO",
+                    "La versión solo puede activarse o programarse."
+            );
+        }
+
+        if (version.getEstadoPromocion() != null && version.getEstadoPromocion().isFinalizada()) {
+            throw new ConflictException(
+                    "PROMOCION_VERSION_FINALIZADA",
+                    "La versión de promoción ya se encuentra finalizada o cancelada."
             );
         }
 
@@ -89,12 +175,41 @@ public class PromocionVersionValidator {
                     "No se puede activar la versión porque no tiene descuentos por SKU."
             );
         }
+
+        LocalDateTime resolvedNow = now == null ? DateTimeUtil.nowUtc() : now;
+
+        if (version.getFechaFin() != null && version.getFechaFin().isBefore(resolvedNow)) {
+            throw new ConflictException(
+                    "PROMOCION_VERSION_VENCIDA",
+                    "No se puede activar la promoción porque la fecha fin ya venció."
+            );
+        }
+
+        if (targetState == EstadoPromocion.ACTIVA
+                && version.getFechaInicio() != null
+                && version.getFechaInicio().isAfter(resolvedNow)) {
+            throw new ConflictException(
+                    "PROMOCION_VERSION_FECHA_FUTURA",
+                    "No se puede activar la promoción porque su fecha de inicio es futura. Prográmela."
+            );
+        }
+    }
+
+    public void validateCanFinalize(PromocionVersion version) {
+        requireActive(version);
+
+        if (version.getEstadoPromocion() != null && version.getEstadoPromocion().isFinalizada()) {
+            throw new ConflictException(
+                    "PROMOCION_VERSION_FINALIZADA",
+                    "La versión de promoción ya se encuentra finalizada o cancelada."
+            );
+        }
     }
 
     public void validateCanCancel(PromocionVersion version, String motivo) {
         requireActive(version);
 
-        if (version.getEstadoPromocion().isFinalizada()) {
+        if (version.getEstadoPromocion() != null && version.getEstadoPromocion().isFinalizada()) {
             throw new ConflictException(
                     "PROMOCION_VERSION_FINALIZADA",
                     "La versión de promoción ya se encuentra finalizada o cancelada."

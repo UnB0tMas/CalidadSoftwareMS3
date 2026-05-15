@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/ms4/Ms4ClientErrorMapper.java
+// ruta: src/main/java/com/upsjb/ms3/integration/ms4/Ms4ClientErrorMapper.java
 package com.upsjb.ms3.integration.ms4;
 
 import org.springframework.stereotype.Component;

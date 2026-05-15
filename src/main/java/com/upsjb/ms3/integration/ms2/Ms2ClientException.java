@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2ClientException.java
+// ruta: src/main/java/com/upsjb/ms3/integration/ms2/Ms2ClientException.java
 package com.upsjb.ms3.integration.ms2;
 
 import com.upsjb.ms3.shared.exception.ExternalServiceException;

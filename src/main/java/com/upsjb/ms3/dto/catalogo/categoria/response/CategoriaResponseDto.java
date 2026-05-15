@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/response/CategoriaResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/categoria/response/CategoriaResponseDto.java
 package com.upsjb.ms3.dto.catalogo.categoria.response;
 
 import java.time.LocalDateTime;

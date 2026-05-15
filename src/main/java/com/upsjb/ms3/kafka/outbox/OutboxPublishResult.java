@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxPublishResult.java
+// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxPublishResult.java
 package com.upsjb.ms3.kafka.outbox;
 
 import java.time.LocalDateTime;
@@ -54,8 +54,8 @@ public record OutboxPublishResult(
                 eventId,
                 false,
                 false,
-                code == null || code.isBlank() ? "EVENTO_KAFKA_PUBLICACION_FALLIDA" : code,
-                message == null || message.isBlank() ? "No se pudo publicar el evento en Kafka." : message,
+                cleanCode(code, "EVENTO_KAFKA_PUBLICACION_FALLIDA"),
+                cleanMessage(message, "No se pudo publicar el evento en Kafka."),
                 topic,
                 eventKey,
                 null,
@@ -70,18 +70,37 @@ public record OutboxPublishResult(
             String code,
             String message
     ) {
+        return skipped(idEvento, eventId, null, null, code, message);
+    }
+
+    public static OutboxPublishResult skipped(
+            Long idEvento,
+            UUID eventId,
+            String topic,
+            String eventKey,
+            String code,
+            String message
+    ) {
         return new OutboxPublishResult(
                 idEvento,
                 eventId,
                 false,
                 true,
-                code == null || code.isBlank() ? "EVENTO_KAFKA_OMITIDO" : code,
-                message == null || message.isBlank() ? "La publicación del evento fue omitida." : message,
-                null,
-                null,
+                cleanCode(code, "EVENTO_KAFKA_OMITIDO"),
+                cleanMessage(message, "La publicación del evento fue omitida."),
+                topic,
+                eventKey,
                 null,
                 null,
                 LocalDateTime.now()
         );
+    }
+
+    private static String cleanCode(String code, String fallback) {
+        return code == null || code.isBlank() ? fallback : code.trim();
+    }
+
+    private static String cleanMessage(String message, String fallback) {
+        return message == null || message.isBlank() ? fallback : message.trim();
     }
 }

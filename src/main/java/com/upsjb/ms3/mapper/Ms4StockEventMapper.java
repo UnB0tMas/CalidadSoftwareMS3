@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/Ms4StockEventMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/Ms4StockEventMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;
@@ -254,7 +254,6 @@ public class Ms4StockEventMapper {
             String message
     ) {
         ProductoSku sku = resolveSku(event, reserva, movimiento, stock);
-        Producto producto = sku == null ? null : sku.getProducto();
         Almacen almacen = resolveAlmacen(event, reserva, movimiento, stock);
 
         return Ms4StockSyncResultDto.builder()
@@ -340,7 +339,11 @@ public class Ms4StockEventMapper {
     }
 
     private String eventSkuCodigo(StockEventView event) {
-        return event.sku() == null ? null : event.sku().codigo();
+        if (event.sku() == null) {
+            return null;
+        }
+
+        return event.sku().codigoSku() == null ? event.sku().codigo() : event.sku().codigoSku();
     }
 
     private Long eventAlmacenId(StockEventView event) {
@@ -348,16 +351,16 @@ public class Ms4StockEventMapper {
     }
 
     private String eventAlmacenCodigo(StockEventView event) {
-        return event.almacen() == null ? null : event.almacen().codigo();
+        if (event.almacen() == null) {
+            return null;
+        }
+
+        return event.almacen().codigoAlmacen() == null ? event.almacen().codigo() : event.almacen().codigoAlmacen();
     }
 
     private Integer resolveStockDisponible(StockSku stock) {
         if (stock == null) {
             return 0;
-        }
-
-        if (stock.getStockDisponible() != null) {
-            return stock.getStockDisponible();
         }
 
         return defaultInteger(stock.getStockFisico()) - defaultInteger(stock.getStockReservado());

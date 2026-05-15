@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/PromocionSkuDescuentoVersionRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/PromocionSkuDescuentoVersionRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.PromocionSkuDescuentoVersion;

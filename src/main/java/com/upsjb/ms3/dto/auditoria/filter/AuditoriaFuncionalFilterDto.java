@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/auditoria/filter/AuditoriaFuncionalFilterDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/auditoria/filter/AuditoriaFuncionalFilterDto.java
 package com.upsjb.ms3.dto.auditoria.filter;
 
 import com.upsjb.ms3.domain.enums.EntidadAuditada;

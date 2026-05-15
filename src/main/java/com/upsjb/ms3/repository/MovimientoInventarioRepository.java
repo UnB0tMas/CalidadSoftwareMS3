@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/repository/MovimientoInventarioRepository.java
+// ruta: src/main/java/com/upsjb/ms3/repository/MovimientoInventarioRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.MovimientoInventario;
@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.domain.Specification;
 
 public interface MovimientoInventarioRepository extends
         JpaRepository<MovimientoInventario, Long>,
@@ -39,6 +39,13 @@ public interface MovimientoInventarioRepository extends
     })
     Optional<MovimientoInventario> findByIdMovimientoAndEstadoTrue(Long idMovimiento);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Optional<MovimientoInventario> findByCodigoMovimientoIgnoreCaseAndEstadoTrue(String codigoMovimiento);
 
     boolean existsByCodigoMovimientoIgnoreCaseAndEstadoTrue(String codigoMovimiento);
@@ -86,16 +93,37 @@ public interface MovimientoInventarioRepository extends
     })
     Page<MovimientoInventario> findByAlmacen_IdAlmacenAndEstadoTrue(Long idAlmacen, Pageable pageable);
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByTipoMovimientoAndEstadoTrue(
             TipoMovimientoInventario tipoMovimiento,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByMotivoMovimientoAndEstadoTrue(
             MotivoMovimientoInventario motivoMovimiento,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {
+            "sku",
+            "sku.producto",
+            "almacen",
+            "compraDetalle",
+            "reservaStock"
+    })
     Page<MovimientoInventario> findByEstadoMovimientoAndEstadoTrue(
             EstadoMovimientoInventario estadoMovimiento,
             Pageable pageable

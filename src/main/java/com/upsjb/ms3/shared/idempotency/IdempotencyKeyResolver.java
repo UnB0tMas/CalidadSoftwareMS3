@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.shared.idempotency;
+package com.upsjb.ms3.shared.idempotency;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

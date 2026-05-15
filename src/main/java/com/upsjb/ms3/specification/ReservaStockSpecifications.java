@@ -1,9 +1,8 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/ReservaStockSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/ReservaStockSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.ReservaStock;
 import com.upsjb.ms3.domain.enums.EstadoReservaStock;
-import com.upsjb.ms3.domain.enums.TipoReferenciaStock;
 import com.upsjb.ms3.dto.inventario.reserva.filter.ReservaStockFilterDto;
 import com.upsjb.ms3.shared.specification.BooleanCriteria;
 import com.upsjb.ms3.shared.specification.SpecificationBuilder;
@@ -22,46 +21,41 @@ public final class ReservaStockSpecifications {
 
         return SpecificationBuilder.<ReservaStock>create()
                 .textSearch(
-                        SpecificationFilterSupport.text(filter, "search"),
+                        filter.search(),
                         "codigoReserva",
                         "referenciaIdExterno",
                         "motivo",
                         "sku.codigoSku",
+                        "sku.barcode",
                         "sku.producto.codigoProducto",
                         "sku.producto.nombre",
                         "almacen.codigo",
                         "almacen.nombre"
                 )
-                .like("codigoReserva", SpecificationFilterSupport.text(filter, "codigoReserva"))
-                .equal("sku.idSku", SpecificationFilterSupport.longValue(filter, "idSku"))
-                .like("sku.codigoSku", SpecificationFilterSupport.text(filter, "codigoSku"))
-                .equal("sku.producto.idProducto", SpecificationFilterSupport.longValue(filter, "idProducto"))
-                .like("sku.producto.codigoProducto", SpecificationFilterSupport.text(filter, "codigoProducto"))
-                .equal("almacen.idAlmacen", SpecificationFilterSupport.longValue(filter, "idAlmacen"))
-                .like("almacen.codigo", SpecificationFilterSupport.text(filter, "codigoAlmacen"))
-                .equal("referenciaTipo", SpecificationFilterSupport.value(filter, TipoReferenciaStock.class, "referenciaTipo"))
-                .like("referenciaIdExterno", SpecificationFilterSupport.text(filter, "referenciaIdExterno"))
-                .equal("estadoReserva", SpecificationFilterSupport.value(filter, EstadoReservaStock.class, "estadoReserva"))
-                .equal("reservadoPorIdUsuarioMs1", SpecificationFilterSupport.longValue(filter, "reservadoPorIdUsuarioMs1"))
-                .equal("confirmadoPorIdUsuarioMs1", SpecificationFilterSupport.longValue(filter, "confirmadoPorIdUsuarioMs1"))
-                .equal("liberadoPorIdUsuarioMs1", SpecificationFilterSupport.longValue(filter, "liberadoPorIdUsuarioMs1"))
+                .like("codigoReserva", filter.codigoReserva())
+                .equal("sku.idSku", filter.idSku())
+                .like("sku.codigoSku", filter.codigoSku())
+                .like("sku.barcode", filter.barcode())
+                .equal("sku.producto.idProducto", filter.idProducto())
+                .like("sku.producto.codigoProducto", filter.codigoProducto())
+                .like("sku.producto.nombre", filter.nombreProducto())
+                .equal("almacen.idAlmacen", filter.idAlmacen())
+                .like("almacen.codigo", filter.codigoAlmacen())
+                .like("almacen.nombre", filter.nombreAlmacen())
+                .equal("referenciaTipo", filter.referenciaTipo())
+                .like("referenciaIdExterno", filter.referenciaIdExterno())
+                .equal("estadoReserva", filter.estadoReserva())
+                .equal("reservadoPorIdUsuarioMs1", filter.reservadoPorIdUsuarioMs1())
+                .equal("confirmadoPorIdUsuarioMs1", filter.confirmadoPorIdUsuarioMs1())
+                .equal("liberadoPorIdUsuarioMs1", filter.liberadoPorIdUsuarioMs1())
                 .bool("estado", BooleanCriteria.of(resolveEstado(filter)))
-                .range("reservadoAt", SpecificationFilterSupport.dateRange(
-                        SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaReserva", "fechaReservado", "reservadoAt")
-                ))
-                .range("confirmadoAt", SpecificationFilterSupport.dateRange(
-                        SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaConfirmacion", "confirmadoAt")
-                ))
-                .range("liberadoAt", SpecificationFilterSupport.dateRange(
-                        SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaLiberacion", "liberadoAt")
-                ))
-                .range("expiresAt", SpecificationFilterSupport.dateRange(
-                        SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaExpiracion", "expiresAt")
-                ))
-                .range("createdAt", SpecificationFilterSupport.dateRange(
-                        SpecificationFilterSupport.value(filter, com.upsjb.ms3.dto.shared.DateRangeFilterDto.class, "fechaCreacion")
-                ))
-                .and(expirada(SpecificationFilterSupport.bool(filter, "expirada")))
+                .range("reservadoAt", SpecificationFilterSupport.dateRange(filter.fechaReserva()))
+                .range("confirmadoAt", SpecificationFilterSupport.dateRange(filter.fechaConfirmacion()))
+                .range("liberadoAt", SpecificationFilterSupport.dateRange(filter.fechaLiberacion()))
+                .range("expiresAt", SpecificationFilterSupport.dateRange(filter.fechaExpiracion()))
+                .range("createdAt", SpecificationFilterSupport.dateRange(filter.fechaCreacion()))
+                .range("updatedAt", SpecificationFilterSupport.dateRange(filter.fechaActualizacion()))
+                .and(expirada(resolveExpirada(filter)))
                 .build();
     }
 
@@ -75,16 +69,6 @@ public final class ReservaStockSpecifications {
         return SpecificationBuilder.<ReservaStock>create()
                 .activeOnly()
                 .equal("estadoReserva", EstadoReservaStock.RESERVADA)
-                .build();
-    }
-
-    public static Specification<ReservaStock> byReferencia(
-            TipoReferenciaStock referenciaTipo,
-            String referenciaIdExterno
-    ) {
-        return SpecificationBuilder.<ReservaStock>create()
-                .equal("referenciaTipo", referenciaTipo)
-                .like("referenciaIdExterno", referenciaIdExterno)
                 .build();
     }
 
@@ -113,7 +97,22 @@ public final class ReservaStockSpecifications {
     }
 
     private static Boolean resolveEstado(ReservaStockFilterDto filter) {
-        Boolean estado = SpecificationFilterSupport.bool(filter, "estado");
-        return estado == null ? Boolean.TRUE : estado;
+        if (filter == null) {
+            return Boolean.TRUE;
+        }
+
+        if (Boolean.TRUE.equals(filter.incluirTodosLosEstados())) {
+            return null;
+        }
+
+        return filter.estado() == null ? Boolean.TRUE : filter.estado();
+    }
+
+    private static Boolean resolveExpirada(ReservaStockFilterDto filter) {
+        if (filter == null) {
+            return null;
+        }
+
+        return filter.expirada() == null ? filter.expiradas() : filter.expirada();
     }
 }

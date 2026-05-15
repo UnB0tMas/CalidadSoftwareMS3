@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoSkuServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoSkuServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Atributo;
@@ -14,7 +14,6 @@ import com.upsjb.ms3.domain.entity.StockSku;
 import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoPromocion;
-import com.upsjb.ms3.domain.enums.EstadoReservaStock;
 import com.upsjb.ms3.domain.enums.EstadoSku;
 import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.domain.enums.ProductoEventType;
@@ -68,13 +67,13 @@ import com.upsjb.ms3.shared.reference.AtributoReferenceResolver;
 import com.upsjb.ms3.shared.reference.ProductoReferenceResolver;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.ProductoSkuSpecifications;
+import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.MoneyUtil;
 import com.upsjb.ms3.util.PercentageUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.AtributoValidator;
 import com.upsjb.ms3.validator.ProductoSkuValidator;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -225,6 +224,7 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
 
         productoSkuValidator.validateUpdate(
                 sku,
+                normalized.estadoSku(),
                 normalized.barcode(),
                 normalized.stockMinimo(),
                 normalized.stockMaximo(),
@@ -421,6 +421,9 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
             EntityReferenceDto productoReference,
             PageRequestDto pageRequest
     ) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        productoSkuPolicy.ensureCanViewAdmin(actor);
+
         Producto producto = resolveProducto(productoReference);
 
         ProductoSkuFilterDto filter = ProductoSkuFilterDto.builder()
@@ -428,7 +431,26 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
                 .estado(Boolean.TRUE)
                 .build();
 
-        return listar(filter, pageRequest);
+        PageRequestDto safePage = safePageRequest(pageRequest, "updatedAt");
+
+        Pageable pageable = paginationService.pageable(
+                safePage.page(),
+                safePage.size(),
+                safePage.sortBy(),
+                safePage.sortDirection(),
+                ALLOWED_SORT_FIELDS,
+                "updatedAt"
+        );
+
+        PageResponseDto<ProductoSkuResponseDto> response = paginationService.toPageResponseDto(
+                productoSkuRepository.findAll(ProductoSkuSpecifications.fromFilter(filter), pageable),
+                this::toResponse
+        );
+
+        return apiResponseFactory.dtoOk(
+                "Lista obtenida correctamente.",
+                response
+        );
     }
 
     @Override
@@ -647,7 +669,7 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
                 .findDescuentosAplicablesBySkuAt(
                         sku.getIdSku(),
                         List.of(EstadoPromocion.ACTIVA, EstadoPromocion.PROGRAMADA),
-                        LocalDateTime.now()
+                        DateTimeUtil.nowUtc()
                 )
                 .stream()
                 .findFirst()
@@ -775,7 +797,7 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
         return reservaStockRepository
                 .findBySku_IdSkuAndEstadoTrue(sku.getIdSku(), Pageable.unpaged())
                 .stream()
-                .anyMatch(reserva -> reserva.getEstadoReserva() == EstadoReservaStock.RESERVADA);
+                .anyMatch(reserva -> reserva.getEstadoReserva() != null && reserva.getEstadoReserva().isPendiente());
     }
 
     private void registrarOutboxProducto(Producto producto, ProductoEventType eventType) {
@@ -868,6 +890,44 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
                 .estado(sku.getEstado())
                 .createdAt(sku.getCreatedAt())
                 .updatedAt(sku.getUpdatedAt())
+                .atributos(toSkuAtributoSnapshotPayloads(sku))
+                .build();
+    }
+
+    private List<ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload> toSkuAtributoSnapshotPayloads(ProductoSku sku) {
+        if (sku == null || sku.getIdSku() == null) {
+            return List.of();
+        }
+
+        return skuAtributoValorRepository
+                .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(sku.getIdSku())
+                .stream()
+                .map(this::toSkuAtributoSnapshotPayload)
+                .toList();
+    }
+
+    private ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload toSkuAtributoSnapshotPayload(
+            SkuAtributoValor valor
+    ) {
+        Atributo atributo = valor.getAtributo();
+
+        return ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload.builder()
+                .idSkuAtributoValor(valor.getIdSkuAtributoValor())
+                .idAtributo(atributo == null ? null : atributo.getIdAtributo())
+                .codigoAtributo(atributo == null ? null : atributo.getCodigo())
+                .nombreAtributo(atributo == null ? null : atributo.getNombre())
+                .tipoDato(atributo == null || atributo.getTipoDato() == null ? null : atributo.getTipoDato().getCode())
+                .unidadMedida(atributo == null ? null : atributo.getUnidadMedida())
+                .requerido(atributo == null ? null : atributo.getRequerido())
+                .filtrable(atributo == null ? null : atributo.getFiltrable())
+                .visiblePublico(atributo == null ? null : atributo.getVisiblePublico())
+                .valorTexto(valor.getValorTexto())
+                .valorNumero(valor.getValorNumero())
+                .valorBoolean(valor.getValorBoolean())
+                .valorFecha(valor.getValorFecha())
+                .estado(valor.getEstado())
+                .createdAt(valor.getCreatedAt())
+                .updatedAt(valor.getUpdatedAt())
                 .build();
     }
 

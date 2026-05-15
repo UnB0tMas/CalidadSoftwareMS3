@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.domain.value;
+package com.upsjb.ms3.domain.value;
 
 import com.upsjb.ms3.domain.enums.Moneda;
 import java.io.Serializable;

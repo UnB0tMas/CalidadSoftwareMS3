@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/validator/EmpleadoInventarioPermisoValidator.java
+// ruta: src/main/java/com/upsjb/ms3/validator/EmpleadoInventarioPermisoValidator.java
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.EmpleadoInventarioPermisoHistorial;
@@ -35,6 +35,13 @@ public class EmpleadoInventarioPermisoValidator {
 
         if (otorgadoPorIdUsuarioMs1 == null) {
             errors.add("otorgadoPorIdUsuarioMs1", "El usuario que otorga el permiso es obligatorio.", "REQUIRED", null);
+        } else if (otorgadoPorIdUsuarioMs1 <= 0) {
+            errors.add(
+                    "otorgadoPorIdUsuarioMs1",
+                    "El usuario que otorga el permiso debe ser válido.",
+                    "INVALID_VALUE",
+                    otorgadoPorIdUsuarioMs1
+            );
         }
 
         errors.throwIfAny("No se puede otorgar el permiso de inventario.");
@@ -98,12 +105,20 @@ public class EmpleadoInventarioPermisoValidator {
                     "Debe activar al menos un permiso funcional de inventario."
             );
         }
+
+        if (permiso.getFechaFin() != null && !permiso.getFechaFin().isAfter(LocalDateTime.now())) {
+            throw new ConflictException(
+                    "PERMISO_INVENTARIO_FECHA_FIN_NO_VIGENTE",
+                    "No se puede otorgar un permiso cuya fecha fin ya venció."
+            );
+        }
     }
 
     public void validateRevoke(
             EmpleadoInventarioPermisoHistorial permiso,
             String motivo,
-            Long revocadoPorIdUsuarioMs1
+            Long revocadoPorIdUsuarioMs1,
+            LocalDateTime fechaFin
     ) {
         requireCurrent(permiso);
 
@@ -120,6 +135,9 @@ public class EmpleadoInventarioPermisoValidator {
                     "El usuario que revoca el permiso es obligatorio."
             );
         }
+
+        LocalDateTime resolvedFechaFin = fechaFin == null ? LocalDateTime.now() : fechaFin;
+        validateDateRange(permiso.getFechaInicio(), resolvedFechaFin);
     }
 
     public void requireCurrent(EmpleadoInventarioPermisoHistorial permiso) {
@@ -134,6 +152,13 @@ public class EmpleadoInventarioPermisoValidator {
             throw new ConflictException(
                     "PERMISO_INVENTARIO_NO_VIGENTE",
                     "El permiso de inventario no está vigente."
+            );
+        }
+
+        if (permiso.getFechaFin() != null && !permiso.getFechaFin().isAfter(LocalDateTime.now())) {
+            throw new ConflictException(
+                    "PERMISO_INVENTARIO_VENCIDO",
+                    "El permiso de inventario ya se encuentra vencido."
             );
         }
     }

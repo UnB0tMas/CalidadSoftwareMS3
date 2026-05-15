@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/response/ProductoAtributoValorResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/response/ProductoAtributoValorResponseDto.java
 package com.upsjb.ms3.dto.catalogo.producto.response;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
@@ -18,6 +18,9 @@ public record ProductoAtributoValorResponseDto(
         TipoDatoAtributo tipoDato,
         String tipoDatoLabel,
         String unidadMedida,
+        Boolean atributoRequerido,
+        Boolean filtrable,
+        Boolean visiblePublico,
         String valorTexto,
         BigDecimal valorNumero,
         Boolean valorBoolean,

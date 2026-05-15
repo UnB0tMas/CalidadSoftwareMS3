@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/shared/SelectOptionDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/shared/SelectOptionDto.java
 package com.upsjb.ms3.dto.shared;
 
 import lombok.Builder;

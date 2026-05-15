@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/mapper/ProductoImagenMapper.java
+// ruta: src/main/java/com/upsjb/ms3/mapper/ProductoImagenMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Producto;

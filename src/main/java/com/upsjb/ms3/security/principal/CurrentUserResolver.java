@@ -1,4 +1,4 @@
-﻿package com.upsjb.ms3.security.principal;
+package com.upsjb.ms3.security.principal;
 
 import com.upsjb.ms3.security.jwt.JwtClaimNames;
 import com.upsjb.ms3.security.roles.SecurityRoles;

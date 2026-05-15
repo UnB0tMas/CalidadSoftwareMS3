@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/specification/MovimientoInventarioSpecifications.java
+// ruta: src/main/java/com/upsjb/ms3/specification/MovimientoInventarioSpecifications.java
 package com.upsjb.ms3.specification;
 
 import com.upsjb.ms3.domain.entity.MovimientoInventario;

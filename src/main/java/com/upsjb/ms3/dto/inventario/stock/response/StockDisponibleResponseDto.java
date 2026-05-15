@@ -1,12 +1,15 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/inventario/stock/response/StockDisponibleResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/inventario/stock/response/StockDisponibleResponseDto.java
 package com.upsjb.ms3.dto.inventario.stock.response;
 
+import com.upsjb.ms3.domain.enums.EstadoSku;
 import lombok.Builder;
 
 @Builder
 public record StockDisponibleResponseDto(
         Long idSku,
         String codigoSku,
+        String barcode,
+        EstadoSku estadoSku,
         String codigoProducto,
         String nombreProducto,
         Long idAlmacen,

@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryDeleteResponse.java
+// ruta: src/main/java/com/upsjb/ms3/integration/cloudinary/CloudinaryDeleteResponse.java
 package com.upsjb.ms3.integration.cloudinary;
 
 import java.util.Collections;

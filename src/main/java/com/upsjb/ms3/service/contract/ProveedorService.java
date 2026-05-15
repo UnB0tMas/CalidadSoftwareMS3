@@ -1,6 +1,7 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/contract/ProveedorService.java
+// ruta: src/main/java/com/upsjb/ms3/service/contract/ProveedorService.java
 package com.upsjb.ms3.service.contract;
 
+import com.upsjb.ms3.domain.enums.TipoDocumentoProveedor;
 import com.upsjb.ms3.dto.proveedor.filter.ProveedorFilterDto;
 import com.upsjb.ms3.dto.proveedor.request.ProveedorCreateRequestDto;
 import com.upsjb.ms3.dto.proveedor.request.ProveedorEstadoRequestDto;
@@ -35,4 +36,9 @@ public interface ProveedorService {
     ApiResponseDto<ProveedorResponseDto> obtenerPorRuc(String ruc);
 
     ApiResponseDto<ProveedorResponseDto> obtenerPorDocumento(String numeroDocumento);
+
+    ApiResponseDto<ProveedorResponseDto> obtenerPorDocumento(
+            TipoDocumentoProveedor tipoDocumento,
+            String numeroDocumento
+    );
 }

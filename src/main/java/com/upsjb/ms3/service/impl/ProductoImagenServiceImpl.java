@@ -1,9 +1,12 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoImagenServiceImpl.java
+// ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoImagenServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
+import com.upsjb.ms3.domain.entity.Categoria;
+import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
 import com.upsjb.ms3.domain.entity.ProductoSku;
+import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.ProductoEventType;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
@@ -19,11 +22,13 @@ import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
 import com.upsjb.ms3.integration.cloudinary.CloudinaryUploadResponse;
 import com.upsjb.ms3.kafka.event.ProductoImagenSnapshotPayload;
+import com.upsjb.ms3.kafka.event.ProductoSkuSnapshotPayload;
 import com.upsjb.ms3.kafka.event.ProductoSnapshotEvent;
 import com.upsjb.ms3.kafka.event.ProductoSnapshotPayload;
 import com.upsjb.ms3.mapper.ProductoImagenMapper;
 import com.upsjb.ms3.policy.ProductoImagenPolicy;
 import com.upsjb.ms3.repository.ProductoImagenCloudinaryRepository;
+import com.upsjb.ms3.repository.ProductoSkuRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
@@ -81,6 +86,7 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
     );
 
     private final ProductoImagenCloudinaryRepository productoImagenRepository;
+    private final ProductoSkuRepository productoSkuRepository;
     private final ProductoReferenceResolver productoReferenceResolver;
     private final ProductoSkuReferenceResolver productoSkuReferenceResolver;
     private final ProductoImagenMapper productoImagenMapper;
@@ -137,53 +143,58 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 uploadTags(producto, sku)
         );
 
-        productoImagenValidator.validateMetadata(
-                cloudinaryResponse.publicId(),
-                cloudinaryResponse.secureUrl(),
-                cloudinaryResponse.resourceType(),
-                cloudinaryResponse.format(),
-                cloudinaryResponse.bytes(),
-                cloudinaryResponse.width(),
-                cloudinaryResponse.height()
-        );
+        try {
+            productoImagenValidator.validateMetadata(
+                    cloudinaryResponse.publicId(),
+                    cloudinaryResponse.secureUrl(),
+                    cloudinaryResponse.resourceType(),
+                    cloudinaryResponse.format(),
+                    cloudinaryResponse.bytes(),
+                    cloudinaryResponse.width(),
+                    cloudinaryResponse.height()
+            );
 
-        ProductoImagenCloudinary entity = productoImagenMapper.toEntity(
-                normalized,
-                producto,
-                sku,
-                cloudinaryResponse.assetId(),
-                cloudinaryResponse.publicId(),
-                cloudinaryResponse.version(),
-                cloudinaryResponse.secureUrl(),
-                cloudinaryResponse.url(),
-                cloudinaryResponse.resourceType(),
-                cloudinaryResponse.format(),
-                cloudinaryResponse.bytes(),
-                cloudinaryResponse.width(),
-                cloudinaryResponse.height(),
-                cloudinaryResponse.folder(),
-                cloudinaryResponse.originalFilename(),
-                actor.getIdUsuarioMs1()
-        );
-        entity.activar();
+            ProductoImagenCloudinary entity = productoImagenMapper.toEntity(
+                    normalized,
+                    producto,
+                    sku,
+                    cloudinaryResponse.assetId(),
+                    cloudinaryResponse.publicId(),
+                    cloudinaryResponse.version(),
+                    cloudinaryResponse.secureUrl(),
+                    cloudinaryResponse.url(),
+                    cloudinaryResponse.resourceType(),
+                    cloudinaryResponse.format(),
+                    cloudinaryResponse.bytes(),
+                    cloudinaryResponse.width(),
+                    cloudinaryResponse.height(),
+                    cloudinaryResponse.folder(),
+                    cloudinaryResponse.originalFilename(),
+                    actor.getIdUsuarioMs1()
+            );
+            entity.activar();
 
-        ProductoImagenCloudinary saved = productoImagenRepository.saveAndFlush(entity);
+            ProductoImagenCloudinary saved = productoImagenRepository.saveAndFlush(entity);
 
-        auditoriaFuncionalService.registrarExito(
-                TipoEventoAuditoria.IMAGEN_PRODUCTO_SUBIDA,
-                EntidadAuditada.PRODUCTO_IMAGEN_CLOUDINARY,
-                String.valueOf(saved.getIdImagen()),
-                "SUBIR_IMAGEN_PRODUCTO",
-                "Imagen de producto subida correctamente.",
-                auditMetadata(saved, actor, Map.of("cloudinaryPublicId", saved.getCloudinaryPublicId()))
-        );
+            auditoriaFuncionalService.registrarExito(
+                    TipoEventoAuditoria.IMAGEN_PRODUCTO_SUBIDA,
+                    EntidadAuditada.PRODUCTO_IMAGEN_CLOUDINARY,
+                    String.valueOf(saved.getIdImagen()),
+                    "SUBIR_IMAGEN_PRODUCTO",
+                    "Imagen de producto subida correctamente.",
+                    auditMetadata(saved, actor, Map.of("cloudinaryPublicId", saved.getCloudinaryPublicId()))
+            );
 
-        registrarOutboxProducto(saved, ProductoEventType.IMAGEN_PRODUCTO_SNAPSHOT_ACTUALIZADO);
+            registrarOutboxProducto(saved, ProductoEventType.IMAGEN_PRODUCTO_SNAPSHOT_ACTUALIZADO);
 
-        return apiResponseFactory.dtoCreated(
-                "Imagen de producto subida correctamente.",
-                productoImagenMapper.toResponse(saved)
-        );
+            return apiResponseFactory.dtoCreated(
+                    "Imagen de producto subida correctamente.",
+                    productoImagenMapper.toResponse(saved)
+            );
+        } catch (RuntimeException ex) {
+            safeDeleteUploadedResource(cloudinaryResponse);
+            throw ex;
+        }
     }
 
     @Override
@@ -197,6 +208,12 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
 
         ProductoImagenCloudinary imagen = findActiveRequired(idImagen);
         ProductoImagenUpdateRequestDto normalized = normalizeUpdateRequest(request);
+
+        productoImagenValidator.validateUpdate(
+                normalized.altText(),
+                normalized.titulo(),
+                normalized.orden()
+        );
 
         productoImagenMapper.updateEntity(imagen, normalized);
 
@@ -230,26 +247,17 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
 
         ProductoImagenCloudinary imagen = findActiveRequired(idImagen);
         ProductoImagenPrincipalRequestDto normalized = normalizePrincipalRequest(request, imagen);
+        ProductoSku requestedSku = normalized.sku() == null ? null : resolveSkuRequired(normalized.sku());
+
+        validatePrincipalScope(imagen, normalized, requestedSku);
 
         boolean principalSku = Boolean.TRUE.equals(normalized.principalSku());
         boolean principalProducto = Boolean.TRUE.equals(normalized.principalProducto());
-
-        if (principalSku && imagen.getSku() == null) {
-            throw new ConflictException(
-                    "IMAGEN_SKU_REQUERIDA",
-                    "No se puede marcar como principal de SKU una imagen que no pertenece a un SKU."
-            );
-        }
 
         if (principalSku) {
             clearPrincipal(imagen.getProducto(), imagen.getSku());
         } else if (principalProducto) {
             clearPrincipal(imagen.getProducto(), null);
-        } else {
-            throw new ValidationException(
-                    "IMAGEN_PRINCIPAL_TIPO_REQUERIDO",
-                    "Debe indicar si la imagen será principal del producto o del SKU."
-            );
         }
 
         productoImagenMapper.markPrincipal(imagen, Boolean.TRUE);
@@ -352,6 +360,9 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<ProductoImagenResponseDto>> listarPorProducto(EntityReferenceDto productoReference) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        productoImagenPolicy.ensureCanViewAdmin(actor);
+
         Producto producto = resolveProducto(productoReference);
 
         List<ProductoImagenResponseDto> response = productoImagenRepository
@@ -369,6 +380,9 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<List<ProductoImagenResponseDto>> listarPorSku(EntityReferenceDto skuReference) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        productoImagenPolicy.ensureCanViewAdmin(actor);
+
         ProductoSku sku = resolveSkuRequired(skuReference);
 
         List<ProductoImagenResponseDto> response = productoImagenRepository
@@ -386,6 +400,9 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<ProductoImagenResponseDto> obtenerPrincipalProducto(EntityReferenceDto productoReference) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        productoImagenPolicy.ensureCanViewAdmin(actor);
+
         Producto producto = resolveProducto(productoReference);
 
         ProductoImagenCloudinary imagen = productoImagenRepository
@@ -406,6 +423,9 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponseDto<ProductoImagenResponseDto> obtenerPrincipalSku(EntityReferenceDto skuReference) {
+        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        productoImagenPolicy.ensureCanViewAdmin(actor);
+
         ProductoSku sku = resolveSkuRequired(skuReference);
 
         ProductoImagenCloudinary imagen = productoImagenRepository
@@ -530,6 +550,45 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 .build();
     }
 
+    private void validatePrincipalScope(
+            ProductoImagenCloudinary imagen,
+            ProductoImagenPrincipalRequestDto request,
+            ProductoSku requestedSku
+    ) {
+        boolean principalSku = Boolean.TRUE.equals(request.principalSku());
+        boolean principalProducto = Boolean.TRUE.equals(request.principalProducto());
+
+        if (principalSku == principalProducto) {
+            throw new ValidationException(
+                    "IMAGEN_PRINCIPAL_TIPO_REQUERIDO",
+                    "Debe indicar si la imagen será principal del producto o del SKU."
+            );
+        }
+
+        if (principalProducto && imagen.getSku() != null) {
+            throw new ConflictException(
+                    "IMAGEN_PRODUCTO_BASE_REQUERIDA",
+                    "No se puede marcar como principal de producto una imagen asociada a un SKU."
+            );
+        }
+
+        if (principalSku && imagen.getSku() == null) {
+            throw new ConflictException(
+                    "IMAGEN_SKU_REQUERIDA",
+                    "No se puede marcar como principal de SKU una imagen que no pertenece a un SKU."
+            );
+        }
+
+        if (requestedSku != null) {
+            if (imagen.getSku() == null || !requestedSku.getIdSku().equals(imagen.getSku().getIdSku())) {
+                throw new ConflictException(
+                        "IMAGEN_SKU_NO_COINCIDE",
+                        "El SKU indicado no coincide con el SKU asociado a la imagen."
+                );
+            }
+        }
+    }
+
     private void validateSkuBelongsToProduct(Producto producto, ProductoSku sku) {
         if (producto == null || sku == null) {
             return;
@@ -572,12 +631,14 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 : productoImagenRepository
                 .findBySku_IdSkuAndEstadoTrueOrderByPrincipalDescOrdenAscIdImagenAsc(sku.getIdSku());
 
-        anteriores.stream()
+        List<ProductoImagenCloudinary> changed = anteriores.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getPrincipal()))
-                .forEach(item -> {
-                    item.setPrincipal(Boolean.FALSE);
-                    productoImagenRepository.save(item);
-                });
+                .peek(item -> item.setPrincipal(Boolean.FALSE))
+                .toList();
+
+        if (!changed.isEmpty()) {
+            productoImagenRepository.saveAll(changed);
+        }
     }
 
     private Map<String, String> uploadMetadata(Producto producto, ProductoSku sku) {
@@ -618,25 +679,90 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 producto.getIdProducto(),
                 traceValue(context.requestId()),
                 traceValue(context.correlationId()),
-                ProductoSnapshotPayload.builder()
-                        .idProducto(producto.getIdProducto())
-                        .codigoProducto(producto.getCodigoProducto())
-                        .nombre(producto.getNombre())
-                        .slug(producto.getSlug())
-                        .estadoRegistro(producto.getEstadoRegistro() == null ? null : producto.getEstadoRegistro().getCode())
-                        .estadoPublicacion(producto.getEstadoPublicacion() == null ? null : producto.getEstadoPublicacion().getCode())
-                        .estadoVenta(producto.getEstadoVenta() == null ? null : producto.getEstadoVenta().getCode())
-                        .visiblePublico(producto.getVisiblePublico())
-                        .vendible(producto.getVendible())
-                        .estado(producto.getEstado())
-                        .createdAt(producto.getCreatedAt())
-                        .updatedAt(producto.getUpdatedAt())
-                        .imagenes(List.of(toImagenPayload(imagen)))
-                        .build(),
+                toProductoSnapshotPayload(producto),
                 Map.of("source", "ProductoImagenService")
         );
 
         eventoDominioOutboxService.registrarEvento(event);
+    }
+
+    private ProductoSnapshotPayload toProductoSnapshotPayload(Producto producto) {
+        List<ProductoSkuSnapshotPayload> skus = productoSkuRepository
+                .findByProducto_IdProductoAndEstadoTrueOrderByIdSkuAsc(producto.getIdProducto())
+                .stream()
+                .map(this::toSkuPayload)
+                .toList();
+
+        List<ProductoImagenSnapshotPayload> imagenes = productoImagenRepository
+                .findByProducto_IdProductoAndEstadoTrueOrderByPrincipalDescOrdenAscIdImagenAsc(producto.getIdProducto())
+                .stream()
+                .map(this::toImagenPayload)
+                .toList();
+
+        TipoProducto tipoProducto = producto.getTipoProducto();
+        Categoria categoria = producto.getCategoria();
+        Marca marca = producto.getMarca();
+
+        return ProductoSnapshotPayload.builder()
+                .idProducto(producto.getIdProducto())
+                .codigoProducto(producto.getCodigoProducto())
+                .nombre(producto.getNombre())
+                .slug(producto.getSlug())
+                .idTipoProducto(tipoProducto == null ? null : tipoProducto.getIdTipoProducto())
+                .codigoTipoProducto(tipoProducto == null ? null : tipoProducto.getCodigo())
+                .nombreTipoProducto(tipoProducto == null ? null : tipoProducto.getNombre())
+                .idCategoria(categoria == null ? null : categoria.getIdCategoria())
+                .codigoCategoria(categoria == null ? null : categoria.getCodigo())
+                .nombreCategoria(categoria == null ? null : categoria.getNombre())
+                .slugCategoria(categoria == null ? null : categoria.getSlug())
+                .idMarca(marca == null ? null : marca.getIdMarca())
+                .codigoMarca(marca == null ? null : marca.getCodigo())
+                .nombreMarca(marca == null ? null : marca.getNombre())
+                .slugMarca(marca == null ? null : marca.getSlug())
+                .descripcionCorta(producto.getDescripcionCorta())
+                .descripcionLarga(producto.getDescripcionLarga())
+                .generoObjetivo(producto.getGeneroObjetivo() == null ? null : producto.getGeneroObjetivo().getCode())
+                .temporada(producto.getTemporada())
+                .deporte(producto.getDeporte())
+                .estadoRegistro(producto.getEstadoRegistro() == null ? null : producto.getEstadoRegistro().getCode())
+                .estadoPublicacion(producto.getEstadoPublicacion() == null ? null : producto.getEstadoPublicacion().getCode())
+                .estadoVenta(producto.getEstadoVenta() == null ? null : producto.getEstadoVenta().getCode())
+                .visiblePublico(producto.getVisiblePublico())
+                .vendible(producto.getVendible())
+                .fechaPublicacionInicio(producto.getFechaPublicacionInicio())
+                .fechaPublicacionFin(producto.getFechaPublicacionFin())
+                .motivoEstado(producto.getMotivoEstado())
+                .estado(producto.getEstado())
+                .createdAt(producto.getCreatedAt())
+                .updatedAt(producto.getUpdatedAt())
+                .skus(skus)
+                .imagenes(imagenes)
+                .build();
+    }
+
+    private ProductoSkuSnapshotPayload toSkuPayload(ProductoSku sku) {
+        return ProductoSkuSnapshotPayload.builder()
+                .idSku(sku.getIdSku())
+                .idProducto(sku.getProducto() == null ? null : sku.getProducto().getIdProducto())
+                .codigoProducto(sku.getProducto() == null ? null : sku.getProducto().getCodigoProducto())
+                .codigoSku(sku.getCodigoSku())
+                .barcode(sku.getBarcode())
+                .color(sku.getColor())
+                .talla(sku.getTalla())
+                .material(sku.getMaterial())
+                .modelo(sku.getModelo())
+                .stockMinimo(sku.getStockMinimo())
+                .stockMaximo(sku.getStockMaximo())
+                .pesoGramos(sku.getPesoGramos())
+                .altoCm(sku.getAltoCm())
+                .anchoCm(sku.getAnchoCm())
+                .largoCm(sku.getLargoCm())
+                .estadoSku(sku.getEstadoSku() == null ? null : sku.getEstadoSku().getCode())
+                .estado(sku.getEstado())
+                .createdAt(sku.getCreatedAt())
+                .updatedAt(sku.getUpdatedAt())
+                .atributos(List.of())
+                .build();
     }
 
     private ProductoImagenSnapshotPayload toImagenPayload(ProductoImagenCloudinary imagen) {
@@ -690,6 +816,23 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
         }
 
         return metadata;
+    }
+
+    private void safeDeleteUploadedResource(CloudinaryUploadResponse response) {
+        if (response == null || !StringNormalizer.hasText(response.publicId())) {
+            return;
+        }
+
+        try {
+            cloudinaryService.eliminar(response.publicId(), response.resourceType(), Boolean.TRUE);
+        } catch (RuntimeException cleanupException) {
+            log.warn(
+                    "No se pudo compensar la subida Cloudinary luego de fallo transaccional. publicId={}, resourceType={}",
+                    response.publicId(),
+                    response.resourceType(),
+                    cleanupException
+            );
+        }
     }
 
     private boolean employeeCanManageImages(AuthenticatedUserContext actor) {

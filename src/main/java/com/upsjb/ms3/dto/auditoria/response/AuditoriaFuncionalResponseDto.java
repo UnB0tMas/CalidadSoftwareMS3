@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/auditoria/response/AuditoriaFuncionalResponseDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/auditoria/response/AuditoriaFuncionalResponseDto.java
 package com.upsjb.ms3.dto.auditoria.response;
 
 import com.upsjb.ms3.domain.enums.EntidadAuditada;

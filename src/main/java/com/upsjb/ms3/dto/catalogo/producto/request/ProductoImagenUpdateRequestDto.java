@@ -1,4 +1,4 @@
-﻿// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoImagenUpdateRequestDto.java
+// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoImagenUpdateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.producto.request;
 
 import jakarta.validation.constraints.Min;
