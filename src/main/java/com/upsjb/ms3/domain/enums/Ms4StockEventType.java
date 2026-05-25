@@ -1,4 +1,8 @@
+// ruta: src/main/java/com/upsjb/ms3/domain/enums/Ms4StockEventType.java
 package com.upsjb.ms3.domain.enums;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.util.Arrays;
 
@@ -17,6 +21,7 @@ public enum Ms4StockEventType {
         this.label = label;
     }
 
+    @JsonValue
     public String getCode() {
         return code;
     }
@@ -41,13 +46,19 @@ public enum Ms4StockEventType {
         return this == VENTA_ANULADA_STOCK_PENDIENTE;
     }
 
+    @JsonCreator
     public static Ms4StockEventType fromCode(String code) {
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("El tipo de evento de stock de MS4 es obligatorio.");
         }
 
+        String normalized = code.trim();
+
         return Arrays.stream(values())
-                .filter(value -> value.code.equalsIgnoreCase(code.trim()))
+                .filter(value ->
+                        value.name().equalsIgnoreCase(normalized)
+                                || value.code.equalsIgnoreCase(normalized)
+                )
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Tipo de evento de stock de MS4 no válido: " + code));
     }

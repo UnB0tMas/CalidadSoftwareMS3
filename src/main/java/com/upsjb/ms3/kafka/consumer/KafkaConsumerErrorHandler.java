@@ -1,10 +1,12 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/KafkaConsumerErrorHandler.java
 package com.upsjb.ms3.kafka.consumer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upsjb.ms3.kafka.producer.KafkaTopicResolver;
 import com.upsjb.ms3.shared.exception.BusinessException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -16,12 +18,15 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class KafkaConsumerErrorHandler {
 
+    private static final int MAX_RAW_MESSAGE_LENGTH = 10_000;
+
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final KafkaTopicResolver topicResolver;
+    private final ObjectMapper objectMapper;
 
     public boolean handle(String topic, String key, String rawMessage, Exception exception) {
-        String safeTopic = StringUtils.hasText(topic) ? topic : "UNKNOWN_TOPIC";
-        String safeKey = StringUtils.hasText(key) ? key : "UNKNOWN_KEY";
+        String safeTopic = StringUtils.hasText(topic) ? topic.trim() : "UNKNOWN_TOPIC";
+        String safeKey = StringUtils.hasText(key) ? key.trim() : "UNKNOWN_KEY";
 
         if (exception instanceof BusinessException businessException) {
             log.warn(
@@ -32,7 +37,14 @@ public class KafkaConsumerErrorHandler {
                     businessException.getMessage()
             );
 
-            sendToDeadLetter(safeTopic, safeKey, rawMessage, businessException.getCode(), businessException.getMessage());
+            sendToDeadLetter(
+                    safeTopic,
+                    safeKey,
+                    rawMessage,
+                    businessException.getCode(),
+                    businessException.getMessage()
+            );
+
             return true;
         }
 
@@ -44,7 +56,14 @@ public class KafkaConsumerErrorHandler {
                     exception.getMessage()
             );
 
-            sendToDeadLetter(safeTopic, safeKey, rawMessage, "KAFKA_EVENTO_INVALIDO", exception.getMessage());
+            sendToDeadLetter(
+                    safeTopic,
+                    safeKey,
+                    rawMessage,
+                    "KAFKA_EVENTO_INVALIDO",
+                    exception.getMessage()
+            );
+
             return true;
         }
 
@@ -80,35 +99,40 @@ public class KafkaConsumerErrorHandler {
             String rawMessage,
             String errorCode,
             String errorMessage
-    ) {
-        String sanitizedMessage = rawMessage == null
-                ? ""
-                : new String(rawMessage.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8)
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
+    ) throws JsonProcessingException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sourceTopic", sourceTopic);
+        payload.put("sourceKey", sourceKey);
+        payload.put("errorCode", clean(errorCode, "KAFKA_CONSUMER_ERROR"));
+        payload.put("errorMessage", clean(errorMessage, "Error consumiendo evento Kafka."));
+        payload.put("failedAt", LocalDateTime.now());
+        payload.put("rawMessage", truncate(rawMessage, MAX_RAW_MESSAGE_LENGTH));
+
+        return objectMapper.writeValueAsString(payload);
+    }
+
+    private String clean(String value, String fallback) {
+        if (!StringUtils.hasText(value)) {
+            return fallback;
+        }
+
+        return value.trim()
                 .replace("\r", " ")
-                .replace("\n", " ");
+                .replace("\n", " ")
+                .replace("\t", " ");
+    }
 
-        String sanitizedError = errorMessage == null
-                ? ""
-                : errorMessage.replace("\\", "\\\\").replace("\"", "\\\"");
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
 
-        return """
-                {
-                  "sourceTopic": "%s",
-                  "sourceKey": "%s",
-                  "errorCode": "%s",
-                  "errorMessage": "%s",
-                  "failedAt": "%s",
-                  "rawMessage": "%s"
-                }
-                """.formatted(
-                sourceTopic,
-                sourceKey,
-                errorCode,
-                sanitizedError,
-                LocalDateTime.now(),
-                sanitizedMessage
-        );
+        String clean = value.trim();
+
+        if (clean.length() <= maxLength) {
+            return clean;
+        }
+
+        return clean.substring(0, maxLength);
     }
 }

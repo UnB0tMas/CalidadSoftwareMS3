@@ -1,4 +1,8 @@
+// ruta: src/main/java/com/upsjb/ms3/domain/enums/AggregateType.java
 package com.upsjb.ms3.domain.enums;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.util.Arrays;
 
@@ -24,6 +28,7 @@ public enum AggregateType {
         this.label = label;
     }
 
+    @JsonValue
     public String getCode() {
         return code;
     }
@@ -32,13 +37,19 @@ public enum AggregateType {
         return label;
     }
 
+    @JsonCreator
     public static AggregateType fromCode(String code) {
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("El aggregate type es obligatorio.");
         }
 
+        String normalized = code.trim();
+
         return Arrays.stream(values())
-                .filter(value -> value.code.equalsIgnoreCase(code.trim()))
+                .filter(value ->
+                        value.name().equalsIgnoreCase(normalized)
+                                || value.code.equalsIgnoreCase(normalized)
+                )
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Aggregate type no válido: " + code));
     }

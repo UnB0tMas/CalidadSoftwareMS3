@@ -35,5 +35,7 @@ public interface CategoriaService {
 
     ApiResponseDto<List<CategoriaTreeResponseDto>> obtenerArbol(Boolean soloActivas);
 
+    ApiResponseDto<List<CategoriaTreeResponseDto>> obtenerArbolPublico();
+
     ApiResponseDto<List<CategoriaResponseDto>> listarSubcategorias(Long idCategoriaPadre);
 }

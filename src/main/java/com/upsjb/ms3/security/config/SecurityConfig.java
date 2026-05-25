@@ -1,6 +1,8 @@
+// ruta: src/main/java/com/upsjb/ms3/security/config/SecurityConfig.java
 package com.upsjb.ms3.security.config;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
+import com.upsjb.ms3.security.filter.InternalServiceAuthenticationFilter;
 import com.upsjb.ms3.security.filter.RequestAuditContextFilter;
 import com.upsjb.ms3.security.filter.RequestTraceFilter;
 import com.upsjb.ms3.security.handler.RestAccessDeniedHandler;
@@ -12,6 +14,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -20,6 +23,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -37,10 +42,46 @@ public class SecurityConfig implements WebMvcConfigurer {
     private final RestAccessDeniedHandler restAccessDeniedHandler;
     private final RequestTraceFilter requestTraceFilter;
     private final RequestAuditContextFilter requestAuditContextFilter;
+    private final InternalServiceAuthenticationFilter internalServiceAuthenticationFilter;
     private final AuthenticatedUserArgumentResolver authenticatedUserArgumentResolver;
 
+    /*
+     * Cadena exclusiva para endpoints internos entre microservicios.
+     *
+     * Estos endpoints no deben depender de JWT de usuario ADMIN.
+     * Se protegen con X-Internal-Service-Key y reciben ROLE_INTERNAL_SERVICE.
+     */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Order(1)
+    public SecurityFilterChain internalSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/internal/**")
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().hasAuthority(SecurityRoles.ROLE_INTERNAL_SERVICE)
+                )
+                .addFilterBefore(requestTraceFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(internalServiceAuthenticationFilter, AnonymousAuthenticationFilter.class)
+                .addFilterAfter(requestAuditContextFilter, AnonymousAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /*
+     * Cadena principal para rutas públicas, administrativas y operativas del MS3.
+     *
+     * MS3 valida JWT emitidos por MS1 aunque el Gateway también valide.
+     * El Gateway filtra entrada general; MS3 conserva seguridad propia.
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
@@ -76,9 +117,6 @@ public class SecurityConfig implements WebMvcConfigurer {
                         .hasAuthority(SecurityRoles.ROLE_ADMIN)
 
                         .requestMatchers("/api/ms3/auditoria/**")
-                        .hasAuthority(SecurityRoles.ROLE_ADMIN)
-
-                        .requestMatchers("/api/internal/**")
                         .hasAuthority(SecurityRoles.ROLE_ADMIN)
 
                         .requestMatchers("/api/ms3/catalogo/**")

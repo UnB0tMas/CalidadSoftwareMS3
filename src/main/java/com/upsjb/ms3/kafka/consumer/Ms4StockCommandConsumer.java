@@ -1,25 +1,23 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/consumer/Ms4StockCommandConsumer.java
 package com.upsjb.ms3.kafka.consumer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upsjb.ms3.config.AppPropertiesConfig;
+import com.upsjb.ms3.domain.enums.AggregateType;
 import com.upsjb.ms3.dto.ms4.response.Ms4StockSyncResultDto;
 import com.upsjb.ms3.kafka.event.DomainEventEnvelope;
 import com.upsjb.ms3.kafka.event.Ms4StockCommandEvent;
 import com.upsjb.ms3.kafka.event.Ms4StockCommandPayload;
 import com.upsjb.ms3.shared.exception.ValidationException;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-
-import static org.springframework.kafka.support.KafkaHeaders.RECEIVED_KEY;
-import static org.springframework.kafka.support.KafkaHeaders.RECEIVED_TOPIC;
 
 @Slf4j
 @Component
@@ -32,17 +30,22 @@ public class Ms4StockCommandConsumer {
     private final AppPropertiesConfig appPropertiesConfig;
 
     @KafkaListener(
-            topics = "${app.kafka.topics.ms4-stock-command}",
+            topics = {
+                    "${app.kafka.topics.ms4-stock-command}",
+                    "${app.kafka.topics.ms4-stock-reconciliation}"
+            },
             groupId = "${spring.kafka.consumer.group-id:ms3-stock-command-consumer}"
     )
     public void consume(
-            String rawMessage,
-            @Header(name = RECEIVED_TOPIC, required = false) String topic,
-            @Header(name = RECEIVED_KEY, required = false) String key,
+            ConsumerRecord<String, String> record,
             Acknowledgment acknowledgment
     ) {
+        String topic = record == null ? null : record.topic();
+        String key = record == null ? null : record.key();
+        String rawMessage = record == null ? null : record.value();
+
         if (!appPropertiesConfig.getKafka().isEnabled()) {
-            log.info("Kafka consumer MS4 omitido porque app.kafka.enabled=false.");
+            log.info("Kafka consumer MS4 omitido porque app.kafka.enabled=false. topic={}, key={}", topic, key);
             acknowledgment.acknowledge();
             return;
         }
@@ -52,7 +55,11 @@ public class Ms4StockCommandConsumer {
             Ms4StockSyncResultDto result = handler.handle(event);
 
             log.info(
-                    "Comando de stock MS4 procesado. eventId={}, type={}, processed={}, duplicated={}, code={}",
+                    "Comando de stock MS4 procesado. topic={}, partition={}, offset={}, key={}, eventId={}, type={}, processed={}, duplicated={}, code={}",
+                    topic,
+                    record.partition(),
+                    record.offset(),
+                    key,
                     result.eventId(),
                     result.eventType(),
                     result.processed(),
@@ -94,12 +101,35 @@ public class Ms4StockCommandConsumer {
             return objectMapper.treeToValue(root, Ms4StockCommandEvent.class);
         }
 
-        DomainEventEnvelope<Ms4StockCommandPayload> envelope = objectMapper.readValue(
-                rawMessage,
-                new TypeReference<DomainEventEnvelope<Ms4StockCommandPayload>>() {
-                }
-        );
+        if (root.hasNonNull("payload") && root.hasNonNull("aggregateType")) {
+            DomainEventEnvelope<Ms4StockCommandPayload> envelope = objectMapper.readValue(
+                    rawMessage,
+                    new TypeReference<DomainEventEnvelope<Ms4StockCommandPayload>>() {
+                    }
+            );
 
-        return new Ms4StockCommandEvent(envelope);
+            return new Ms4StockCommandEvent(envelope);
+        }
+
+        if (root.hasNonNull("eventType") && root.hasNonNull("sku") && root.hasNonNull("almacen")) {
+            Ms4StockCommandPayload payload = objectMapper.treeToValue(root, Ms4StockCommandPayload.class);
+
+            return new Ms4StockCommandEvent(
+                    DomainEventEnvelope.of(
+                            payload.eventType().getCode(),
+                            AggregateType.STOCK,
+                            payload.safeReferenciaIdExterno(),
+                            payload.requestId(),
+                            payload.correlationId(),
+                            payload,
+                            Map.of("format", "DIRECT_PAYLOAD")
+                    )
+            );
+        }
+
+        throw new ValidationException(
+                "KAFKA_MS4_STOCK_COMMAND_FORMATO_NO_SOPORTADO",
+                "El mensaje Kafka de stock enviado por MS4 no tiene un formato soportado."
+        );
     }
 }

@@ -1,3 +1,4 @@
+// ruta: src/main/java/com/upsjb/ms3/security/roles/SecurityRoles.java
 package com.upsjb.ms3.security.roles;
 
 import java.util.Arrays;
@@ -15,7 +16,23 @@ public final class SecurityRoles {
     public static final String ROLE_EMPLEADO = "ROLE_EMPLEADO";
     public static final String ROLE_CLIENTE = "ROLE_CLIENTE";
 
-    private static final Collection<String> VALID_ROLES = Arrays.asList(ADMIN, EMPLEADO, CLIENTE);
+    /*
+     * Autoridad técnica interna.
+     *
+     * No se incluye en VALID_ROLES para evitar que un JWT emitido por MS1 pueda
+     * convertirse accidentalmente en ROLE_INTERNAL_SERVICE.
+     *
+     * Esta authority solo debe ser creada por InternalServiceAuthenticationFilter
+     * cuando llega una credencial interna válida por X-Internal-Service-Key.
+     */
+    public static final String INTERNAL_SERVICE = "INTERNAL_SERVICE";
+    public static final String ROLE_INTERNAL_SERVICE = "ROLE_INTERNAL_SERVICE";
+
+    private static final Collection<String> VALID_ROLES = Arrays.asList(
+            ADMIN,
+            EMPLEADO,
+            CLIENTE
+    );
 
     private SecurityRoles() {
     }
@@ -68,14 +85,20 @@ public final class SecurityRoles {
         return hasAuthority(authorities, ROLE_CLIENTE);
     }
 
+    public static boolean isInternalService(Collection<String> authorities) {
+        return hasAuthority(authorities, ROLE_INTERNAL_SERVICE);
+    }
+
     public static boolean hasAuthority(Collection<String> authorities, String requiredAuthority) {
         if (authorities == null || requiredAuthority == null || requiredAuthority.isBlank()) {
             return false;
         }
 
+        String normalizedRequired = requiredAuthority.trim().toUpperCase(Locale.ROOT);
+
         return authorities.stream()
                 .filter(value -> value != null && !value.isBlank())
                 .map(value -> value.trim().toUpperCase(Locale.ROOT))
-                .anyMatch(value -> value.equals(requiredAuthority.trim().toUpperCase(Locale.ROOT)));
+                .anyMatch(normalizedRequired::equals);
     }
 }

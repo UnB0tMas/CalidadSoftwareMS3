@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaTopicResolver.java
 package com.upsjb.ms3.kafka.producer;
 
 import com.upsjb.ms3.config.KafkaTopicProperties;
@@ -20,7 +19,7 @@ public class KafkaTopicResolver {
 
     public String resolve(AggregateType aggregateType, String eventType) {
         if (aggregateType == null) {
-            throw new IllegalArgumentException("El aggregateType es obligatorio para resolver topic Kafka.");
+            return resolveByEventType(eventType);
         }
 
         return switch (aggregateType) {
@@ -54,11 +53,15 @@ public class KafkaTopicResolver {
     }
 
     public String resolveMs4StockCommandTopic() {
-        return properties.getMs4StockCommand();
+        return properties.resolveMs4StockCommandTopic();
+    }
+
+    public String resolveMs4StockReconciliationTopic() {
+        return properties.resolveMs4StockReconciliationTopic();
     }
 
     public String resolveDeadLetterTopic() {
-        return properties.getDeadLetter();
+        return properties.resolveDeadLetterTopic();
     }
 
     private String resolveByEventType(String eventType) {
@@ -76,7 +79,7 @@ public class KafkaTopicResolver {
             return properties.resolvePrecioSnapshotTopic();
         }
 
-        if (value.contains("promocion")) {
+        if (value.contains("promocion") || value.contains("promoción")) {
             return properties.resolvePromocionSnapshotTopic();
         }
 

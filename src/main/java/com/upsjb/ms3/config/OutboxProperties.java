@@ -41,12 +41,60 @@ public class OutboxProperties {
 
     private boolean deletePublished = false;
 
+    public int safeBatchSize() {
+        if (batchSize == null || batchSize <= 0) {
+            return 25;
+        }
+
+        return Math.min(batchSize, 100);
+    }
+
+    public int safeMaxAttempts() {
+        if (maxAttempts == null || maxAttempts <= 0) {
+            return 5;
+        }
+
+        return Math.min(maxAttempts, 20);
+    }
+
+    public Duration safeFixedDelay() {
+        return positiveDuration(fixedDelay, Duration.ofSeconds(10));
+    }
+
+    public long fixedDelayMillis() {
+        return safeFixedDelay().toMillis();
+    }
+
+    public Duration safeLockTimeout() {
+        return positiveDuration(lockTimeout, Duration.ofSeconds(30));
+    }
+
+    public long lockTimeoutMillis() {
+        return safeLockTimeout().toMillis();
+    }
+
+    public Duration safePublishTimeout() {
+        return positiveDuration(publishTimeout, Duration.ofSeconds(10));
+    }
+
+    public long publishTimeoutMillis() {
+        return safePublishTimeout().toMillis();
+    }
+
     public boolean canRetry(Integer currentAttempts) {
         if (!retryErrors) {
             return false;
         }
 
         int attempts = currentAttempts == null ? 0 : currentAttempts;
-        return attempts < maxAttempts;
+        return attempts < safeMaxAttempts();
+    }
+
+    private Duration positiveDuration(Duration value, Duration fallback) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            return fallback;
+        }
+
+        return value;
     }
 }

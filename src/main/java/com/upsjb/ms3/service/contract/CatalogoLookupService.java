@@ -36,4 +36,10 @@ public interface CatalogoLookupService {
     ApiResponseDto<List<PromocionOptionDto>> buscarPromociones(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<EmpleadoInventarioOptionDto>> buscarEmpleadosInventario(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<TipoProductoOptionDto>> buscarTiposProductoPublicos(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<CategoriaOptionDto>> buscarCategoriasPublicas(ReferenceSearchFilterDto filter);
+
+    ApiResponseDto<List<MarcaOptionDto>> buscarMarcasPublicas(ReferenceSearchFilterDto filter);
 }

@@ -1,6 +1,6 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/outbox/OutboxScheduler.java
 package com.upsjb.ms3.kafka.outbox;
 
+import com.upsjb.ms3.config.OutboxProperties;
 import com.upsjb.ms3.dto.outbox.response.OutboxPublishResultResponseDto;
 import com.upsjb.ms3.service.contract.KafkaPublisherService;
 import java.util.List;
@@ -17,9 +17,14 @@ import org.springframework.stereotype.Component;
 public class OutboxScheduler {
 
     private final KafkaPublisherService kafkaPublisherService;
+    private final OutboxProperties outboxProperties;
 
-    @Scheduled(fixedDelayString = "#{@outboxProperties.fixedDelay.toMillis()}")
+    @Scheduled(fixedDelayString = "#{@outboxProperties.fixedDelayMillis()}")
     public void publishPendingEvents() {
+        if (!outboxProperties.isEnabled()) {
+            return;
+        }
+
         try {
             List<OutboxPublishResultResponseDto> results = kafkaPublisherService.publicarPendientesInterno();
 
@@ -33,14 +38,17 @@ public class OutboxScheduler {
                         .count();
 
                 log.info(
-                        "Outbox Kafka batch procesado. total={}, publicados={}, fallidos={}",
+                        "Outbox Kafka MS3 batch procesado. total={}, publicados={}, fallidos={}",
                         results.size(),
                         success,
                         failed
                 );
             }
         } catch (Exception ex) {
-            log.error("Error técnico al ejecutar scheduler Outbox Kafka.", ex);
+            log.error(
+                    "Error técnico al ejecutar scheduler Outbox Kafka MS3. El proceso continuará en la siguiente iteración.",
+                    ex
+            );
         }
     }
 }

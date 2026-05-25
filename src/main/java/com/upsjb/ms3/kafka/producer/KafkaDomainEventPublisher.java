@@ -1,12 +1,12 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/producer/KafkaDomainEventPublisher.java
 package com.upsjb.ms3.kafka.producer;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
 import com.upsjb.ms3.config.OutboxProperties;
 import com.upsjb.ms3.domain.entity.EventoDominioOutbox;
 import com.upsjb.ms3.kafka.outbox.OutboxPublishResult;
-import com.upsjb.ms3.shared.exception.KafkaPublishException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -45,12 +45,15 @@ public class KafkaDomainEventPublisher {
             );
         }
 
-        validate(event);
+        OutboxPublishResult validationFailure = validate(event);
+        if (validationFailure != null) {
+            return validationFailure;
+        }
 
         try {
             SendResult<String, String> result = kafkaTemplate
-                    .send(event.getTopic(), event.getEventKey(), event.getPayloadJson())
-                    .get(outboxProperties.getPublishTimeout().toMillis(), TimeUnit.MILLISECONDS);
+                    .send(event.getTopic().trim(), event.getEventKey().trim(), event.getPayloadJson())
+                    .get(outboxProperties.publishTimeoutMillis(), TimeUnit.MILLISECONDS);
 
             RecordMetadata metadata = result.getRecordMetadata();
 
@@ -64,41 +67,81 @@ public class KafkaDomainEventPublisher {
             );
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new KafkaPublishException(
+
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
                     event.getTopic(),
                     event.getEventKey(),
-                    "La publicación Kafka fue interrumpida.",
-                    ex
+                    "KAFKA_PUBLICACION_INTERRUPTED",
+                    "La publicación Kafka fue interrumpida."
+            );
+        } catch (TimeoutException ex) {
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
+                    event.getTopic(),
+                    event.getEventKey(),
+                    "KAFKA_PUBLICACION_TIMEOUT",
+                    "Timeout al publicar evento en Kafka."
+            );
+        } catch (ExecutionException ex) {
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
+                    event.getTopic(),
+                    event.getEventKey(),
+                    "KAFKA_PUBLICACION_ERROR",
+                    "Error al publicar en Kafka: " + cause.getMessage()
             );
         } catch (Exception ex) {
-            throw new KafkaPublishException(
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
                     event.getTopic(),
                     event.getEventKey(),
-                    "No se pudo publicar el evento en Kafka.",
-                    ex
+                    "KAFKA_PUBLICACION_ERROR",
+                    "Error inesperado al publicar en Kafka: " + ex.getMessage()
             );
         }
     }
 
-    private void validate(EventoDominioOutbox event) {
+    private OutboxPublishResult validate(EventoDominioOutbox event) {
         if (!StringUtils.hasText(event.getTopic())) {
-            throw new KafkaPublishException("El topic Kafka del evento outbox es obligatorio.");
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
+                    event.getTopic(),
+                    event.getEventKey(),
+                    "KAFKA_TOPIC_REQUERIDO",
+                    "El topic Kafka del evento outbox es obligatorio."
+            );
         }
 
         if (!StringUtils.hasText(event.getEventKey())) {
-            throw new KafkaPublishException(
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
                     event.getTopic(),
-                    null,
+                    event.getEventKey(),
+                    "KAFKA_KEY_REQUERIDA",
                     "La key Kafka del evento outbox es obligatoria."
             );
         }
 
         if (!StringUtils.hasText(event.getPayloadJson())) {
-            throw new KafkaPublishException(
+            return OutboxPublishResult.failure(
+                    event.getIdEvento(),
+                    event.getEventId(),
                     event.getTopic(),
                     event.getEventKey(),
+                    "KAFKA_PAYLOAD_REQUERIDO",
                     "El payload Kafka es obligatorio."
             );
         }
+
+        return null;
     }
 }

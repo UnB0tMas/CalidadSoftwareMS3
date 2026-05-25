@@ -82,16 +82,7 @@ public class CatalogoLookupServiceImpl implements CatalogoLookupService {
         ensureLookupAllowed();
         ReferenceSearchFilterDto safeFilter = normalizeFilter(filter);
 
-        List<TipoProductoOptionDto> data = lookup(
-                tipoProductoRepository,
-                lookupSpec(
-                        safeFilter,
-                        List.of("codigo", "nombre", "descripcion"),
-                        Map.of("codigo", "codigo", "nombre", "nombre")
-                ),
-                "nombre",
-                safeFilter
-        ).stream().map(catalogoLookupMapper::toTipoProductoOption).toList();
+        List<TipoProductoOptionDto> data = findTiposProducto(safeFilter);
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
@@ -102,16 +93,7 @@ public class CatalogoLookupServiceImpl implements CatalogoLookupService {
         ensureLookupAllowed();
         ReferenceSearchFilterDto safeFilter = normalizeFilter(filter);
 
-        List<CategoriaOptionDto> data = lookup(
-                categoriaRepository,
-                lookupSpec(
-                        safeFilter,
-                        List.of("codigo", "nombre", "slug", "descripcion"),
-                        Map.of("codigo", "codigo", "nombre", "nombre", "slug", "slug")
-                ),
-                "nombre",
-                safeFilter
-        ).stream().map(catalogoLookupMapper::toCategoriaOption).toList();
+        List<CategoriaOptionDto> data = findCategorias(safeFilter);
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
@@ -122,16 +104,7 @@ public class CatalogoLookupServiceImpl implements CatalogoLookupService {
         ensureLookupAllowed();
         ReferenceSearchFilterDto safeFilter = normalizeFilter(filter);
 
-        List<MarcaOptionDto> data = lookup(
-                marcaRepository,
-                lookupSpec(
-                        safeFilter,
-                        List.of("codigo", "nombre", "slug", "descripcion"),
-                        Map.of("codigo", "codigo", "nombre", "nombre", "slug", "slug")
-                ),
-                "nombre",
-                safeFilter
-        ).stream().map(catalogoLookupMapper::toMarcaOption).toList();
+        List<MarcaOptionDto> data = findMarcas(safeFilter);
 
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
@@ -301,6 +274,75 @@ public class CatalogoLookupServiceImpl implements CatalogoLookupService {
         return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<TipoProductoOptionDto>> buscarTiposProductoPublicos(ReferenceSearchFilterDto filter) {
+        ReferenceSearchFilterDto safeFilter = normalizePublicFilter(filter);
+
+        List<TipoProductoOptionDto> data = findTiposProducto(safeFilter);
+
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<CategoriaOptionDto>> buscarCategoriasPublicas(ReferenceSearchFilterDto filter) {
+        ReferenceSearchFilterDto safeFilter = normalizePublicFilter(filter);
+
+        List<CategoriaOptionDto> data = findCategorias(safeFilter);
+
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<List<MarcaOptionDto>> buscarMarcasPublicas(ReferenceSearchFilterDto filter) {
+        ReferenceSearchFilterDto safeFilter = normalizePublicFilter(filter);
+
+        List<MarcaOptionDto> data = findMarcas(safeFilter);
+
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", data);
+    }
+
+    private List<TipoProductoOptionDto> findTiposProducto(ReferenceSearchFilterDto safeFilter) {
+        return lookup(
+                tipoProductoRepository,
+                lookupSpec(
+                        safeFilter,
+                        List.of("codigo", "nombre", "descripcion"),
+                        Map.of("codigo", "codigo", "nombre", "nombre")
+                ),
+                "nombre",
+                safeFilter
+        ).stream().map(catalogoLookupMapper::toTipoProductoOption).toList();
+    }
+
+    private List<CategoriaOptionDto> findCategorias(ReferenceSearchFilterDto safeFilter) {
+        return lookup(
+                categoriaRepository,
+                lookupSpec(
+                        safeFilter,
+                        List.of("codigo", "nombre", "slug", "descripcion"),
+                        Map.of("codigo", "codigo", "nombre", "nombre", "slug", "slug")
+                ),
+                "nombre",
+                safeFilter
+        ).stream().map(catalogoLookupMapper::toCategoriaOption).toList();
+    }
+
+    private List<MarcaOptionDto> findMarcas(ReferenceSearchFilterDto safeFilter) {
+        return lookup(
+                marcaRepository,
+                lookupSpec(
+                        safeFilter,
+                        List.of("codigo", "nombre", "slug", "descripcion"),
+                        Map.of("codigo", "codigo", "nombre", "nombre", "slug", "slug")
+                ),
+                "nombre",
+                safeFilter
+        ).stream().map(catalogoLookupMapper::toMarcaOption).toList();
+    }
+
     private void ensureLookupAllowed() {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         catalogoLookupPolicy.ensureCanLookup(actor);
@@ -435,6 +477,22 @@ public class CatalogoLookupServiceImpl implements CatalogoLookupService {
                 .ruc(StringNormalizer.truncateOrNull(filter.ruc(), 20))
                 .soloActivos(filter.soloActivos())
                 .limit(sanitizeLimit(filter.limit()))
+                .build();
+    }
+
+    private ReferenceSearchFilterDto normalizePublicFilter(ReferenceSearchFilterDto filter) {
+        ReferenceSearchFilterDto safeFilter = normalizeFilter(filter);
+
+        return ReferenceSearchFilterDto.builder()
+                .search(safeFilter.search())
+                .codigo(safeFilter.codigo())
+                .nombre(safeFilter.nombre())
+                .slug(safeFilter.slug())
+                .barcode(null)
+                .numeroDocumento(null)
+                .ruc(null)
+                .soloActivos(Boolean.TRUE)
+                .limit(sanitizeLimit(safeFilter.limit()))
                 .build();
     }
 

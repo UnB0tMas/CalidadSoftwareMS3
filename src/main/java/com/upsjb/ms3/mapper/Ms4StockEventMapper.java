@@ -3,7 +3,6 @@ package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Almacen;
 import com.upsjb.ms3.domain.entity.MovimientoInventario;
-import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.ReservaStock;
 import com.upsjb.ms3.domain.entity.StockSku;
@@ -21,11 +20,116 @@ import com.upsjb.ms3.dto.ms4.request.Ms4VentaStockLiberadoEventDto;
 import com.upsjb.ms3.dto.ms4.request.Ms4VentaStockReservadoEventDto;
 import com.upsjb.ms3.dto.ms4.response.Ms4StockSyncResultDto;
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;
+import com.upsjb.ms3.kafka.event.Ms4StockCommandPayload;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 
 @Component
 public class Ms4StockEventMapper {
+
+    public Ms4StockCommandPayload toPayload(Ms4VentaStockReservadoEventDto event) {
+        if (event == null) {
+            return null;
+        }
+
+        return Ms4StockCommandPayload.builder()
+                .eventId(event.eventId())
+                .idempotencyKey(event.idempotencyKey())
+                .eventType(event.eventType())
+                .sku(event.sku())
+                .almacen(event.almacen())
+                .referenciaTipo(event.referenciaTipo())
+                .referenciaIdExterno(event.referenciaIdExterno())
+                .cantidad(event.cantidad())
+                .actorIdUsuarioMs1(event.actorIdUsuarioMs1())
+                .actorIdEmpleadoMs2(event.actorIdEmpleadoMs2())
+                .actorRol(event.actorRol())
+                .occurredAt(event.occurredAt())
+                .expiresAt(event.expiresAt())
+                .motivo(event.motivo())
+                .requestId(event.requestId())
+                .correlationId(event.correlationId())
+                .metadataJson(event.metadataJson())
+                .build();
+    }
+
+    public Ms4StockCommandPayload toPayload(Ms4VentaStockConfirmadoEventDto event) {
+        if (event == null) {
+            return null;
+        }
+
+        return Ms4StockCommandPayload.builder()
+                .eventId(event.eventId())
+                .idempotencyKey(event.idempotencyKey())
+                .eventType(event.eventType())
+                .sku(event.sku())
+                .almacen(event.almacen())
+                .referenciaTipo(event.referenciaTipo())
+                .referenciaIdExterno(event.referenciaIdExterno())
+                .cantidad(event.cantidad())
+                .codigoReserva(event.codigoReserva())
+                .actorIdUsuarioMs1(event.actorIdUsuarioMs1())
+                .actorIdEmpleadoMs2(event.actorIdEmpleadoMs2())
+                .actorRol(event.actorRol())
+                .occurredAt(event.occurredAt())
+                .motivo(event.motivo())
+                .requestId(event.requestId())
+                .correlationId(event.correlationId())
+                .metadataJson(event.metadataJson())
+                .build();
+    }
+
+    public Ms4StockCommandPayload toPayload(Ms4VentaStockLiberadoEventDto event) {
+        if (event == null) {
+            return null;
+        }
+
+        return Ms4StockCommandPayload.builder()
+                .eventId(event.eventId())
+                .idempotencyKey(event.idempotencyKey())
+                .eventType(event.eventType())
+                .sku(event.sku())
+                .almacen(event.almacen())
+                .referenciaTipo(event.referenciaTipo())
+                .referenciaIdExterno(event.referenciaIdExterno())
+                .cantidad(event.cantidad())
+                .codigoReserva(event.codigoReserva())
+                .actorIdUsuarioMs1(event.actorIdUsuarioMs1())
+                .actorIdEmpleadoMs2(event.actorIdEmpleadoMs2())
+                .actorRol(event.actorRol())
+                .occurredAt(event.occurredAt())
+                .motivo(event.motivo())
+                .requestId(event.requestId())
+                .correlationId(event.correlationId())
+                .metadataJson(event.metadataJson())
+                .build();
+    }
+
+    public Ms4StockCommandPayload toPayload(Ms4VentaAnuladaStockEventDto event) {
+        if (event == null) {
+            return null;
+        }
+
+        return Ms4StockCommandPayload.builder()
+                .eventId(event.eventId())
+                .idempotencyKey(event.idempotencyKey())
+                .eventType(event.eventType())
+                .sku(event.sku())
+                .almacen(event.almacen())
+                .referenciaTipo(event.referenciaTipo())
+                .referenciaIdExterno(event.referenciaIdExterno())
+                .cantidad(event.cantidad())
+                .codigoReserva(event.codigoReserva())
+                .actorIdUsuarioMs1(event.actorIdUsuarioMs1())
+                .actorIdEmpleadoMs2(event.actorIdEmpleadoMs2())
+                .actorRol(event.actorRol())
+                .occurredAt(event.occurredAt())
+                .motivo(event.motivo())
+                .requestId(event.requestId())
+                .correlationId(event.correlationId())
+                .metadataJson(event.metadataJson())
+                .build();
+    }
 
     public ReservaStockMs4RequestDto toReservaStockMs4Request(Ms4VentaStockReservadoEventDto event) {
         if (event == null) {
@@ -253,8 +357,8 @@ public class Ms4StockEventMapper {
             String code,
             String message
     ) {
-        ProductoSku sku = resolveSku(event, reserva, movimiento, stock);
-        Almacen almacen = resolveAlmacen(event, reserva, movimiento, stock);
+        ProductoSku sku = resolveSku(reserva, movimiento, stock);
+        Almacen almacen = resolveAlmacen(reserva, movimiento, stock);
 
         return Ms4StockSyncResultDto.builder()
                 .eventId(event.eventId())
@@ -285,7 +389,6 @@ public class Ms4StockEventMapper {
     }
 
     private ProductoSku resolveSku(
-            StockEventView event,
             ReservaStock reserva,
             MovimientoInventario movimiento,
             StockSku stock
@@ -306,7 +409,6 @@ public class Ms4StockEventMapper {
     }
 
     private Almacen resolveAlmacen(
-            StockEventView event,
             ReservaStock reserva,
             MovimientoInventario movimiento,
             StockSku stock

@@ -1,5 +1,6 @@
 package com.upsjb.ms3.config;
 
+import com.upsjb.ms3.shared.constants.TopicNames;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,46 +16,66 @@ import org.springframework.validation.annotation.Validated;
 public class KafkaTopicProperties {
 
     @NotBlank
-    private String productoSnapshot = "ms3.producto.snapshot.v1";
+    private String productoSnapshot = TopicNames.PRODUCTO_SNAPSHOT;
 
     @NotBlank
-    private String precioSnapshot = "ms3.precio.snapshot.v1";
+    private String precioSnapshot = TopicNames.PRECIO_SNAPSHOT;
 
     @NotBlank
-    private String promocionSnapshot = "ms3.promocion.snapshot.v1";
+    private String promocionSnapshot = TopicNames.PROMOCION_SNAPSHOT;
 
     @NotBlank
-    private String stockSnapshot = "ms3.stock.snapshot.v1";
+    private String stockSnapshot = TopicNames.STOCK_SNAPSHOT;
 
     @NotBlank
-    private String movimientoInventario = "ms3.movimiento-inventario.v1";
+    private String movimientoInventario = TopicNames.MOVIMIENTO_INVENTARIO;
 
     @NotBlank
-    private String ms4StockCommand = "ms4.stock.command.v1";
+    private String ms4StockCommand = TopicNames.MS4_STOCK_COMMAND;
 
     @NotBlank
-    private String ms4StockReconciliation = "ms4.stock.reconciliation.v1";
+    private String ms4StockReconciliation = TopicNames.MS4_STOCK_RECONCILIATION;
 
     @NotBlank
-    private String deadLetter = "ms3.dead-letter.v1";
+    private String deadLetter = TopicNames.DEAD_LETTER;
 
     public String resolveProductoSnapshotTopic() {
-        return productoSnapshot;
+        return normalize(productoSnapshot, TopicNames.PRODUCTO_SNAPSHOT);
     }
 
     public String resolvePrecioSnapshotTopic() {
-        return precioSnapshot;
+        return normalize(precioSnapshot, TopicNames.PRECIO_SNAPSHOT);
     }
 
     public String resolvePromocionSnapshotTopic() {
-        return promocionSnapshot;
+        return normalize(promocionSnapshot, TopicNames.PROMOCION_SNAPSHOT);
     }
 
     public String resolveStockSnapshotTopic() {
-        return stockSnapshot;
+        return normalize(stockSnapshot, TopicNames.STOCK_SNAPSHOT);
     }
 
     public String resolveMovimientoInventarioTopic() {
-        return movimientoInventario;
+        return normalize(movimientoInventario, TopicNames.MOVIMIENTO_INVENTARIO);
+    }
+
+    public String resolveMs4StockCommandTopic() {
+        return normalize(ms4StockCommand, TopicNames.MS4_STOCK_COMMAND);
+    }
+
+    public String resolveMs4StockReconciliationTopic() {
+        return normalize(ms4StockReconciliation, TopicNames.MS4_STOCK_RECONCILIATION);
+    }
+
+    public String resolveDeadLetterTopic() {
+        return normalize(deadLetter, TopicNames.DEAD_LETTER);
+    }
+
+    private String normalize(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+
+        return value.trim();
     }
 }

@@ -366,6 +366,15 @@ public class CategoriaServiceImpl implements CategoriaService {
 
     @Override
     @Transactional(readOnly = true)
+    public ApiResponseDto<List<CategoriaTreeResponseDto>> obtenerArbolPublico() {
+        List<Categoria> categorias = categoriaRepository.findByEstadoTrueOrderByNivelAscOrdenAscNombreAsc();
+        List<CategoriaTreeResponseDto> tree = buildTree(categorias);
+
+        return apiResponseFactory.dtoOk("Lista obtenida correctamente.", tree);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ApiResponseDto<List<CategoriaResponseDto>> listarSubcategorias(Long idCategoriaPadre) {
         AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
         categoriaPolicy.ensureCanViewAdmin(actor);
