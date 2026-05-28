@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/security/config/SecurityConfig.java
 package com.upsjb.ms3.security.config;
 
 import com.upsjb.ms3.config.AppPropertiesConfig;
@@ -35,6 +34,23 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig implements WebMvcConfigurer {
+
+    private static final String[] SWAGGER_WHITELIST = {
+            "/swagger-ui.html",
+            "/swagger-ui/index.html",
+            "/swagger-ui/**",
+            "/v3/api-docs",
+            "/v3/api-docs/",
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/v3/api-docs.yml"
+    };
+
+    private static final String[] ACTUATOR_PUBLIC_WHITELIST = {
+            "/actuator/health",
+            "/actuator/health/**",
+            "/actuator/info"
+    };
 
     private final AppPropertiesConfig appProperties;
     private final RoleJwtAuthenticationConverter roleJwtAuthenticationConverter;
@@ -93,22 +109,27 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        /*
+                         * Swagger/OpenAPI queda libre únicamente para documentación técnica local.
+                         *
+                         * Rutas liberadas:
+                         * - /swagger-ui.html
+                         * - /swagger-ui/**
+                         * - /v3/api-docs
+                         * - /v3/api-docs/**
+                         * - /v3/api-docs.yaml
+                         * - /v3/api-docs.yml
+                         *
+                         * No libera endpoints funcionales del dominio.
+                         */
+                        .requestMatchers(SWAGGER_WHITELIST).permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/ms3/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ms3/catalogo/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ms3/productos/public/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ms3/promociones/public/**").permitAll()
 
-                        .requestMatchers(
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**"
-                        ).permitAll()
-
-                        .requestMatchers(
-                                "/actuator/health",
-                                "/actuator/health/**",
-                                "/actuator/info"
-                        ).permitAll()
+                        .requestMatchers(ACTUATOR_PUBLIC_WHITELIST).permitAll()
 
                         .requestMatchers("/api/ms3/admin/**")
                         .hasAuthority(SecurityRoles.ROLE_ADMIN)
