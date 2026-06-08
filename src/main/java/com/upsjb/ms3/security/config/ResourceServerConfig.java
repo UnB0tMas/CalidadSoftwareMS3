@@ -209,11 +209,11 @@ public class ResourceServerConfig {
 
         @Override
         public OAuth2TokenValidatorResult validate(Jwt jwt) {
-            if (requireUserId && !hasTextClaim(jwt, userIdClaim)) {
+            if (requireUserId && !hasPositiveLongClaim(jwt, userIdClaims())) {
                 return invalid("El JWT no contiene el claim obligatorio de usuario MS1.");
             }
 
-            if (requireSession && !hasTextClaim(jwt, sessionIdClaim)) {
+            if (requireSession && !hasPositiveLongClaim(jwt, sessionIdClaims())) {
                 return invalid("El JWT no contiene el claim obligatorio de sesión.");
             }
 
@@ -222,7 +222,7 @@ public class ResourceServerConfig {
             }
 
             if (requireTokenType && StringUtils.hasText(requiredTokenType)) {
-                String tokenType = claimAsString(jwt, tokenTypeClaim);
+                String tokenType = firstTextClaim(jwt, tokenTypeClaims());
 
                 if (!requiredTokenType.equalsIgnoreCase(tokenType)) {
                     return invalid("El JWT no es de tipo access token.");
@@ -230,6 +230,57 @@ public class ResourceServerConfig {
             }
 
             return OAuth2TokenValidatorResult.success();
+        }
+
+        private List<String> userIdClaims() {
+            return claimNames(
+                    userIdClaim,
+                    JwtClaimNames.ID_USUARIO_MS1,
+                    JwtClaimNames.ID_USUARIO_MS1_CAMEL,
+                    JwtClaimNames.ID_USUARIO,
+                    JwtClaimNames.ID_USUARIO_CAMEL,
+                    JwtClaimNames.USER_ID,
+                    JwtClaimNames.USER_ID_ALT,
+                    JwtClaimNames.USER_ID_CAMEL
+            );
+        }
+
+        private List<String> sessionIdClaims() {
+            return claimNames(
+                    sessionIdClaim,
+                    JwtClaimNames.SESSION_ID,
+                    JwtClaimNames.SESSION_ID_ALT,
+                    JwtClaimNames.SESSION_ID_CAMEL,
+                    JwtClaimNames.ID_SESION,
+                    JwtClaimNames.ID_SESION_CAMEL
+            );
+        }
+
+        private List<String> tokenTypeClaims() {
+            return claimNames(
+                    tokenTypeClaim,
+                    JwtClaimNames.TOKEN_TYPE,
+                    JwtClaimNames.TOKEN_TYPE_ALT,
+                    JwtClaimNames.TOKEN_TYPE_CAMEL,
+                    JwtClaimNames.TIPO_TOKEN,
+                    JwtClaimNames.TIPO_TOKEN_CAMEL
+            );
+        }
+
+        private List<String> claimNames(String... claimNames) {
+            List<String> result = new ArrayList<>();
+
+            if (claimNames == null) {
+                return result;
+            }
+
+            for (String claimName : claimNames) {
+                if (StringUtils.hasText(claimName) && !result.contains(claimName.trim())) {
+                    result.add(claimName.trim());
+                }
+            }
+
+            return result;
         }
 
         private boolean hasAnyRoleClaim(Jwt jwt) {
@@ -260,17 +311,62 @@ public class ResourceServerConfig {
             return value != null;
         }
 
-        private boolean hasTextClaim(Jwt jwt, String claimName) {
-            return StringUtils.hasText(claimAsString(jwt, claimName));
+        private boolean hasPositiveLongClaim(Jwt jwt, List<String> claimNames) {
+            if (jwt == null || claimNames == null || claimNames.isEmpty()) {
+                return false;
+            }
+
+            for (String claimName : claimNames) {
+                Long parsed = claimAsLong(jwt, claimName);
+
+                if (parsed != null && parsed > 0) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        private String claimAsString(Jwt jwt, String claimName) {
+        private Long claimAsLong(Jwt jwt, String claimName) {
             if (!StringUtils.hasText(claimName)) {
                 return null;
             }
 
             Object value = jwt.getClaims().get(claimName);
-            return value == null ? null : String.valueOf(value);
+
+            if (value instanceof Number numberValue) {
+                return numberValue.longValue();
+            }
+
+            if (value instanceof String stringValue && StringUtils.hasText(stringValue)) {
+                try {
+                    return Long.valueOf(stringValue.trim());
+                } catch (NumberFormatException ignored) {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
+        private String firstTextClaim(Jwt jwt, List<String> claimNames) {
+            if (jwt == null || claimNames == null || claimNames.isEmpty()) {
+                return null;
+            }
+
+            for (String claimName : claimNames) {
+                if (!StringUtils.hasText(claimName)) {
+                    continue;
+                }
+
+                Object value = jwt.getClaims().get(claimName);
+
+                if (value != null && StringUtils.hasText(String.valueOf(value))) {
+                    return String.valueOf(value).trim();
+                }
+            }
+
+            return null;
         }
 
         private OAuth2TokenValidatorResult invalid(String message) {

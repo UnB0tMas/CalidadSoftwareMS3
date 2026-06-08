@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/controller/PublicCatalogoController.java
 package com.upsjb.ms3.controller;
 
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaTreeResponseDto;
@@ -55,7 +54,7 @@ public class PublicCatalogoController {
     public ResponseEntity<ApiResponseDto<List<CategoriaOptionDto>>> listarCategorias(
             @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarCategorias(filter));
+        return ResponseEntity.ok(catalogoLookupService.buscarCategoriasPublicas(filter));
     }
 
     @GetMapping("/categorias/arbol")
@@ -64,7 +63,7 @@ public class PublicCatalogoController {
             description = "Devuelve solo categorías activas para menús públicos."
     )
     public ResponseEntity<ApiResponseDto<List<CategoriaTreeResponseDto>>> obtenerArbolCategorias() {
-        return ResponseEntity.ok(categoriaService.obtenerArbol(Boolean.TRUE));
+        return ResponseEntity.ok(categoriaService.obtenerArbolPublico());
     }
 
     @GetMapping("/marcas")
@@ -75,7 +74,7 @@ public class PublicCatalogoController {
     public ResponseEntity<ApiResponseDto<List<MarcaOptionDto>>> listarMarcas(
             @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarMarcas(filter));
+        return ResponseEntity.ok(catalogoLookupService.buscarMarcasPublicas(filter));
     }
 
     @GetMapping("/tipos-producto")
@@ -86,7 +85,7 @@ public class PublicCatalogoController {
     public ResponseEntity<ApiResponseDto<List<TipoProductoOptionDto>>> listarTiposProducto(
             @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarTiposProducto(filter));
+        return ResponseEntity.ok(catalogoLookupService.buscarTiposProductoPublicos(filter));
     }
 
     @GetMapping("/generos-objetivo")
@@ -113,7 +112,7 @@ public class PublicCatalogoController {
             description = "Devuelve productos públicos paginados usando las reglas de visibilidad de ProductoPublicService."
     )
     public ResponseEntity<ApiResponseDto<PageResponseDto<ProductoPublicResponseDto>>> listarProductosRecientes(
-            @Min(value = 1, message = "La página mínima es 0.")
+            @Min(value = 0, message = "La página mínima es 0.")
             @RequestParam(defaultValue = "0") Integer page,
             @Min(value = 1, message = "El tamaño mínimo es 1.")
             @Max(value = 24, message = "El tamaño máximo público es 24.")

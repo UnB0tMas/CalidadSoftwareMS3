@@ -66,14 +66,50 @@ public class CurrentUserResolver {
         String rolPrincipal = resolvePrincipalRole(authorities, jwt);
 
         AuthenticatedUserContext context = new AuthenticatedUserContext(
-                claimAsLong(jwt, userIdClaim, JwtClaimNames.USER_ID, JwtClaimNames.USER_ID_ALT),
-                claimAsLong(jwt, JwtClaimNames.EMPLOYEE_ID),
-                firstTextClaim(jwt, JwtClaimNames.USERNAME, JwtClaimNames.PREFERRED_USERNAME, JwtClaimNames.NAME, JwtClaimNames.SUBJECT),
+                claimAsLong(
+                        jwt,
+                        userIdClaim,
+                        JwtClaimNames.ID_USUARIO_MS1,
+                        JwtClaimNames.ID_USUARIO_MS1_CAMEL,
+                        JwtClaimNames.ID_USUARIO,
+                        JwtClaimNames.ID_USUARIO_CAMEL,
+                        JwtClaimNames.USER_ID,
+                        JwtClaimNames.USER_ID_ALT,
+                        JwtClaimNames.USER_ID_CAMEL
+                ),
+                claimAsLong(
+                        jwt,
+                        JwtClaimNames.EMPLOYEE_ID,
+                        JwtClaimNames.EMPLOYEE_ID_CAMEL
+                ),
+                firstTextClaim(
+                        jwt,
+                        JwtClaimNames.USERNAME,
+                        JwtClaimNames.PREFERRED_USERNAME,
+                        JwtClaimNames.NAME,
+                        JwtClaimNames.SUBJECT
+                ),
                 firstTextClaim(jwt, JwtClaimNames.EMAIL),
                 rolPrincipal,
                 authorities,
-                firstTextClaim(jwt, sessionIdClaim, JwtClaimNames.SESSION_ID, JwtClaimNames.SESSION_ID_ALT),
-                firstTextClaim(jwt, tokenTypeClaim, JwtClaimNames.TOKEN_TYPE, JwtClaimNames.TOKEN_TYPE_ALT)
+                firstTextClaim(
+                        jwt,
+                        sessionIdClaim,
+                        JwtClaimNames.SESSION_ID,
+                        JwtClaimNames.SESSION_ID_ALT,
+                        JwtClaimNames.SESSION_ID_CAMEL,
+                        JwtClaimNames.ID_SESION,
+                        JwtClaimNames.ID_SESION_CAMEL
+                ),
+                firstTextClaim(
+                        jwt,
+                        tokenTypeClaim,
+                        JwtClaimNames.TOKEN_TYPE,
+                        JwtClaimNames.TOKEN_TYPE_ALT,
+                        JwtClaimNames.TOKEN_TYPE_CAMEL,
+                        JwtClaimNames.TIPO_TOKEN,
+                        JwtClaimNames.TIPO_TOKEN_CAMEL
+                )
         );
 
         return Optional.of(context);
@@ -174,7 +210,7 @@ public class CurrentUserResolver {
             Object value = jwt.getClaims().get(claimName);
 
             if (value != null && StringUtils.hasText(String.valueOf(value))) {
-                return String.valueOf(value);
+                return String.valueOf(value).trim();
             }
         }
 
@@ -182,14 +218,43 @@ public class CurrentUserResolver {
     }
 
     private Long claimAsLong(Jwt jwt, String... claimNames) {
-        String value = firstTextClaim(jwt, claimNames);
+        if (claimNames == null) {
+            return null;
+        }
 
-        if (!StringUtils.hasText(value)) {
+        for (String claimName : claimNames) {
+            if (!StringUtils.hasText(claimName)) {
+                continue;
+            }
+
+            Object rawValue = jwt.getClaims().get(claimName);
+            Long parsed = toLong(rawValue);
+
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+
+        return null;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Number numberValue) {
+            return numberValue.longValue();
+        }
+
+        String text = String.valueOf(value);
+
+        if (!StringUtils.hasText(text)) {
             return null;
         }
 
         try {
-            return Long.valueOf(value);
+            return Long.valueOf(text.trim());
         } catch (NumberFormatException ex) {
             throw new AuthenticationCredentialsNotFoundException(
                     "El claim de usuario autenticado no tiene formato numérico válido."
