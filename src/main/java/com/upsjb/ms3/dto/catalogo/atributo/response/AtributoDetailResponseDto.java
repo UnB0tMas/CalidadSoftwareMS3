@@ -20,7 +20,7 @@ public record AtributoDetailResponseDto(
         Boolean estado,
         Long cantidadValoresProducto,
         Long cantidadValoresSku,
-        List<TipoProductoAtributoResponseDto> tiposProductoAsociados,
+        List<CategoriaAtributoResponseDto> categoriasAsociadas,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

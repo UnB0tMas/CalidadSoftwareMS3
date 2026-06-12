@@ -1,3 +1,4 @@
+
 // ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoAtributoValorServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
@@ -6,8 +7,7 @@ import com.upsjb.ms3.domain.entity.Categoria;
 import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoAtributoValor;
-import com.upsjb.ms3.domain.entity.TipoProducto;
-import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
+import com.upsjb.ms3.domain.entity.CategoriaAtributo;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.ProductoEventType;
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
@@ -27,7 +27,7 @@ import com.upsjb.ms3.policy.ProductoPolicy;
 import com.upsjb.ms3.repository.AtributoRepository;
 import com.upsjb.ms3.repository.ProductoAtributoValorRepository;
 import com.upsjb.ms3.repository.ProductoRepository;
-import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
+import com.upsjb.ms3.repository.CategoriaAtributoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
@@ -89,7 +89,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
     private final ProductoRepository productoRepository;
     private final AtributoRepository atributoRepository;
     private final ProductoAtributoValorRepository productoAtributoValorRepository;
-    private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
+    private final CategoriaAtributoRepository categoriaAtributoRepository;
     private final ProductoAtributoValorMapper productoAtributoValorMapper;
     private final ProductoValidator productoValidator;
     private final AtributoValidator atributoValidator;
@@ -125,7 +125,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
 
         ProductoAtributoValorRequestDto normalized = normalizeRequest(request);
         Atributo atributo = resolveAtributo(normalized.atributo());
-        TipoProductoAtributo relation = resolveRelationRequired(producto, atributo);
+        CategoriaAtributo relation = resolveRelationRequired(producto, atributo);
 
         validateValue(producto, atributo, relation, normalized);
 
@@ -194,7 +194,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
         Producto producto = resolveProducto(productoReference);
         productoValidator.requireEditable(producto);
 
-        List<TipoProductoAtributo> plantilla = findPlantillaActiva(producto);
+        List<CategoriaAtributo> plantilla = findPlantillaActiva(producto);
         List<ValorPreparado> preparados = prepararValores(producto, request, plantilla);
 
         Set<Long> atributosProcesados = new LinkedHashSet<>();
@@ -365,7 +365,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
         Producto producto = entity.getProducto();
         productoValidator.requireEditable(producto);
 
-        TipoProductoAtributo relation = resolveRelationOrNull(producto, entity.getAtributo());
+        CategoriaAtributo relation = resolveRelationOrNull(producto, entity.getAtributo());
         productoAtributoValorValidator.validateCanInactivate(entity, relation);
 
         Map<String, Object> before = auditSnapshot(entity);
@@ -400,7 +400,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
     private List<ValorPreparado> prepararValores(
             Producto producto,
             List<ProductoAtributoValorRequestDto> request,
-            List<TipoProductoAtributo> plantilla
+            List<CategoriaAtributo> plantilla
     ) {
         List<ProductoAtributoValorRequestDto> safeRequest = request == null ? List.of() : request;
         Set<Long> atributosProcesados = new LinkedHashSet<>();
@@ -409,7 +409,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
         for (ProductoAtributoValorRequestDto item : safeRequest) {
             ProductoAtributoValorRequestDto normalized = normalizeRequest(item);
             Atributo atributo = resolveAtributo(normalized.atributo());
-            TipoProductoAtributo relation = findRelationFromTemplate(plantilla, atributo.getIdAtributo());
+            CategoriaAtributo relation = findRelationFromTemplate(plantilla, atributo.getIdAtributo());
 
             productoAtributoValorValidator.validateDuplicateInReplacement(
                     atributo.getIdAtributo(),
@@ -426,7 +426,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
     private void validateValue(
             Producto producto,
             Atributo atributo,
-            TipoProductoAtributo relation,
+            CategoriaAtributo relation,
             ProductoAtributoValorRequestDto request
     ) {
         productoAtributoValorValidator.validateAssociationAllowed(producto, atributo, relation);
@@ -585,38 +585,36 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
                 .build();
     }
 
-    private TipoProductoAtributo resolveRelationRequired(Producto producto, Atributo atributo) {
+    private CategoriaAtributo resolveRelationRequired(Producto producto, Atributo atributo) {
         return resolveRelationOrNull(producto, atributo);
     }
 
-    private TipoProductoAtributo resolveRelationOrNull(Producto producto, Atributo atributo) {
-        productoAtributoValorValidator.requireProductWithProductType(producto);
+    private CategoriaAtributo resolveRelationOrNull(Producto producto, Atributo atributo) {
+        productoAtributoValorValidator.requireProductWithCategory(producto);
 
         if (atributo == null || atributo.getIdAtributo() == null) {
             return null;
         }
 
-        Long idTipoProducto = producto.getTipoProducto().getIdTipoProducto();
+        List<CategoriaAtributo> plantilla = findPlantillaActiva(producto);
 
-        return tipoProductoAtributoRepository
-                .findByTipoProducto_IdTipoProductoAndAtributo_IdAtributoAndEstadoTrue(
-                        idTipoProducto,
-                        atributo.getIdAtributo()
-                )
-                .orElse(null);
+        return findRelationFromTemplate(
+                plantilla,
+                atributo.getIdAtributo()
+        );
     }
 
-    private List<TipoProductoAtributo> findPlantillaActiva(Producto producto) {
-        productoAtributoValorValidator.requireProductWithProductType(producto);
+    private List<CategoriaAtributo> findPlantillaActiva(Producto producto) {
+        productoAtributoValorValidator.requireProductWithCategory(producto);
 
-        return tipoProductoAtributoRepository
-                .findByTipoProducto_IdTipoProductoAndEstadoTrueOrderByOrdenAscIdTipoProductoAtributoAsc(
-                        producto.getTipoProducto().getIdTipoProducto()
+        return categoriaAtributoRepository
+                .findByCategoria_IdCategoriaAndEstadoTrueOrderByOrdenAscIdCategoriaAtributoAsc(
+                        producto.getCategoria().getIdCategoria()
                 );
     }
 
-    private TipoProductoAtributo findRelationFromTemplate(
-            List<TipoProductoAtributo> plantilla,
+    private CategoriaAtributo findRelationFromTemplate(
+            List<CategoriaAtributo> plantilla,
             Long idAtributo
     ) {
         if (plantilla == null || idAtributo == null) {
@@ -650,7 +648,6 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
     }
 
     private ProductoSnapshotPayload toProductoSnapshotPayload(Producto producto) {
-        TipoProducto tipoProducto = producto.getTipoProducto();
         Categoria categoria = producto.getCategoria();
         Marca marca = producto.getMarca();
 
@@ -665,9 +662,6 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
                 .codigoProducto(producto.getCodigoProducto())
                 .nombre(producto.getNombre())
                 .slug(producto.getSlug())
-                .idTipoProducto(tipoProducto == null ? null : tipoProducto.getIdTipoProducto())
-                .codigoTipoProducto(tipoProducto == null ? null : tipoProducto.getCodigo())
-                .nombreTipoProducto(tipoProducto == null ? null : tipoProducto.getNombre())
                 .idCategoria(categoria == null ? null : categoria.getIdCategoria())
                 .codigoCategoria(categoria == null ? null : categoria.getCodigo())
                 .nombreCategoria(categoria == null ? null : categoria.getNombre())
@@ -854,7 +848,7 @@ public class ProductoAtributoValorServiceImpl implements ProductoAtributoValorSe
     private record ValorPreparado(
             ProductoAtributoValorRequestDto request,
             Atributo atributo,
-            TipoProductoAtributo relation
+            CategoriaAtributo relation
     ) {
     }
 }

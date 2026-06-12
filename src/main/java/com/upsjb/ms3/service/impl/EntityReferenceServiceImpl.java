@@ -10,7 +10,6 @@ import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.Promocion;
 import com.upsjb.ms3.domain.entity.Proveedor;
-import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.dto.reference.filter.ReferenceSearchFilterDto;
 import com.upsjb.ms3.dto.reference.request.EntityReferenceRequestDto;
 import com.upsjb.ms3.dto.reference.response.EntityReferenceResolvedDto;
@@ -31,7 +30,6 @@ import com.upsjb.ms3.shared.reference.ProductoSkuReferenceResolver;
 import com.upsjb.ms3.shared.reference.PromocionReferenceResolver;
 import com.upsjb.ms3.shared.reference.ProveedorReferenceResolver;
 import com.upsjb.ms3.shared.reference.ReferenceOptionMapper;
-import com.upsjb.ms3.shared.reference.TipoProductoReferenceResolver;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.util.StringNormalizer;
 import java.util.List;
@@ -47,7 +45,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 50;
 
-    private final TipoProductoReferenceResolver tipoProductoReferenceResolver;
     private final CategoriaReferenceResolver categoriaReferenceResolver;
     private final MarcaReferenceResolver marcaReferenceResolver;
     private final AtributoReferenceResolver atributoReferenceResolver;
@@ -102,12 +99,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<List<EntityReferenceResolvedDto>> buscarTipoProducto(ReferenceSearchFilterDto filter) {
-        return buscar("TIPO_PRODUCTO", filter);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public ApiResponseDto<List<EntityReferenceResolvedDto>> buscarCategoria(ReferenceSearchFilterDto filter) {
         return buscar("CATEGORIA", filter);
     }
@@ -158,21 +149,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
     @Transactional(readOnly = true)
     public ApiResponseDto<List<EntityReferenceResolvedDto>> buscarEmpleadoInventario(ReferenceSearchFilterDto filter) {
         return buscar("EMPLEADO_SNAPSHOT_MS2", filter);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ApiResponseDto<EntityReferenceDto> resolverTipoProducto(EntityReferenceDto reference) {
-        ensureCanResolve();
-        EntityReferenceDto safeReference = requireReference(reference);
-
-        TipoProducto entity = tipoProductoReferenceResolver.resolve(
-                safeReference.id(),
-                safeReference.codigo(),
-                safeReference.nombre()
-        );
-
-        return apiResponseFactory.dtoOk("Detalle obtenido correctamente.", toReference(entity));
     }
 
     @Override
@@ -319,11 +295,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
         EntityReferenceDto safeReference = requireReference(reference);
 
         return switch (entidad) {
-            case "TIPO_PRODUCTO" -> tipoProductoReferenceResolver.toOption(tipoProductoReferenceResolver.resolve(
-                    safeReference.id(),
-                    safeReference.codigo(),
-                    safeReference.nombre()
-            ));
             case "CATEGORIA" -> categoriaReferenceResolver.toOption(categoriaReferenceResolver.resolve(
                     safeReference.id(),
                     safeReference.codigo(),
@@ -389,7 +360,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
         }
 
         return switch (entidad) {
-            case "TIPO_PRODUCTO" -> tipoProductoReferenceResolver.search(search, limit);
             case "CATEGORIA" -> categoriaReferenceResolver.search(search, limit);
             case "MARCA" -> marcaReferenceResolver.search(search, limit);
             case "ATRIBUTO" -> atributoReferenceResolver.search(search, limit);
@@ -474,14 +444,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
                 .description(option.description())
                 .active(option.active())
                 .metadata(option.metadata())
-                .build();
-    }
-
-    private EntityReferenceDto toReference(TipoProducto entity) {
-        return EntityReferenceDto.builder()
-                .id(entity.getIdTipoProducto())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
                 .build();
     }
 
@@ -582,7 +544,6 @@ public class EntityReferenceServiceImpl implements EntityReferenceService {
                 .toUpperCase(Locale.ROOT);
 
         return switch (normalized) {
-            case "TIPOPRODUCTO", "TIPO_PRODUCTO" -> "TIPO_PRODUCTO";
             case "CATEGORIA" -> "CATEGORIA";
             case "MARCA" -> "MARCA";
             case "ATRIBUTO" -> "ATRIBUTO";

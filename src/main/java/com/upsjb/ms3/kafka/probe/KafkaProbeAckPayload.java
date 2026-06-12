@@ -32,13 +32,41 @@ public record KafkaProbeAckPayload(
                 receivedKey,
                 Instant.now(),
                 "OK",
-                "MS3 received probe from MS4 without persistence."
+                "MS3 recibió el probe técnico de MS4."
+        );
+    }
+
+    public static KafkaProbeAckPayload functional(
+            String probeId,
+            String sourceService,
+            String targetService,
+            String direction,
+            String receivedTopic,
+            String receivedKey,
+            String message
+    ) {
+        return new KafkaProbeAckPayload(
+                probeId,
+                sourceService,
+                targetService,
+                "KAFKA_PROBE_ACK",
+                direction,
+                receivedTopic,
+                receivedKey,
+                Instant.now(),
+                "OK",
+                message
         );
     }
 
     public boolean isOk() {
-        return "KAFKA_PROBE_ACK".equalsIgnoreCase(eventType)
-                && "OK".equalsIgnoreCase(status)
+        return "KAFKA_PROBE_ACK"
+                .equalsIgnoreCase(
+                        eventType
+                )
+                && "OK".equalsIgnoreCase(
+                status
+        )
                 && probeId != null
                 && !probeId.isBlank();
     }

@@ -213,4 +213,82 @@ public interface StockSkuRepository extends
               and s.estado = true
             """)
     Long sumStockDisponibleByAlmacen(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(s)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+            """)
+    Long countActiveStocks(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(distinct s.sku.idSku)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+            """)
+    Long countDistinctActiveSku(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(s)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+              and coalesce(s.stockDisponible, 0) <= 0
+            """)
+    Long countOutOfStock(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(s)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+              and coalesce(s.stockDisponible, 0) > 0
+              and coalesce(s.stockDisponible, 0) <= coalesce(s.stockMinimo, 0)
+            """)
+    Long countLowStock(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(s)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+              and coalesce(s.stockReservado, 0) > 0
+            """)
+    Long countWithReservations(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select count(s)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+              and coalesce(s.stockDisponible, 0) > 0
+            """)
+    Long countAvailable(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockFisico), 0)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+            """)
+    Long sumActivePhysicalStock(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockReservado), 0)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+            """)
+    Long sumActiveReservedStock(@Param("idAlmacen") Long idAlmacen);
+
+    @Query("""
+            select coalesce(sum(s.stockDisponible), 0)
+            from StockSku s
+            where s.estado = true
+              and (:idAlmacen is null or s.almacen.idAlmacen = :idAlmacen)
+            """)
+    Long sumActiveAvailableStock(@Param("idAlmacen") Long idAlmacen);
+
 }

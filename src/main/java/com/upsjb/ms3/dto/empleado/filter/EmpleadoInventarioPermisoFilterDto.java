@@ -1,4 +1,4 @@
-// ruta: src/main/java/com/upsjb/ms3/dto/empleado/filter/EmpleadoInventarioPermisoFilterDto.java
+
 package com.upsjb.ms3.dto.empleado.filter;
 
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
@@ -9,7 +9,10 @@ import lombok.Builder;
 @Builder
 public record EmpleadoInventarioPermisoFilterDto(
 
-        @Size(max = 250, message = "La búsqueda no debe superar 250 caracteres.")
+        @Size(
+                max = 250,
+                message = "La búsqueda no debe superar 250 caracteres."
+        )
         String search,
 
         Long idEmpleadoSnapshot,
@@ -18,8 +21,16 @@ public record EmpleadoInventarioPermisoFilterDto(
 
         Long idUsuarioMs1,
 
+        @Size(
+                max = 50,
+                message = "El código de empleado no debe superar 50 caracteres."
+        )
         String codigoEmpleado,
 
+        @Size(
+                max = 50,
+                message = "El código de área no debe superar 50 caracteres."
+        )
         String areaCodigo,
 
         Boolean empleadoActivo,
@@ -43,6 +54,8 @@ public record EmpleadoInventarioPermisoFilterDto(
         Boolean puedeActualizarAtributos,
 
         Boolean estado,
+
+        Boolean incluirTodosLosEstados,
 
         @Valid
         DateRangeFilterDto fechaVigencia,

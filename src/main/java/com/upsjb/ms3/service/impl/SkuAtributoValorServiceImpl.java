@@ -1,14 +1,13 @@
+
 // ruta: src/main/java/com/upsjb/ms3/service/impl/SkuAtributoValorServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Atributo;
+import com.upsjb.ms3.domain.entity.CategoriaAtributo;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.SkuAtributoValor;
-import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
-import com.upsjb.ms3.domain.enums.AggregateType;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
-import com.upsjb.ms3.domain.enums.ProductoEventType;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
 import com.upsjb.ms3.dto.catalogo.producto.filter.SkuAtributoValorFilterDto;
 import com.upsjb.ms3.dto.catalogo.producto.request.SkuAtributoValorRequestDto;
@@ -18,21 +17,20 @@ import com.upsjb.ms3.dto.shared.EntityReferenceDto;
 import com.upsjb.ms3.dto.shared.EstadoChangeRequestDto;
 import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
-import com.upsjb.ms3.kafka.event.ProductoSkuSnapshotPayload;
 import com.upsjb.ms3.mapper.SkuAtributoValorMapper;
 import com.upsjb.ms3.policy.ProductoSkuPolicy;
 import com.upsjb.ms3.repository.AtributoRepository;
+import com.upsjb.ms3.repository.CategoriaAtributoRepository;
 import com.upsjb.ms3.repository.ProductoSkuRepository;
 import com.upsjb.ms3.repository.SkuAtributoValorRepository;
-import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
 import com.upsjb.ms3.service.contract.EmpleadoInventarioPermisoService;
-import com.upsjb.ms3.service.contract.EventoDominioOutboxService;
 import com.upsjb.ms3.service.contract.SkuAtributoValorService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
+import com.upsjb.ms3.shared.outbox.ProductoSnapshotOutboxRegistrar;
 import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.SkuAtributoValorSpecifications;
@@ -55,22 +53,24 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
+public class SkuAtributoValorServiceImpl
+        implements SkuAtributoValorService {
 
-    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
-            "idSkuAtributoValor",
-            "sku.codigoSku",
-            "sku.barcode",
-            "sku.producto.codigoProducto",
-            "sku.producto.nombre",
-            "atributo.codigo",
-            "atributo.nombre",
-            "atributo.tipoDato",
-            "valorTexto",
-            "estado",
-            "createdAt",
-            "updatedAt"
-    );
+    private static final Set<String> ALLOWED_SORT_FIELDS =
+            Set.of(
+                    "idSkuAtributoValor",
+                    "sku.codigoSku",
+                    "sku.barcode",
+                    "sku.producto.codigoProducto",
+                    "sku.producto.nombre",
+                    "atributo.codigo",
+                    "atributo.nombre",
+                    "atributo.tipoDato",
+                    "valorTexto",
+                    "estado",
+                    "createdAt",
+                    "updatedAt"
+            );
 
     private static final int MAX_SEARCH_LENGTH = 250;
     private static final int MAX_CODIGO_SKU_LENGTH = 100;
@@ -84,70 +84,142 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
 
     private final ProductoSkuRepository productoSkuRepository;
     private final AtributoRepository atributoRepository;
-    private final SkuAtributoValorRepository skuAtributoValorRepository;
-    private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
-    private final SkuAtributoValorMapper skuAtributoValorMapper;
+    private final SkuAtributoValorRepository
+            skuAtributoValorRepository;
+    private final CategoriaAtributoRepository
+            categoriaAtributoRepository;
+    private final SkuAtributoValorMapper
+            skuAtributoValorMapper;
     private final ProductoSkuValidator productoSkuValidator;
     private final AtributoValidator atributoValidator;
-    private final SkuAtributoValorValidator skuAtributoValorValidator;
+    private final SkuAtributoValorValidator
+            skuAtributoValorValidator;
     private final ProductoSkuPolicy productoSkuPolicy;
     private final CurrentUserResolver currentUserResolver;
-    private final EmpleadoInventarioPermisoService empleadoInventarioPermisoService;
-    private final AuditoriaFuncionalService auditoriaFuncionalService;
-    private final EventoDominioOutboxService eventoDominioOutboxService;
+    private final EmpleadoInventarioPermisoService
+            empleadoInventarioPermisoService;
+    private final AuditoriaFuncionalService
+            auditoriaFuncionalService;
+    private final ProductoSnapshotOutboxRegistrar
+            productoSnapshotOutboxRegistrar;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
 
     @Override
     @Transactional
-    public ApiResponseDto<SkuAtributoValorResponseDto> guardarValor(
+    public ApiResponseDto<SkuAtributoValorResponseDto>
+    guardarValor(
             Long idSku,
             SkuAtributoValorRequestDto request
     ) {
-        return guardarValor(EntityReferenceDto.builder().id(idSku).build(), request);
+        return guardarValor(
+                EntityReferenceDto.builder()
+                        .id(idSku)
+                        .build(),
+                request
+        );
     }
 
     @Override
     @Transactional
-    public ApiResponseDto<SkuAtributoValorResponseDto> guardarValor(
+    public ApiResponseDto<SkuAtributoValorResponseDto>
+    guardarValor(
             EntityReferenceDto skuReference,
             SkuAtributoValorRequestDto request
     ) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        productoSkuPolicy.ensureCanUpdateAttributes(actor, employeeCanUpdateAttributes(actor));
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
 
-        ProductoSku sku = resolveSku(skuReference);
+        productoSkuPolicy.ensureCanUpdateAttributes(
+                actor,
+                employeeCanUpdateAttributes(actor)
+        );
+
+        ProductoSku sku =
+                resolveSku(skuReference);
+
         productoSkuValidator.requireActive(sku);
 
-        SkuAtributoValorRequestDto normalized = normalizeRequest(request);
-        Atributo atributo = resolveAtributo(normalized.atributo());
-        TipoProductoAtributo relation = resolveRelationRequired(sku, atributo);
+        SkuAtributoValorRequestDto normalized =
+                normalizeRequest(request);
 
-        validateValue(sku, atributo, relation, normalized);
+        Atributo atributo =
+                resolveAtributo(
+                        normalized.atributo()
+                );
 
-        SkuAtributoValor entity = skuAtributoValorRepository
-                .findBySku_IdSkuAndAtributo_IdAtributoAndEstadoTrue(sku.getIdSku(), atributo.getIdAtributo())
-                .orElse(null);
+        CategoriaAtributo relation =
+                resolveRelationRequired(
+                        sku,
+                        atributo
+                );
 
-        boolean created = entity == null;
-        Map<String, Object> before = created ? null : auditSnapshot(entity);
+        validateValue(
+                sku,
+                atributo,
+                relation,
+                normalized
+        );
+
+        SkuAtributoValor entity =
+                skuAtributoValorRepository
+                        .findBySku_IdSkuAndAtributo_IdAtributoAndEstadoTrue(
+                                sku.getIdSku(),
+                                atributo.getIdAtributo()
+                        )
+                        .orElse(null);
+
+        boolean created =
+                entity == null;
+
+        Map<String, Object> before =
+                created
+                        ? null
+                        : auditSnapshot(entity);
 
         if (created) {
-            entity = skuAtributoValorMapper.toEntity(normalized, sku, atributo);
+            entity =
+                    skuAtributoValorMapper.toEntity(
+                            normalized,
+                            sku,
+                            atributo
+                    );
+
             entity.activar();
         } else {
-            skuAtributoValorMapper.updateEntity(entity, normalized, atributo);
+            skuAtributoValorMapper.updateEntity(
+                    entity,
+                    normalized,
+                    atributo
+            );
         }
 
-        SkuAtributoValor saved = skuAtributoValorRepository.saveAndFlush(entity);
+        SkuAtributoValor saved =
+                skuAtributoValorRepository
+                        .saveAndFlush(entity);
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.SKU_ACTUALIZADO,
                 EntidadAuditada.SKU_ATRIBUTO_VALOR,
-                String.valueOf(saved.getIdSkuAtributoValor()),
-                created ? "CREAR_VALOR_ATRIBUTO_SKU" : "ACTUALIZAR_VALOR_ATRIBUTO_SKU",
-                created ? "Atributo de SKU creado correctamente." : "Atributo de SKU actualizado correctamente.",
-                auditMetadata(saved, actor, before == null ? null : Map.of("before", before))
+                String.valueOf(
+                        saved.getIdSkuAtributoValor()
+                ),
+                created
+                        ? "CREAR_VALOR_ATRIBUTO_SKU"
+                        : "ACTUALIZAR_VALOR_ATRIBUTO_SKU",
+                created
+                        ? "Atributo de SKU creado correctamente."
+                        : "Atributo de SKU actualizado correctamente.",
+                auditMetadata(
+                        saved,
+                        actor,
+                        before == null
+                                ? null
+                                : Map.of(
+                                "before",
+                                before
+                        )
+                )
         );
 
         registrarOutboxSkuActualizado(sku);
@@ -168,54 +240,124 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
 
     @Override
     @Transactional
-    public ApiResponseDto<List<SkuAtributoValorResponseDto>> reemplazarValores(
+    public ApiResponseDto<List<SkuAtributoValorResponseDto>>
+    reemplazarValores(
             Long idSku,
             List<SkuAtributoValorRequestDto> request
     ) {
-        return reemplazarValores(EntityReferenceDto.builder().id(idSku).build(), request);
+        return reemplazarValores(
+                EntityReferenceDto.builder()
+                        .id(idSku)
+                        .build(),
+                request
+        );
     }
 
     @Override
     @Transactional
-    public ApiResponseDto<List<SkuAtributoValorResponseDto>> reemplazarValores(
+    public ApiResponseDto<List<SkuAtributoValorResponseDto>>
+    reemplazarValores(
             EntityReferenceDto skuReference,
             List<SkuAtributoValorRequestDto> request
     ) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        productoSkuPolicy.ensureCanUpdateAttributes(actor, employeeCanUpdateAttributes(actor));
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
 
-        ProductoSku sku = resolveSku(skuReference);
+        productoSkuPolicy.ensureCanUpdateAttributes(
+                actor,
+                employeeCanUpdateAttributes(actor)
+        );
+
+        ProductoSku sku =
+                resolveSku(skuReference);
+
         productoSkuValidator.requireActive(sku);
 
-        List<TipoProductoAtributo> plantilla = findPlantillaActiva(sku);
-        List<ValorPreparado> preparados = prepararValores(sku, request, plantilla);
+        List<CategoriaAtributo> plantilla =
+                findPlantillaActiva(sku);
 
-        Set<Long> atributosProcesados = new LinkedHashSet<>();
-        preparados.forEach(preparado -> atributosProcesados.add(preparado.atributo().getIdAtributo()));
-        skuAtributoValorValidator.validateRequiredAttributesPresent(plantilla, atributosProcesados);
+        List<ValorPreparado> preparados =
+                prepararValores(
+                        sku,
+                        request,
+                        plantilla
+                );
 
-        List<SkuAtributoValor> actuales = skuAtributoValorRepository
-                .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(sku.getIdSku());
+        Set<Long> atributosProcesados =
+                new LinkedHashSet<>();
 
-        Map<Long, SkuAtributoValor> actualesPorAtributo = new LinkedHashMap<>();
+        preparados.forEach(
+                preparado ->
+                        atributosProcesados.add(
+                                preparado
+                                        .atributo()
+                                        .getIdAtributo()
+                        )
+        );
+
+        skuAtributoValorValidator
+                .validateRequiredAttributesPresent(
+                        plantilla,
+                        atributosProcesados
+                );
+
+        List<SkuAtributoValor> actuales =
+                skuAtributoValorRepository
+                        .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(
+                                sku.getIdSku()
+                        );
+
+        Map<Long, SkuAtributoValor>
+                actualesPorAtributo =
+                new LinkedHashMap<>();
+
         for (SkuAtributoValor actual : actuales) {
-            if (actual.getAtributo() != null && actual.getAtributo().getIdAtributo() != null) {
-                actualesPorAtributo.put(actual.getAtributo().getIdAtributo(), actual);
+            if (
+                    actual.getAtributo() != null
+                            && actual.getAtributo()
+                            .getIdAtributo() != null
+            ) {
+                actualesPorAtributo.put(
+                        actual.getAtributo()
+                                .getIdAtributo(),
+                        actual
+                );
             }
         }
 
-        List<SkuAtributoValor> toPersist = new ArrayList<>();
-        Set<Long> atributosReemplazados = new LinkedHashSet<>();
+        List<SkuAtributoValor> toPersist =
+                new ArrayList<>();
+
+        Set<Long> atributosReemplazados =
+                new LinkedHashSet<>();
 
         for (ValorPreparado preparado : preparados) {
-            Long idAtributo = preparado.atributo().getIdAtributo();
+            Long idAtributo =
+                    preparado.atributo()
+                            .getIdAtributo();
+
             atributosReemplazados.add(idAtributo);
 
-            SkuAtributoValor entity = actualesPorAtributo.get(idAtributo);
+            SkuAtributoValor entity =
+                    actualesPorAtributo.get(
+                            idAtributo
+                    );
+
             if (entity == null) {
-                entity = skuAtributoValorMapper.toEntity(preparado.request(), sku, preparado.atributo());
+                entity =
+                        skuAtributoValorMapper
+                                .toEntity(
+                                        preparado.request(),
+                                        sku,
+                                        preparado.atributo()
+                                );
             } else {
-                skuAtributoValorMapper.updateEntity(entity, preparado.request(), preparado.atributo());
+                skuAtributoValorMapper
+                        .updateEntity(
+                                entity,
+                                preparado.request(),
+                                preparado.atributo()
+                        );
             }
 
             entity.activar();
@@ -223,32 +365,54 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         }
 
         for (SkuAtributoValor actual : actuales) {
-            Long idAtributo = actual.getAtributo() == null ? null : actual.getAtributo().getIdAtributo();
+            Long idAtributo =
+                    actual.getAtributo() == null
+                            ? null
+                            : actual.getAtributo()
+                            .getIdAtributo();
 
-            if (idAtributo != null && !atributosReemplazados.contains(idAtributo)) {
+            if (
+                    idAtributo != null
+                            && !atributosReemplazados.contains(
+                            idAtributo
+                    )
+            ) {
                 actual.inactivar();
                 toPersist.add(actual);
             }
         }
 
-        List<SkuAtributoValor> saved = skuAtributoValorRepository.saveAllAndFlush(toPersist);
+        List<SkuAtributoValor> saved =
+                skuAtributoValorRepository
+                        .saveAllAndFlush(toPersist);
 
-        List<SkuAtributoValorResponseDto> response = saved.stream()
-                .filter(SkuAtributoValor::isActivo)
-                .map(skuAtributoValorMapper::toResponse)
-                .toList();
+        List<SkuAtributoValorResponseDto> response =
+                saved.stream()
+                        .filter(
+                                SkuAtributoValor::isActivo
+                        )
+                        .map(
+                                skuAtributoValorMapper::toResponse
+                        )
+                        .toList();
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.SKU_ACTUALIZADO,
                 EntidadAuditada.PRODUCTO_SKU,
-                String.valueOf(sku.getIdSku()),
+                String.valueOf(
+                        sku.getIdSku()
+                ),
                 "REEMPLAZAR_ATRIBUTOS_SKU",
                 "Atributos de SKU reemplazados correctamente.",
                 Map.of(
-                        "idSku", sku.getIdSku(),
-                        "codigoSku", sku.getCodigoSku(),
-                        "cantidadAtributos", response.size(),
-                        "actor", actor.actorLabel()
+                        "idSku",
+                        sku.getIdSku(),
+                        "codigoSku",
+                        sku.getCodigoSku(),
+                        "cantidadAtributos",
+                        response.size(),
+                        "actor",
+                        actor.actorLabel()
                 )
         );
 
@@ -270,23 +434,41 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<List<SkuAtributoValorResponseDto>> listarPorSku(Long idSku) {
-        return listarPorSku(EntityReferenceDto.builder().id(idSku).build());
+    public ApiResponseDto<List<SkuAtributoValorResponseDto>>
+    listarPorSku(
+            Long idSku
+    ) {
+        return listarPorSku(
+                EntityReferenceDto.builder()
+                        .id(idSku)
+                        .build()
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<List<SkuAtributoValorResponseDto>> listarPorSku(EntityReferenceDto skuReference) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<List<SkuAtributoValorResponseDto>>
+    listarPorSku(
+            EntityReferenceDto skuReference
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         productoSkuPolicy.ensureCanViewAdmin(actor);
 
-        ProductoSku sku = resolveSku(skuReference);
+        ProductoSku sku =
+                resolveSku(skuReference);
 
-        List<SkuAtributoValorResponseDto> response = skuAtributoValorRepository
-                .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(sku.getIdSku())
-                .stream()
-                .map(skuAtributoValorMapper::toResponse)
-                .toList();
+        List<SkuAtributoValorResponseDto> response =
+                skuAtributoValorRepository
+                        .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(
+                                sku.getIdSku()
+                        )
+                        .stream()
+                        .map(
+                                skuAtributoValorMapper::toResponse
+                        )
+                        .toList();
 
         return apiResponseFactory.dtoOk(
                 "Lista obtenida correctamente.",
@@ -296,32 +478,48 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<PageResponseDto<SkuAtributoValorResponseDto>> listar(
+    public ApiResponseDto<PageResponseDto<SkuAtributoValorResponseDto>>
+    listar(
             SkuAtributoValorFilterDto filter,
             PageRequestDto pageRequest
     ) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         productoSkuPolicy.ensureCanViewAdmin(actor);
 
-        PageRequestDto safePage = safePageRequest(pageRequest, "createdAt");
-        SkuAtributoValorFilterDto normalizedFilter = normalizeFilter(filter);
+        PageRequestDto safePage =
+                safePageRequest(
+                        pageRequest,
+                        "createdAt"
+                );
 
-        Pageable pageable = paginationService.pageable(
-                safePage.page(),
-                safePage.size(),
-                safePage.sortBy(),
-                safePage.sortDirection(),
-                ALLOWED_SORT_FIELDS,
-                "createdAt"
-        );
+        SkuAtributoValorFilterDto normalizedFilter =
+                normalizeFilter(filter);
 
-        PageResponseDto<SkuAtributoValorResponseDto> response = paginationService.toPageResponseDto(
-                skuAtributoValorRepository.findAll(
-                        SkuAtributoValorSpecifications.fromFilter(normalizedFilter),
-                        pageable
-                ),
-                skuAtributoValorMapper::toResponse
-        );
+        Pageable pageable =
+                paginationService.pageable(
+                        safePage.page(),
+                        safePage.size(),
+                        safePage.sortBy(),
+                        safePage.sortDirection(),
+                        ALLOWED_SORT_FIELDS,
+                        "createdAt"
+                );
+
+        PageResponseDto<SkuAtributoValorResponseDto>
+                response =
+                paginationService.toPageResponseDto(
+                        skuAtributoValorRepository
+                                .findAll(
+                                        SkuAtributoValorSpecifications
+                                                .fromFilter(
+                                                        normalizedFilter
+                                                ),
+                                        pageable
+                                ),
+                        skuAtributoValorMapper::toResponse
+                );
 
         return apiResponseFactory.dtoOk(
                 "Lista obtenida correctamente.",
@@ -331,81 +529,168 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<SkuAtributoValorResponseDto> obtenerDetalle(Long idSkuAtributoValor) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<SkuAtributoValorResponseDto>
+    obtenerDetalle(
+            Long idSkuAtributoValor
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         productoSkuPolicy.ensureCanViewAdmin(actor);
 
-        SkuAtributoValor entity = findAnyValorRequired(idSkuAtributoValor);
+        SkuAtributoValor entity =
+                findAnyValorRequired(
+                        idSkuAtributoValor
+                );
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
-                skuAtributoValorMapper.toResponse(entity)
+                skuAtributoValorMapper
+                        .toResponse(entity)
         );
     }
 
     @Override
     @Transactional
-    public ApiResponseDto<SkuAtributoValorResponseDto> inactivar(
+    public ApiResponseDto<SkuAtributoValorResponseDto>
+    inactivar(
             Long idSkuAtributoValor,
             EstadoChangeRequestDto request
     ) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        productoSkuPolicy.ensureCanUpdateAttributes(actor, employeeCanUpdateAttributes(actor));
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
 
-        String motivo = validateEstadoChangeRequestAndReturnMotivo(request);
+        productoSkuPolicy.ensureCanUpdateAttributes(
+                actor,
+                employeeCanUpdateAttributes(actor)
+        );
 
-        SkuAtributoValor entity = findActiveValorRequired(idSkuAtributoValor);
-        TipoProductoAtributo relation = resolveRelationOrNull(entity.getSku(), entity.getAtributo());
+        String motivo =
+                validateEstadoChangeRequestAndReturnMotivo(
+                        request
+                );
 
-        skuAtributoValorValidator.validateCanInactivate(entity, relation);
+        SkuAtributoValor entity =
+                findActiveValorRequired(
+                        idSkuAtributoValor
+                );
 
-        Map<String, Object> before = auditSnapshot(entity);
+        CategoriaAtributo relation =
+                resolveRelationOrNull(
+                        entity.getSku(),
+                        entity.getAtributo()
+                );
+
+        skuAtributoValorValidator
+                .validateCanInactivate(
+                        entity,
+                        relation
+                );
+
+        Map<String, Object> before =
+                auditSnapshot(entity);
+
         entity.inactivar();
 
-        SkuAtributoValor saved = skuAtributoValorRepository.saveAndFlush(entity);
+        SkuAtributoValor saved =
+                skuAtributoValorRepository
+                        .saveAndFlush(entity);
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.SKU_ACTUALIZADO,
                 EntidadAuditada.SKU_ATRIBUTO_VALOR,
-                String.valueOf(saved.getIdSkuAtributoValor()),
+                String.valueOf(
+                        saved.getIdSkuAtributoValor()
+                ),
                 "INACTIVAR_VALOR_ATRIBUTO_SKU",
                 "Atributo de SKU inactivado correctamente.",
-                auditMetadata(saved, actor, Map.of("before", before, "motivo", motivo))
+                auditMetadata(
+                        saved,
+                        actor,
+                        Map.of(
+                                "before",
+                                before,
+                                "motivo",
+                                motivo
+                        )
+                )
         );
 
-        registrarOutboxSkuActualizado(saved.getSku());
+        registrarOutboxSkuActualizado(
+                saved.getSku()
+        );
 
         log.info(
                 "Valor de atributo de SKU inactivado. idSkuAtributoValor={}, idSku={}, actor={}",
                 saved.getIdSkuAtributoValor(),
-                saved.getSku() == null ? null : saved.getSku().getIdSku(),
+                saved.getSku() == null
+                        ? null
+                        : saved.getSku()
+                        .getIdSku(),
                 actor.actorLabel()
         );
 
         return apiResponseFactory.dtoOk(
                 "Operación realizada correctamente.",
-                skuAtributoValorMapper.toResponse(saved)
+                skuAtributoValorMapper
+                        .toResponse(saved)
         );
     }
 
     private List<ValorPreparado> prepararValores(
             ProductoSku sku,
             List<SkuAtributoValorRequestDto> request,
-            List<TipoProductoAtributo> plantilla
+            List<CategoriaAtributo> plantilla
     ) {
-        List<SkuAtributoValorRequestDto> safeRequest = request == null ? List.of() : request;
-        Set<Long> atributosProcesados = new LinkedHashSet<>();
-        List<ValorPreparado> preparados = new ArrayList<>();
+        List<SkuAtributoValorRequestDto> safeRequest =
+                request == null
+                        ? List.of()
+                        : request;
 
-        for (SkuAtributoValorRequestDto item : safeRequest) {
-            SkuAtributoValorRequestDto normalized = normalizeRequest(item);
-            Atributo atributo = resolveAtributo(normalized.atributo());
-            TipoProductoAtributo relation = findRelationFromTemplate(plantilla, atributo.getIdAtributo());
+        Set<Long> atributosProcesados =
+                new LinkedHashSet<>();
 
-            skuAtributoValorValidator.validateDuplicateInReplacement(atributo.getIdAtributo(), atributosProcesados);
-            validateValue(sku, atributo, relation, normalized);
+        List<ValorPreparado> preparados =
+                new ArrayList<>();
 
-            preparados.add(new ValorPreparado(normalized, atributo, relation));
+        for (
+                SkuAtributoValorRequestDto item
+                : safeRequest
+        ) {
+            SkuAtributoValorRequestDto normalized =
+                    normalizeRequest(item);
+
+            Atributo atributo =
+                    resolveAtributo(
+                            normalized.atributo()
+                    );
+
+            CategoriaAtributo relation =
+                    findRelationFromTemplate(
+                            plantilla,
+                            atributo.getIdAtributo()
+                    );
+
+            skuAtributoValorValidator
+                    .validateDuplicateInReplacement(
+                            atributo.getIdAtributo(),
+                            atributosProcesados
+                    );
+
+            validateValue(
+                    sku,
+                    atributo,
+                    relation,
+                    normalized
+            );
+
+            preparados.add(
+                    new ValorPreparado(
+                            normalized,
+                            atributo,
+                            relation
+                    )
+            );
         }
 
         return preparados;
@@ -414,10 +699,15 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
     private void validateValue(
             ProductoSku sku,
             Atributo atributo,
-            TipoProductoAtributo relation,
+            CategoriaAtributo relation,
             SkuAtributoValorRequestDto request
     ) {
-        skuAtributoValorValidator.validateAssociationAllowed(sku, atributo, relation);
+        skuAtributoValorValidator
+                .validateAssociationAllowed(
+                        sku,
+                        atributo,
+                        relation
+                );
 
         atributoValidator.validateValueByType(
                 atributo,
@@ -427,17 +717,20 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
                 request.valorFecha()
         );
 
-        skuAtributoValorValidator.validateValueByTemplate(
-                atributo,
-                relation,
-                request.valorTexto(),
-                request.valorNumero(),
-                request.valorBoolean(),
-                request.valorFecha()
-        );
+        skuAtributoValorValidator
+                .validateValueByTemplate(
+                        atributo,
+                        relation,
+                        request.valorTexto(),
+                        request.valorNumero(),
+                        request.valorBoolean(),
+                        request.valorFecha()
+                );
     }
 
-    private ProductoSku resolveSku(EntityReferenceDto reference) {
+    private ProductoSku resolveSku(
+            EntityReferenceDto reference
+    ) {
         if (reference == null) {
             throw new ValidationException(
                     "SKU_REFERENCIA_REQUERIDA",
@@ -446,19 +739,43 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         }
 
         if (reference.id() != null) {
-            return productoSkuRepository.findByIdSkuAndEstadoTrue(reference.id())
-                    .orElseThrow(this::skuNotFound);
+            return productoSkuRepository
+                    .findByIdSkuAndEstadoTrue(
+                            reference.id()
+                    )
+                    .orElseThrow(
+                            this::skuNotFound
+                    );
         }
 
-        String codigoSku = firstText(reference.codigoSku(), reference.codigo());
+        String codigoSku =
+                firstText(
+                        reference.codigoSku(),
+                        reference.codigo()
+                );
+
         if (StringNormalizer.hasText(codigoSku)) {
-            return productoSkuRepository.findByCodigoSkuIgnoreCaseAndEstadoTrue(codigoSku)
-                    .orElseThrow(this::skuNotFound);
+            return productoSkuRepository
+                    .findByCodigoSkuIgnoreCaseAndEstadoTrue(
+                            codigoSku
+                    )
+                    .orElseThrow(
+                            this::skuNotFound
+                    );
         }
 
-        if (StringNormalizer.hasText(reference.barcode())) {
-            return productoSkuRepository.findByBarcodeIgnoreCaseAndEstadoTrue(reference.barcode())
-                    .orElseThrow(this::skuNotFound);
+        if (
+                StringNormalizer.hasText(
+                        reference.barcode()
+                )
+        ) {
+            return productoSkuRepository
+                    .findByBarcodeIgnoreCaseAndEstadoTrue(
+                            reference.barcode()
+                    )
+                    .orElseThrow(
+                            this::skuNotFound
+                    );
         }
 
         throw new ValidationException(
@@ -467,7 +784,9 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         );
     }
 
-    private Atributo resolveAtributo(EntityReferenceDto reference) {
+    private Atributo resolveAtributo(
+            EntityReferenceDto reference
+    ) {
         if (reference == null) {
             throw new ValidationException(
                     "ATRIBUTO_REFERENCIA_REQUERIDA",
@@ -476,18 +795,41 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         }
 
         if (reference.id() != null) {
-            return atributoRepository.findByIdAtributoAndEstadoTrue(reference.id())
-                    .orElseThrow(this::atributoNotFound);
+            return atributoRepository
+                    .findByIdAtributoAndEstadoTrue(
+                            reference.id()
+                    )
+                    .orElseThrow(
+                            this::atributoNotFound
+                    );
         }
 
-        if (StringNormalizer.hasText(reference.codigo())) {
-            return atributoRepository.findByCodigoIgnoreCaseAndEstadoTrue(reference.codigo())
-                    .orElseThrow(this::atributoNotFound);
+        if (
+                StringNormalizer.hasText(
+                        reference.codigo()
+                )
+        ) {
+            return atributoRepository
+                    .findByCodigoIgnoreCaseAndEstadoTrue(
+                            reference.codigo()
+                    )
+                    .orElseThrow(
+                            this::atributoNotFound
+                    );
         }
 
-        if (StringNormalizer.hasText(reference.nombre())) {
-            return atributoRepository.findByNombreIgnoreCaseAndEstadoTrue(reference.nombre())
-                    .orElseThrow(this::atributoNotFound);
+        if (
+                StringNormalizer.hasText(
+                        reference.nombre()
+                )
+        ) {
+            return atributoRepository
+                    .findByNombreIgnoreCaseAndEstadoTrue(
+                            reference.nombre()
+                    )
+                    .orElseThrow(
+                            this::atributoNotFound
+                    );
         }
 
         throw new ValidationException(
@@ -496,7 +838,9 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         );
     }
 
-    private SkuAtributoValor findActiveValorRequired(Long idSkuAtributoValor) {
+    private SkuAtributoValor findActiveValorRequired(
+            Long idSkuAtributoValor
+    ) {
         if (idSkuAtributoValor == null) {
             throw new ValidationException(
                     "SKU_ATRIBUTO_VALOR_ID_REQUERIDO",
@@ -504,14 +848,22 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
             );
         }
 
-        return skuAtributoValorRepository.findByIdSkuAtributoValorAndEstadoTrue(idSkuAtributoValor)
-                .orElseThrow(() -> new NotFoundException(
-                        "SKU_ATRIBUTO_VALOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+        return skuAtributoValorRepository
+                .findByIdSkuAtributoValorAndEstadoTrue(
+                        idSkuAtributoValor
+                )
+                .orElseThrow(
+                        () ->
+                                new NotFoundException(
+                                        "SKU_ATRIBUTO_VALOR_NO_ENCONTRADO",
+                                        "No se encontró el registro solicitado."
+                                )
+                );
     }
 
-    private SkuAtributoValor findAnyValorRequired(Long idSkuAtributoValor) {
+    private SkuAtributoValor findAnyValorRequired(
+            Long idSkuAtributoValor
+    ) {
         if (idSkuAtributoValor == null) {
             throw new ValidationException(
                     "SKU_ATRIBUTO_VALOR_ID_REQUERIDO",
@@ -519,14 +871,22 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
             );
         }
 
-        return skuAtributoValorRepository.findByIdSkuAtributoValor(idSkuAtributoValor)
-                .orElseThrow(() -> new NotFoundException(
-                        "SKU_ATRIBUTO_VALOR_NO_ENCONTRADO",
-                        "No se encontró el registro solicitado."
-                ));
+        return skuAtributoValorRepository
+                .findByIdSkuAtributoValor(
+                        idSkuAtributoValor
+                )
+                .orElseThrow(
+                        () ->
+                                new NotFoundException(
+                                        "SKU_ATRIBUTO_VALOR_NO_ENCONTRADO",
+                                        "No se encontró el registro solicitado."
+                                )
+                );
     }
 
-    private SkuAtributoValorRequestDto normalizeRequest(SkuAtributoValorRequestDto request) {
+    private SkuAtributoValorRequestDto normalizeRequest(
+            SkuAtributoValorRequestDto request
+    ) {
         if (request == null) {
             throw new ValidationException(
                     "SKU_ATRIBUTO_REQUEST_REQUERIDO",
@@ -535,151 +895,242 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         }
 
         return SkuAtributoValorRequestDto.builder()
-                .atributo(request.atributo())
-                .valorTexto(StringNormalizer.cleanOrNull(request.valorTexto()))
-                .valorNumero(request.valorNumero())
-                .valorBoolean(request.valorBoolean())
-                .valorFecha(request.valorFecha())
+                .atributo(
+                        request.atributo()
+                )
+                .valorTexto(
+                        StringNormalizer.cleanOrNull(
+                                request.valorTexto()
+                        )
+                )
+                .valorNumero(
+                        request.valorNumero()
+                )
+                .valorBoolean(
+                        request.valorBoolean()
+                )
+                .valorFecha(
+                        request.valorFecha()
+                )
                 .build();
     }
 
-    private SkuAtributoValorFilterDto normalizeFilter(SkuAtributoValorFilterDto filter) {
+    private SkuAtributoValorFilterDto normalizeFilter(
+            SkuAtributoValorFilterDto filter
+    ) {
         if (filter == null) {
             return null;
         }
 
         return SkuAtributoValorFilterDto.builder()
-                .search(StringNormalizer.truncateOrNull(filter.search(), MAX_SEARCH_LENGTH))
-                .idSku(filter.idSku())
-                .codigoSku(StringNormalizer.truncateOrNull(filter.codigoSku(), MAX_CODIGO_SKU_LENGTH))
-                .barcode(StringNormalizer.truncateOrNull(filter.barcode(), MAX_BARCODE_LENGTH))
-                .idProducto(filter.idProducto())
-                .codigoProducto(StringNormalizer.truncateOrNull(filter.codigoProducto(), MAX_CODIGO_PRODUCTO_LENGTH))
-                .nombreProducto(StringNormalizer.truncateOrNull(filter.nombreProducto(), MAX_NOMBRE_PRODUCTO_LENGTH))
-                .idAtributo(filter.idAtributo())
-                .codigoAtributo(StringNormalizer.truncateOrNull(filter.codigoAtributo(), MAX_CODIGO_ATRIBUTO_LENGTH))
-                .nombreAtributo(StringNormalizer.truncateOrNull(filter.nombreAtributo(), MAX_NOMBRE_ATRIBUTO_LENGTH))
-                .tipoDato(filter.tipoDato())
-                .valorTexto(StringNormalizer.truncateOrNull(filter.valorTexto(), MAX_VALOR_TEXTO_LENGTH))
-                .visiblePublico(filter.visiblePublico())
-                .filtrable(filter.filtrable())
-                .estado(filter.estado())
-                .incluirTodosLosEstados(Boolean.TRUE.equals(filter.incluirTodosLosEstados()))
-                .fechaCreacion(filter.fechaCreacion())
-                .fechaActualizacion(filter.fechaActualizacion())
+                .search(
+                        StringNormalizer.truncateOrNull(
+                                filter.search(),
+                                MAX_SEARCH_LENGTH
+                        )
+                )
+                .idSku(
+                        filter.idSku()
+                )
+                .codigoSku(
+                        StringNormalizer.truncateOrNull(
+                                filter.codigoSku(),
+                                MAX_CODIGO_SKU_LENGTH
+                        )
+                )
+                .barcode(
+                        StringNormalizer.truncateOrNull(
+                                filter.barcode(),
+                                MAX_BARCODE_LENGTH
+                        )
+                )
+                .idProducto(
+                        filter.idProducto()
+                )
+                .codigoProducto(
+                        StringNormalizer.truncateOrNull(
+                                filter.codigoProducto(),
+                                MAX_CODIGO_PRODUCTO_LENGTH
+                        )
+                )
+                .nombreProducto(
+                        StringNormalizer.truncateOrNull(
+                                filter.nombreProducto(),
+                                MAX_NOMBRE_PRODUCTO_LENGTH
+                        )
+                )
+                .idAtributo(
+                        filter.idAtributo()
+                )
+                .codigoAtributo(
+                        StringNormalizer.truncateOrNull(
+                                filter.codigoAtributo(),
+                                MAX_CODIGO_ATRIBUTO_LENGTH
+                        )
+                )
+                .nombreAtributo(
+                        StringNormalizer.truncateOrNull(
+                                filter.nombreAtributo(),
+                                MAX_NOMBRE_ATRIBUTO_LENGTH
+                        )
+                )
+                .tipoDato(
+                        filter.tipoDato()
+                )
+                .valorTexto(
+                        StringNormalizer.truncateOrNull(
+                                filter.valorTexto(),
+                                MAX_VALOR_TEXTO_LENGTH
+                        )
+                )
+                .visiblePublico(
+                        filter.visiblePublico()
+                )
+                .filtrable(
+                        filter.filtrable()
+                )
+                .estado(
+                        filter.estado()
+                )
+                .incluirTodosLosEstados(
+                        Boolean.TRUE.equals(
+                                filter.incluirTodosLosEstados()
+                        )
+                )
+                .fechaCreacion(
+                        filter.fechaCreacion()
+                )
+                .fechaActualizacion(
+                        filter.fechaActualizacion()
+                )
                 .build();
     }
 
-    private TipoProductoAtributo resolveRelationRequired(ProductoSku sku, Atributo atributo) {
-        return resolveRelationOrNull(sku, atributo);
+    private CategoriaAtributo resolveRelationRequired(
+            ProductoSku sku,
+            Atributo atributo
+    ) {
+        return resolveRelationOrNull(
+                sku,
+                atributo
+        );
     }
 
-    private TipoProductoAtributo resolveRelationOrNull(ProductoSku sku, Atributo atributo) {
-        skuAtributoValorValidator.requireSkuWithProductType(sku);
+    private CategoriaAtributo resolveRelationOrNull(
+            ProductoSku sku,
+            Atributo atributo
+    ) {
+        skuAtributoValorValidator
+                .requireSkuWithCategory(sku);
 
-        if (atributo == null || atributo.getIdAtributo() == null) {
+        if (
+                atributo == null
+                        || atributo.getIdAtributo() == null
+        ) {
             return null;
         }
 
-        Long idTipoProducto = sku.getProducto().getTipoProducto().getIdTipoProducto();
+        List<CategoriaAtributo> plantilla =
+                findPlantillaActiva(
+                        sku
+                );
 
-        return tipoProductoAtributoRepository
-                .findByTipoProducto_IdTipoProductoAndAtributo_IdAtributoAndEstadoTrue(
-                        idTipoProducto,
-                        atributo.getIdAtributo()
-                )
-                .orElse(null);
+        return findRelationFromTemplate(
+                plantilla,
+                atributo.getIdAtributo()
+        );
     }
 
-    private List<TipoProductoAtributo> findPlantillaActiva(ProductoSku sku) {
-        skuAtributoValorValidator.requireSkuWithProductType(sku);
+    private List<CategoriaAtributo> findPlantillaActiva(
+            ProductoSku sku
+    ) {
+        skuAtributoValorValidator
+                .requireSkuWithCategory(sku);
 
-        return tipoProductoAtributoRepository
-                .findByTipoProducto_IdTipoProductoAndEstadoTrueOrderByOrdenAscIdTipoProductoAtributoAsc(
-                        sku.getProducto().getTipoProducto().getIdTipoProducto()
+        return categoriaAtributoRepository
+                .findByCategoria_IdCategoriaAndEstadoTrueOrderByOrdenAscIdCategoriaAtributoAsc(
+                        sku.getProducto()
+                                .getCategoria()
+                                .getIdCategoria()
                 );
     }
 
-    private TipoProductoAtributo findRelationFromTemplate(
-            List<TipoProductoAtributo> plantilla,
+    private CategoriaAtributo findRelationFromTemplate(
+            List<CategoriaAtributo> plantilla,
             Long idAtributo
     ) {
-        if (plantilla == null || idAtributo == null) {
+        if (
+                plantilla == null
+                        || idAtributo == null
+        ) {
             return null;
         }
 
         return plantilla.stream()
-                .filter(item -> item.getAtributo() != null)
-                .filter(item -> idAtributo.equals(item.getAtributo().getIdAtributo()))
+                .filter(
+                        item ->
+                                item.getAtributo()
+                                        != null
+                )
+                .filter(
+                        item ->
+                                idAtributo.equals(
+                                        item.getAtributo()
+                                                .getIdAtributo()
+                                )
+                )
                 .findFirst()
                 .orElse(null);
     }
 
-    private void registrarOutboxSkuActualizado(ProductoSku sku) {
-        eventoDominioOutboxService.registrarEvento(
-                AggregateType.SKU,
-                String.valueOf(sku.getIdSku()),
-                ProductoEventType.SKU_SNAPSHOT_ACTUALIZADO.getCode(),
-                toSkuSnapshotPayload(sku)
-        );
-    }
-
-    private ProductoSkuSnapshotPayload toSkuSnapshotPayload(ProductoSku sku) {
-        Producto producto = sku.getProducto();
-
-        List<ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload> atributos = skuAtributoValorRepository
-                .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(sku.getIdSku())
-                .stream()
-                .map(this::toSkuAtributoSnapshotPayload)
-                .toList();
-
-        return ProductoSkuSnapshotPayload.builder()
-                .idSku(sku.getIdSku())
-                .idProducto(producto == null ? null : producto.getIdProducto())
-                .codigoProducto(producto == null ? null : producto.getCodigoProducto())
-                .codigoSku(sku.getCodigoSku())
-                .barcode(sku.getBarcode())
-                .color(sku.getColor())
-                .talla(sku.getTalla())
-                .material(sku.getMaterial())
-                .modelo(sku.getModelo())
-                .stockMinimo(sku.getStockMinimo())
-                .stockMaximo(sku.getStockMaximo())
-                .pesoGramos(sku.getPesoGramos())
-                .altoCm(sku.getAltoCm())
-                .anchoCm(sku.getAnchoCm())
-                .largoCm(sku.getLargoCm())
-                .estadoSku(sku.getEstadoSku() == null ? null : sku.getEstadoSku().getCode())
-                .estado(sku.getEstado())
-                .createdAt(sku.getCreatedAt())
-                .updatedAt(sku.getUpdatedAt())
-                .atributos(atributos)
-                .build();
-    }
-
-    private ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload toSkuAtributoSnapshotPayload(
-            SkuAtributoValor valor
+    private void registrarOutboxSkuActualizado(
+            ProductoSku sku
     ) {
-        Atributo atributo = valor.getAtributo();
+        if (
+                sku == null
+                        || sku.getProducto() == null
+                        || sku.getProducto()
+                        .getIdProducto() == null
+        ) {
+            return;
+        }
 
-        return ProductoSkuSnapshotPayload.SkuAtributoSnapshotPayload.builder()
-                .idSkuAtributoValor(valor.getIdSkuAtributoValor())
-                .idAtributo(atributo == null ? null : atributo.getIdAtributo())
-                .codigoAtributo(atributo == null ? null : atributo.getCodigo())
-                .nombreAtributo(atributo == null ? null : atributo.getNombre())
-                .tipoDato(atributo == null || atributo.getTipoDato() == null ? null : atributo.getTipoDato().getCode())
-                .unidadMedida(atributo == null ? null : atributo.getUnidadMedida())
-                .requerido(atributo == null ? null : atributo.getRequerido())
-                .filtrable(atributo == null ? null : atributo.getFiltrable())
-                .visiblePublico(atributo == null ? null : atributo.getVisiblePublico())
-                .valorTexto(valor.getValorTexto())
-                .valorNumero(valor.getValorNumero())
-                .valorBoolean(valor.getValorBoolean())
-                .valorFecha(valor.getValorFecha())
-                .estado(valor.getEstado())
-                .createdAt(valor.getCreatedAt())
-                .updatedAt(valor.getUpdatedAt())
-                .build();
+        Map<String, Object> metadata =
+                new LinkedHashMap<>();
+
+        metadata.put(
+                "accion",
+                "ACTUALIZAR_ATRIBUTOS_SKU"
+        );
+
+        metadata.put(
+                "idSku",
+                sku.getIdSku()
+        );
+
+        metadata.put(
+                "codigoSku",
+                sku.getCodigoSku()
+        );
+
+        metadata.put(
+                "idProducto",
+                sku.getProducto()
+                        .getIdProducto()
+        );
+
+        metadata.put(
+                "codigoProducto",
+                sku.getProducto()
+                        .getCodigoProducto()
+        );
+
+        productoSnapshotOutboxRegistrar
+                .registrarProductoActualizado(
+                        sku.getProducto(),
+                        "SkuAtributoValorService",
+                        metadata
+                );
     }
 
     private Map<String, Object> auditMetadata(
@@ -687,48 +1138,145 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
             AuthenticatedUserContext actor,
             Map<String, Object> extra
     ) {
-        Map<String, Object> metadata = auditSnapshot(valor);
-        metadata.put("actor", actor.actorLabel());
-        metadata.put("idUsuarioMs1", actor.getIdUsuarioMs1());
+        Map<String, Object> metadata =
+                auditSnapshot(valor);
 
-        if (extra != null && !extra.isEmpty()) {
+        metadata.put(
+                "actor",
+                actor.actorLabel()
+        );
+
+        metadata.put(
+                "idUsuarioMs1",
+                actor.getIdUsuarioMs1()
+        );
+
+        if (
+                extra != null
+                        && !extra.isEmpty()
+        ) {
             metadata.putAll(extra);
         }
 
         return metadata;
     }
 
-    private Map<String, Object> auditSnapshot(SkuAtributoValor valor) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        ProductoSku sku = valor.getSku();
-        Producto producto = sku == null ? null : sku.getProducto();
-        Atributo atributo = valor.getAtributo();
+    private Map<String, Object> auditSnapshot(
+            SkuAtributoValor valor
+    ) {
+        Map<String, Object> metadata =
+                new LinkedHashMap<>();
 
-        metadata.put("idSkuAtributoValor", valor.getIdSkuAtributoValor());
-        metadata.put("idSku", sku == null ? null : sku.getIdSku());
-        metadata.put("codigoSku", sku == null ? null : sku.getCodigoSku());
-        metadata.put("idProducto", producto == null ? null : producto.getIdProducto());
-        metadata.put("codigoProducto", producto == null ? null : producto.getCodigoProducto());
-        metadata.put("idAtributo", atributo == null ? null : atributo.getIdAtributo());
-        metadata.put("codigoAtributo", atributo == null ? null : atributo.getCodigo());
-        metadata.put("tipoDato", atributo == null || atributo.getTipoDato() == null ? null : atributo.getTipoDato().getCode());
-        metadata.put("valorTexto", valor.getValorTexto());
-        metadata.put("valorNumero", valor.getValorNumero());
-        metadata.put("valorBoolean", valor.getValorBoolean());
-        metadata.put("valorFecha", valor.getValorFecha());
-        metadata.put("estado", valor.getEstado());
+        ProductoSku sku =
+                valor.getSku();
+
+        Producto producto =
+                sku == null
+                        ? null
+                        : sku.getProducto();
+
+        Atributo atributo =
+                valor.getAtributo();
+
+        metadata.put(
+                "idSkuAtributoValor",
+                valor.getIdSkuAtributoValor()
+        );
+
+        metadata.put(
+                "idSku",
+                sku == null
+                        ? null
+                        : sku.getIdSku()
+        );
+
+        metadata.put(
+                "codigoSku",
+                sku == null
+                        ? null
+                        : sku.getCodigoSku()
+        );
+
+        metadata.put(
+                "idProducto",
+                producto == null
+                        ? null
+                        : producto.getIdProducto()
+        );
+
+        metadata.put(
+                "codigoProducto",
+                producto == null
+                        ? null
+                        : producto.getCodigoProducto()
+        );
+
+        metadata.put(
+                "idAtributo",
+                atributo == null
+                        ? null
+                        : atributo.getIdAtributo()
+        );
+
+        metadata.put(
+                "codigoAtributo",
+                atributo == null
+                        ? null
+                        : atributo.getCodigo()
+        );
+
+        metadata.put(
+                "tipoDato",
+                atributo == null
+                        || atributo.getTipoDato() == null
+                        ? null
+                        : atributo.getTipoDato()
+                        .getCode()
+        );
+
+        metadata.put(
+                "valorTexto",
+                valor.getValorTexto()
+        );
+
+        metadata.put(
+                "valorNumero",
+                valor.getValorNumero()
+        );
+
+        metadata.put(
+                "valorBoolean",
+                valor.getValorBoolean()
+        );
+
+        metadata.put(
+                "valorFecha",
+                valor.getValorFecha()
+        );
+
+        metadata.put(
+                "estado",
+                valor.getEstado()
+        );
 
         return metadata;
     }
 
-    private boolean employeeCanUpdateAttributes(AuthenticatedUserContext actor) {
+    private boolean employeeCanUpdateAttributes(
+            AuthenticatedUserContext actor
+    ) {
         return actor != null
                 && actor.isEmpleado()
                 && actor.getIdUsuarioMs1() != null
-                && empleadoInventarioPermisoService.puedeActualizarAtributos(actor.getIdUsuarioMs1());
+                && empleadoInventarioPermisoService
+                .puedeActualizarAtributos(
+                        actor.getIdUsuarioMs1()
+                );
     }
 
-    private String validateEstadoChangeRequestAndReturnMotivo(EstadoChangeRequestDto request) {
+    private String validateEstadoChangeRequestAndReturnMotivo(
+            EstadoChangeRequestDto request
+    ) {
         if (request == null) {
             throw new ValidationException(
                     "CAMBIO_ESTADO_REQUEST_REQUERIDO",
@@ -743,7 +1291,10 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
             );
         }
 
-        String motivo = StringNormalizer.cleanOrNull(request.motivo());
+        String motivo =
+                StringNormalizer.cleanOrNull(
+                        request.motivo()
+                );
 
         if (!StringNormalizer.hasText(motivo)) {
             throw new ValidationException(
@@ -762,7 +1313,10 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         return motivo;
     }
 
-    private PageRequestDto safePageRequest(PageRequestDto pageRequest, String defaultSortBy) {
+    private PageRequestDto safePageRequest(
+            PageRequestDto pageRequest,
+            String defaultSortBy
+    ) {
         if (pageRequest == null) {
             return PageRequestDto.builder()
                     .page(0)
@@ -775,8 +1329,13 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
         return pageRequest;
     }
 
-    private String firstText(String first, String second) {
-        return StringNormalizer.hasText(first) ? first : second;
+    private String firstText(
+            String first,
+            String second
+    ) {
+        return StringNormalizer.hasText(first)
+                ? first
+                : second;
     }
 
     private NotFoundException skuNotFound() {
@@ -796,7 +1355,7 @@ public class SkuAtributoValorServiceImpl implements SkuAtributoValorService {
     private record ValorPreparado(
             SkuAtributoValorRequestDto request,
             Atributo atributo,
-            TipoProductoAtributo relation
+            CategoriaAtributo relation
     ) {
     }
 }

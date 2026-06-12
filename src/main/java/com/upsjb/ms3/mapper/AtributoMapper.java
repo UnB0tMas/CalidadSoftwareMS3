@@ -7,7 +7,7 @@ import com.upsjb.ms3.dto.catalogo.atributo.request.AtributoCreateRequestDto;
 import com.upsjb.ms3.dto.catalogo.atributo.request.AtributoUpdateRequestDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoResponseDto;
-import com.upsjb.ms3.dto.catalogo.atributo.response.TipoProductoAtributoResponseDto;
+import com.upsjb.ms3.dto.catalogo.atributo.response.CategoriaAtributoResponseDto;
 import com.upsjb.ms3.dto.reference.response.AtributoOptionDto;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -15,13 +15,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class AtributoMapper {
 
-    public Atributo toEntity(AtributoCreateRequestDto request) {
+    public Atributo toEntity(
+            AtributoCreateRequestDto request,
+            String codigo
+    ) {
         if (request == null) {
             return null;
         }
 
         Atributo entity = new Atributo();
-        entity.setCodigo(request.codigo());
+        entity.setCodigo(codigo);
         entity.setNombre(request.nombre());
         entity.setTipoDato(request.tipoDato());
         entity.setUnidadMedida(request.unidadMedida());
@@ -37,7 +40,6 @@ public class AtributoMapper {
             return;
         }
 
-        entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
         entity.setTipoDato(request.tipoDato());
         entity.setUnidadMedida(request.unidadMedida());
@@ -90,7 +92,7 @@ public class AtributoMapper {
             Atributo entity,
             Long cantidadValoresProducto,
             Long cantidadValoresSku,
-            List<TipoProductoAtributoResponseDto> tiposProductoAsociados
+            List<CategoriaAtributoResponseDto> categoriasAsociadas
     ) {
         if (entity == null) {
             return null;
@@ -109,7 +111,7 @@ public class AtributoMapper {
                 .estado(entity.getEstado())
                 .cantidadValoresProducto(defaultLong(cantidadValoresProducto))
                 .cantidadValoresSku(defaultLong(cantidadValoresSku))
-                .tiposProductoAsociados(tiposProductoAsociados == null ? List.of() : tiposProductoAsociados)
+                .categoriasAsociadas(categoriasAsociadas == null ? List.of() : categoriasAsociadas)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

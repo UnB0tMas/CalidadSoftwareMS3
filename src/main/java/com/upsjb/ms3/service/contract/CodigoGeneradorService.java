@@ -15,7 +15,19 @@ public interface CodigoGeneradorService {
 
     String generarCodigoMovimientoInventario();
 
+    String generarCodigoAlmacen();
+
+    String generarCodigoCategoria();
+
+    String generarCodigoMarca();
+
+    String generarCodigoAtributo();
+
     String generarCodigo(String entidad);
 
-    String generarCodigo(String entidad, String prefijoPorDefecto, int longitudPorDefecto);
+    String generarCodigo(
+            String entidad,
+            String prefijoPorDefecto,
+            int longitudPorDefecto
+    );
 }

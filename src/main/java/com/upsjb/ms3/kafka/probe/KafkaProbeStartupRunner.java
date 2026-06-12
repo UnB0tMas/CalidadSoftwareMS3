@@ -1,10 +1,10 @@
 package com.upsjb.ms3.kafka.probe;
 
+import com.upsjb.ms3.config.KafkaTopicProperties;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -14,47 +14,65 @@ import org.springframework.stereotype.Component;
 @Component
 public class KafkaProbeStartupRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaProbeStartupRunner.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    KafkaProbeStartupRunner.class
+            );
+
+    private static final String DIRECTION =
+            "MS3_TO_MS4_FUNCTIONAL";
 
     private final KafkaProbeProperties properties;
-    private final KafkaProbePublisher publisher;
+    private final KafkaTopicProperties topicProperties;
     private final KafkaProbeRegistry registry;
+    private final KafkaFunctionalStockSnapshotProbeService
+            functionalProbeService;
+
+    private final AtomicBoolean startupExecuted =
+            new AtomicBoolean(false);
 
     public KafkaProbeStartupRunner(
             KafkaProbeProperties properties,
-            KafkaProbePublisher publisher,
-            KafkaProbeRegistry registry
+            KafkaTopicProperties topicProperties,
+            KafkaProbeRegistry registry,
+            KafkaFunctionalStockSnapshotProbeService functionalProbeService
     ) {
         this.properties = properties;
-        this.publisher = publisher;
+        this.topicProperties = topicProperties;
         this.registry = registry;
+        this.functionalProbeService = functionalProbeService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        if (!properties.isEnabled() || !properties.isRunOnStartup()) {
-            log.info("[KAFKA-PROBE][MS3] Probe deshabilitado por configuración.");
+        if (
+                !properties.isEnabled()
+                        || !properties.isRunOnStartup()
+        ) {
+            log.info(
+                    "[KAFKA-FUNCTIONAL-E2E][MS3] Prueba deshabilitada por configuración."
+            );
             return;
         }
 
-        CompletableFuture.runAsync(this::runProbeSafely);
-    }
+        if (!startupExecuted.compareAndSet(false, true)) {
+            return;
+        }
 
-    public String runManualProbe() {
-        String probeId = newProbeId();
-        runProbe(probeId);
-        return probeId;
-    }
+        sleep(
+                properties.safeInitialDelayMs()
+        );
 
-    private void runProbeSafely() {
-        sleep(properties.safeInitialDelayMs());
-
-        String probeId = newProbeId();
+        String probeId =
+                newProbeId();
 
         try {
             runProbe(probeId);
-        } catch (Exception ex) {
-            log.error("[KAFKA-PROBE][MS3] Error general ejecutando probeId={}", probeId, ex);
+        } catch (RuntimeException ex) {
+            printFailure(
+                    probeId,
+                    ex
+            );
 
             if (properties.isFailOnTimeout()) {
                 throw ex;
@@ -62,92 +80,213 @@ public class KafkaProbeStartupRunner {
         }
     }
 
-    private void runProbe(String probeId) {
-        String topic = properties.ms3ToMs4Topic();
-        String key = "probe:" + probeId;
+    public String runManualProbe() {
+        String probeId =
+                newProbeId();
 
-        for (int attempt = 1; attempt <= properties.safeMaxAttempts(); attempt++) {
+        runProbe(probeId);
+
+        return probeId;
+    }
+
+    private void runProbe(
+            String probeId
+    ) {
+        String expectedTopic =
+                topicProperties
+                        .resolveStockSnapshotTopic();
+
+        registry.markPending(
+                probeId,
+                DIRECTION,
+                expectedTopic,
+                "PENDING:" + probeId,
+                1
+        );
+
+        KafkaFunctionalStockSnapshotProbeService.Publication
+                publication;
+
+        try {
+            publication =
+                    functionalProbeService.publish(
+                            probeId
+                    );
+        } catch (RuntimeException ex) {
+            registry.markFailed(
+                    probeId,
+                    DIRECTION,
+                    expectedTopic,
+                    "PENDING:" + probeId,
+                    1,
+                    ex.getMessage()
+            );
+
+            throw ex;
+        }
+
+        if (!registry.isAcked(probeId)) {
+            registry.markPending(
+                    probeId,
+                    DIRECTION,
+                    publication.topic(),
+                    publication.eventKey(),
+                    1
+            );
+        }
+
+        log.info(
+                "[KAFKA-FUNCTIONAL-E2E][MS3] Snapshot real de stock enviado. probeId={}, eventId={}, idStockMs3={}, idSkuMs3={}, idAlmacenMs3={}, stockDisponible={}, topic={}, key={}, partition={}, offset={}",
+                probeId,
+                publication.eventId(),
+                publication.idStockMs3(),
+                publication.idSkuMs3(),
+                publication.idAlmacenMs3(),
+                publication.stockDisponible(),
+                publication.topic(),
+                publication.eventKey(),
+                publication.partition(),
+                publication.offset()
+        );
+
+        awaitAck(
+                probeId,
+                publication
+        );
+
+        printSuccess(
+                publication
+        );
+    }
+
+    private void awaitAck(
+            String probeId,
+            KafkaFunctionalStockSnapshotProbeService.Publication
+                    publication
+    ) {
+        for (
+                int attempt = 1;
+                attempt <= properties.safeMaxAttempts();
+                attempt++
+        ) {
             if (registry.isAcked(probeId)) {
-                log.info("[KAFKA-PROBE][MS3] Probe ya confirmado. probeId={}", probeId);
                 return;
             }
 
-            try {
-                KafkaProbePayload payload = KafkaProbePayload.ms3ToMs4(
-                        probeId,
-                        properties.getServiceName(),
-                        properties.getTargetMs4()
-                );
+            log.info(
+                    "[KAFKA-FUNCTIONAL-E2E][MS3] Esperando confirmación funcional de MS4. probeId={}, attempt={}/{}",
+                    probeId,
+                    attempt,
+                    properties.safeMaxAttempts()
+            );
 
-                registry.markPending(probeId, "MS3_TO_MS4", topic, key, attempt);
-
-                RecordMetadata metadata = publisher.publishProbe(payload, topic, key);
-
-                log.info(
-                        "[KAFKA-PROBE][MS3] Probe enviado hacia MS4. probeId={}, attempt={}, topic={}, key={}, partition={}, offset={}",
-                        probeId,
-                        attempt,
-                        topic,
-                        key,
-                        metadata == null ? null : metadata.partition(),
-                        metadata == null ? null : metadata.offset()
-                );
-
-                sleep(properties.safeRetryDelayMs());
-
-                if (registry.isAcked(probeId)) {
-                    log.info("[KAFKA-PROBE][MS3] Resultado MS3_TO_MS4=ACKED. probeId={}", probeId);
-                    return;
-                }
-            } catch (Exception ex) {
-                registry.markFailed(
-                        probeId,
-                        "MS3_TO_MS4",
-                        topic,
-                        key,
-                        attempt,
-                        ex.getMessage()
-                );
-
-                log.warn(
-                        "[KAFKA-PROBE][MS3] Falló intento de probe MS3_TO_MS4. probeId={}, attempt={}, error={}",
-                        probeId,
-                        attempt,
-                        ex.getMessage()
-                );
-
-                sleep(properties.safeRetryDelayMs());
-            }
+            sleep(
+                    properties.safeRetryDelayMs()
+            );
         }
 
-        String message = "No llegó ACK desde MS4 para probeId=" + probeId;
+        String message =
+                "MS4 no confirmó el procesamiento funcional del snapshot "
+                        + publication.eventId();
+
         registry.markFailed(
                 probeId,
-                "MS3_TO_MS4",
-                topic,
-                key,
+                DIRECTION,
+                publication.topic(),
+                publication.eventKey(),
                 properties.safeMaxAttempts(),
                 message
         );
 
-        log.error("[KAFKA-PROBE][MS3] Resultado MS3_TO_MS4=FAILED. {}", message);
+        throw new IllegalStateException(
+                message
+        );
+    }
 
-        if (properties.isFailOnTimeout()) {
-            throw new IllegalStateException(message);
-        }
+    private void printSuccess(
+            KafkaFunctionalStockSnapshotProbeService.Publication
+                    publication
+    ) {
+        log.info(
+                """
+                
+                ========================================================================
+                [KAFKA-FUNCTIONAL-E2E][MS3] RESULTADO=APROBADO
+                probeId={}
+                eventId={}
+                flujo=MS3 -> OUTBOX REAL -> KAFKA -> MS4
+                topic={}
+                eventKey={}
+                idStockMs3={}
+                idSkuMs3={}
+                idAlmacenMs3={}
+                contratoStockReal=OK
+                outboxCreadoYPublicado=OK
+                consumoRealMS4=OK
+                persistenciaSnapshotMS4=OK
+                idempotenciaMS4=OK
+                rollbackMS3=OK
+                rollbackMS4=OK
+                residuosBaseDatos=NINGUNO
+                listoContextoReal=true
+                ========================================================================
+                """,
+                publication.probeId(),
+                publication.eventId(),
+                publication.topic(),
+                publication.eventKey(),
+                publication.idStockMs3(),
+                publication.idSkuMs3(),
+                publication.idAlmacenMs3()
+        );
+    }
+
+    private void printFailure(
+            String probeId,
+            RuntimeException ex
+    ) {
+        log.error(
+                """
+                
+                ========================================================================
+                [KAFKA-FUNCTIONAL-E2E][MS3] RESULTADO=FALLIDO
+                probeId={}
+                flujo=MS3 -> MS4
+                listoContextoReal=false
+                error={}
+                Se aplicó rollback a toda escritura funcional de la prueba.
+                ========================================================================
+                """,
+                probeId,
+                ex.getMessage(),
+                ex
+        );
     }
 
     private String newProbeId() {
-        String timestamp = DateTimeFormatter.ISO_INSTANT
-                .format(Instant.now())
-                .replace(":", "")
-                .replace(".", "")
-                .replace("-", "");
+        String timestamp =
+                DateTimeFormatter.ISO_INSTANT
+                        .format(
+                                Instant.now()
+                        )
+                        .replace(":", "")
+                        .replace(".", "")
+                        .replace("-", "");
 
-        return "MS3-" + timestamp + "-" + UUID.randomUUID().toString().substring(0, 8);
+        return "MS3-"
+                + timestamp
+                + "-"
+                + UUID.randomUUID()
+                .toString()
+                .substring(
+                        0,
+                        8
+                );
     }
 
-    private void sleep(long millis) {
+    private void sleep(
+            long millis
+    ) {
         if (millis <= 0) {
             return;
         }
@@ -155,8 +294,13 @@ public class KafkaProbeStartupRunner {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Kafka Probe MS3 fue interrumpido.", ex);
+            Thread.currentThread()
+                    .interrupt();
+
+            throw new IllegalStateException(
+                    "La prueba funcional Kafka MS3 fue interrumpida.",
+                    ex
+            );
         }
     }
 }

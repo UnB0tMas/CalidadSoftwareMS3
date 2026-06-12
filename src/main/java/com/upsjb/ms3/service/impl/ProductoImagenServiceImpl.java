@@ -6,7 +6,6 @@ import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
 import com.upsjb.ms3.domain.entity.ProductoSku;
-import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.ProductoEventType;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
@@ -699,7 +698,6 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 .map(this::toImagenPayload)
                 .toList();
 
-        TipoProducto tipoProducto = producto.getTipoProducto();
         Categoria categoria = producto.getCategoria();
         Marca marca = producto.getMarca();
 
@@ -708,9 +706,6 @@ public class ProductoImagenServiceImpl implements ProductoImagenService {
                 .codigoProducto(producto.getCodigoProducto())
                 .nombre(producto.getNombre())
                 .slug(producto.getSlug())
-                .idTipoProducto(tipoProducto == null ? null : tipoProducto.getIdTipoProducto())
-                .codigoTipoProducto(tipoProducto == null ? null : tipoProducto.getCodigo())
-                .nombreTipoProducto(tipoProducto == null ? null : tipoProducto.getNombre())
                 .idCategoria(categoria == null ? null : categoria.getIdCategoria())
                 .codigoCategoria(categoria == null ? null : categoria.getCodigo())
                 .nombreCategoria(categoria == null ? null : categoria.getNombre())

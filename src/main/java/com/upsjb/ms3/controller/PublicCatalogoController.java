@@ -6,7 +6,6 @@ import com.upsjb.ms3.dto.catalogo.producto.response.ProductoPublicResponseDto;
 import com.upsjb.ms3.dto.reference.filter.ReferenceSearchFilterDto;
 import com.upsjb.ms3.dto.reference.response.CategoriaOptionDto;
 import com.upsjb.ms3.dto.reference.response.MarcaOptionDto;
-import com.upsjb.ms3.dto.reference.response.TipoProductoOptionDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
@@ -37,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/ms3/public/catalogo")
 @Tag(
         name = "MS3 - Público - Catálogo",
-        description = "Endpoints públicos de navegación del catálogo. No exponen costos, proveedores, kardex, stock interno, movimientos ni auditoría."
+        description = "Endpoints públicos de navegación del catálogo."
 )
 public class PublicCatalogoController {
 
@@ -52,9 +51,16 @@ public class PublicCatalogoController {
             description = "Devuelve categorías activas para navegación pública del catálogo."
     )
     public ResponseEntity<ApiResponseDto<List<CategoriaOptionDto>>> listarCategorias(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarCategoriasPublicas(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarCategoriasPublicas(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/categorias/arbol")
@@ -63,7 +69,9 @@ public class PublicCatalogoController {
             description = "Devuelve solo categorías activas para menús públicos."
     )
     public ResponseEntity<ApiResponseDto<List<CategoriaTreeResponseDto>>> obtenerArbolCategorias() {
-        return ResponseEntity.ok(categoriaService.obtenerArbolPublico());
+        return ResponseEntity.ok(
+                categoriaService.obtenerArbolPublico()
+        );
     }
 
     @GetMapping("/marcas")
@@ -72,29 +80,27 @@ public class PublicCatalogoController {
             description = "Devuelve marcas activas para filtros públicos del catálogo."
     )
     public ResponseEntity<ApiResponseDto<List<MarcaOptionDto>>> listarMarcas(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarMarcasPublicas(filter));
-    }
-
-    @GetMapping("/tipos-producto")
-    @Operation(
-            summary = "Listar tipos de producto públicos",
-            description = "Devuelve tipos de producto activos para navegación pública."
-    )
-    public ResponseEntity<ApiResponseDto<List<TipoProductoOptionDto>>> listarTiposProducto(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
-    ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarTiposProductoPublicos(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarMarcasPublicas(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/generos-objetivo")
     @Operation(
             summary = "Listar géneros objetivo públicos",
-            description = "Devuelve opciones públicas de género objetivo para filtros del catálogo."
+            description = "Devuelve opciones públicas de género objetivo."
     )
     public ResponseEntity<ApiResponseDto<List<SelectOptionDto>>> listarGenerosObjetivo() {
-        return ResponseEntity.ok(referenceDataService.generosObjetivo());
+        return ResponseEntity.ok(
+                referenceDataService.generosObjetivo()
+        );
     }
 
     @GetMapping("/monedas")
@@ -103,33 +109,54 @@ public class PublicCatalogoController {
             description = "Devuelve monedas disponibles para presentación comercial."
     )
     public ResponseEntity<ApiResponseDto<List<SelectOptionDto>>> listarMonedas() {
-        return ResponseEntity.ok(referenceDataService.monedas());
+        return ResponseEntity.ok(
+                referenceDataService.monedas()
+        );
     }
 
     @GetMapping("/productos-recientes")
     @Operation(
             summary = "Listar productos públicos recientes",
-            description = "Devuelve productos públicos paginados usando las reglas de visibilidad de ProductoPublicService."
+            description = "Devuelve productos públicos paginados."
     )
     public ResponseEntity<ApiResponseDto<PageResponseDto<ProductoPublicResponseDto>>> listarProductosRecientes(
-            @Min(value = 0, message = "La página mínima es 0.")
-            @RequestParam(defaultValue = "0") Integer page,
-            @Min(value = 1, message = "El tamaño mínimo es 1.")
-            @Max(value = 24, message = "El tamaño máximo público es 24.")
-            @RequestParam(defaultValue = "12") Integer size
+            @Min(
+                    value = 0,
+                    message = "La página mínima es 0."
+            )
+            @RequestParam(defaultValue = "0")
+            Integer page,
+
+            @Min(
+                    value = 1,
+                    message = "El tamaño mínimo es 1."
+            )
+            @Max(
+                    value = 24,
+                    message = "El tamaño máximo público es 24."
+            )
+            @RequestParam(defaultValue = "12")
+            Integer size
     ) {
-        ProductoPublicFilterDto filter = ProductoPublicFilterDto.builder()
-                .soloVendibles(Boolean.FALSE)
-                .incluirProgramados(Boolean.TRUE)
-                .build();
+        ProductoPublicFilterDto filter =
+                ProductoPublicFilterDto.builder()
+                        .soloVendibles(Boolean.FALSE)
+                        .incluirProgramados(Boolean.TRUE)
+                        .build();
 
-        PageRequestDto pageRequest = PageRequestDto.builder()
-                .page(page)
-                .size(size)
-                .sortBy("fechaPublicacionInicio")
-                .sortDirection("DESC")
-                .build();
+        PageRequestDto pageRequest =
+                PageRequestDto.builder()
+                        .page(page)
+                        .size(size)
+                        .sortBy("fechaPublicacionInicio")
+                        .sortDirection("DESC")
+                        .build();
 
-        return ResponseEntity.ok(productoPublicService.listar(filter, pageRequest));
+        return ResponseEntity.ok(
+                productoPublicService.listar(
+                        filter,
+                        pageRequest
+                )
+        );
     }
 }

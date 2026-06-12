@@ -14,8 +14,6 @@ public interface EntityReferenceService {
 
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscar(String entidad, ReferenceSearchFilterDto filter);
 
-    ApiResponseDto<List<EntityReferenceResolvedDto>> buscarTipoProducto(ReferenceSearchFilterDto filter);
-
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscarCategoria(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscarMarca(ReferenceSearchFilterDto filter);
@@ -33,8 +31,6 @@ public interface EntityReferenceService {
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscarPromocion(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<EntityReferenceResolvedDto>> buscarEmpleadoInventario(ReferenceSearchFilterDto filter);
-
-    ApiResponseDto<EntityReferenceDto> resolverTipoProducto(EntityReferenceDto reference);
 
     ApiResponseDto<EntityReferenceDto> resolverCategoria(EntityReferenceDto reference);
 

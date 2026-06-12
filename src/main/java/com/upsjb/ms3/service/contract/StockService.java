@@ -3,6 +3,7 @@ package com.upsjb.ms3.service.contract;
 
 import com.upsjb.ms3.dto.inventario.stock.filter.StockSkuFilterDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockDisponibleResponseDto;
+import com.upsjb.ms3.dto.inventario.stock.response.StockInventarioResumenResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuResponseDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
@@ -11,6 +12,8 @@ import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
 
 public interface StockService {
+
+    ApiResponseDto<StockInventarioResumenResponseDto> obtenerResumen(Long idAlmacen);
 
     ApiResponseDto<PageResponseDto<StockSkuResponseDto>> listar(
             StockSkuFilterDto filter,

@@ -13,6 +13,7 @@ public class MarcaMapper {
 
     public Marca toEntity(
             MarcaCreateRequestDto request,
+            String codigo,
             String slug,
             Boolean slugGenerado
     ) {
@@ -21,7 +22,7 @@ public class MarcaMapper {
         }
 
         Marca entity = new Marca();
-        entity.setCodigo(request.codigo());
+        entity.setCodigo(codigo);
         entity.setNombre(request.nombre());
         entity.setSlug(slug);
         entity.setSlugGenerado(slugGenerado == null || slugGenerado);
@@ -40,7 +41,6 @@ public class MarcaMapper {
             return;
         }
 
-        entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
 
         if (slug != null) {

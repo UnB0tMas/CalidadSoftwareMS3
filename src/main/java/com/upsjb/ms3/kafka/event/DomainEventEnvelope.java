@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/kafka/event/DomainEventEnvelope.java
 package com.upsjb.ms3.kafka.event;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -25,41 +24,65 @@ public record DomainEventEnvelope<T>(
         Map<String, Object> metadata
 ) {
 
-    public DomainEventEnvelope {
-        if (eventId == null) {
-            eventId = UUID.randomUUID();
-        }
+    public static final String DEFAULT_PRODUCER =
+            "ms-catalogo-inventario";
 
-        eventType = cleanRequired(eventType, "eventType");
-        aggregateId = cleanRequired(aggregateId, "aggregateId");
+    public static final int DEFAULT_SCHEMA_VERSION = 1;
+
+    public DomainEventEnvelope {
+        eventId = eventId == null
+                ? UUID.randomUUID()
+                : eventId;
+
+        eventType = cleanRequired(
+                eventType,
+                "eventType"
+        );
+
+        aggregateId = cleanRequired(
+                aggregateId,
+                "aggregateId"
+        );
 
         if (aggregateType == null) {
-            throw new IllegalArgumentException("El aggregateType del evento es obligatorio.");
+            throw new IllegalArgumentException(
+                    "El aggregateType del evento es obligatorio."
+            );
         }
 
-        if (occurredAt == null) {
-            occurredAt = LocalDateTime.now();
-        }
+        occurredAt = occurredAt == null
+                ? LocalDateTime.now()
+                : occurredAt;
 
         producer = clean(producer);
+
         if (!StringUtils.hasText(producer)) {
-            producer = "ms-catalogo-inventario";
+            producer = DEFAULT_PRODUCER;
         }
 
-        if (schemaVersion == null || schemaVersion <= 0) {
-            schemaVersion = 1;
+        if (
+                schemaVersion == null
+                        || schemaVersion <= 0
+        ) {
+            schemaVersion = DEFAULT_SCHEMA_VERSION;
         }
 
         requestId = clean(requestId);
         correlationId = clean(correlationId);
 
         if (payload == null) {
-            throw new IllegalArgumentException("El payload del evento es obligatorio.");
+            throw new IllegalArgumentException(
+                    "El payload del evento es obligatorio."
+            );
         }
 
         metadata = metadata == null
                 ? Map.of()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
+                : Collections.unmodifiableMap(
+                new LinkedHashMap<>(
+                        metadata
+                )
+        );
     }
 
     public static <T> DomainEventEnvelope<T> of(
@@ -68,14 +91,11 @@ public record DomainEventEnvelope<T>(
             String aggregateId,
             T payload
     ) {
-        return new DomainEventEnvelope<>(
-                UUID.randomUUID(),
+        return of(
                 eventType,
                 aggregateType,
                 aggregateId,
-                LocalDateTime.now(),
-                "ms-catalogo-inventario",
-                1,
+                DEFAULT_SCHEMA_VERSION,
                 null,
                 null,
                 payload,
@@ -92,14 +112,11 @@ public record DomainEventEnvelope<T>(
             T payload,
             Map<String, Object> metadata
     ) {
-        return new DomainEventEnvelope<>(
-                UUID.randomUUID(),
+        return of(
                 eventType,
                 aggregateType,
                 aggregateId,
-                LocalDateTime.now(),
-                "ms-catalogo-inventario",
-                1,
+                DEFAULT_SCHEMA_VERSION,
                 requestId,
                 correlationId,
                 payload,
@@ -107,11 +124,110 @@ public record DomainEventEnvelope<T>(
         );
     }
 
-    private static String cleanRequired(String value, String field) {
-        String cleaned = clean(value);
-        if (!StringUtils.hasText(cleaned)) {
-            throw new IllegalArgumentException("El campo " + field + " del evento es obligatorio.");
+    public static <T> DomainEventEnvelope<T> of(
+            String eventType,
+            AggregateType aggregateType,
+            String aggregateId,
+            Integer schemaVersion,
+            String requestId,
+            String correlationId,
+            T payload,
+            Map<String, Object> metadata
+    ) {
+        return new DomainEventEnvelope<>(
+                UUID.randomUUID(),
+                eventType,
+                aggregateType,
+                aggregateId,
+                LocalDateTime.now(),
+                DEFAULT_PRODUCER,
+                schemaVersion,
+                requestId,
+                correlationId,
+                payload,
+                metadata
+        );
+    }
+
+    public <R> DomainEventEnvelope<R> withPayload(
+            R newPayload,
+            Integer newSchemaVersion,
+            Map<String, Object> additionalMetadata
+    ) {
+        return withPayload(
+                newPayload,
+                aggregateType,
+                aggregateId,
+                eventType,
+                newSchemaVersion,
+                additionalMetadata
+        );
+    }
+
+    public <R> DomainEventEnvelope<R> withPayload(
+            R newPayload,
+            AggregateType newAggregateType,
+            String newAggregateId,
+            String newEventType,
+            Integer newSchemaVersion,
+            Map<String, Object> additionalMetadata
+    ) {
+        Map<String, Object> mergedMetadata =
+                new LinkedHashMap<>(
+                        metadata
+                );
+
+        if (additionalMetadata != null) {
+            additionalMetadata.forEach(
+                    (key, value) -> {
+                        if (
+                                StringUtils.hasText(key)
+                                        && value != null
+                        ) {
+                            mergedMetadata.put(
+                                    key.trim(),
+                                    value
+                            );
+                        }
+                    }
+            );
         }
+
+        return new DomainEventEnvelope<>(
+                eventId,
+                StringUtils.hasText(newEventType)
+                        ? newEventType
+                        : eventType,
+                newAggregateType == null
+                        ? aggregateType
+                        : newAggregateType,
+                StringUtils.hasText(newAggregateId)
+                        ? newAggregateId
+                        : aggregateId,
+                occurredAt,
+                producer,
+                newSchemaVersion,
+                requestId,
+                correlationId,
+                newPayload,
+                mergedMetadata
+        );
+    }
+
+    private static String cleanRequired(
+            String value,
+            String field
+    ) {
+        String cleaned = clean(value);
+
+        if (!StringUtils.hasText(cleaned)) {
+            throw new IllegalArgumentException(
+                    "El campo "
+                            + field
+                            + " del evento es obligatorio."
+            );
+        }
+
         return cleaned;
     }
 
@@ -121,7 +237,13 @@ public record DomainEventEnvelope<T>(
         }
 
         return value.trim()
-                .replaceAll("[\\r\\n\\t]", " ")
-                .replaceAll("\\s{2,}", " ");
+                .replaceAll(
+                        "[\\r\\n\\t]",
+                        " "
+                )
+                .replaceAll(
+                        "\\s{2,}",
+                        " "
+                );
     }
 }

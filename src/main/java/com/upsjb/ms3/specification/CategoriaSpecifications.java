@@ -31,6 +31,7 @@ public final class CategoriaSpecifications {
                 .like("slug", filter.slug())
                 .equal("categoriaPadre.idCategoria", filter.idCategoriaPadre())
                 .equal("nivel", filter.nivel())
+                .bool("permiteProductos", BooleanCriteria.of(filter.permiteProductos()))
                 .bool("estado", BooleanCriteria.of(filter.estado() == null ? Boolean.TRUE : filter.estado()))
                 .range("createdAt", toDateTimeRange(filter.fechaCreacion()))
                 .build();

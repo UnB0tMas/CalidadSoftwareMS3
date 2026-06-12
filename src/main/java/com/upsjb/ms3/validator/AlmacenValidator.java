@@ -52,13 +52,11 @@ public class AlmacenValidator {
 
     public void validateUpdate(
             Almacen almacen,
-            String codigo,
             String nombre,
             String direccion,
             String observacion,
             Boolean permiteVenta,
             Boolean permiteCompra,
-            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean alreadyHasPrincipal,
             Boolean principal
@@ -67,20 +65,13 @@ public class AlmacenValidator {
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
-        validateCodigo(codigo, errors);
+        validateCodigo(almacen.getCodigo(), errors);
         validateNombre(nombre, errors);
         validateDireccion(direccion, errors);
         validateObservacion(observacion, errors);
         validateFlags(permiteVenta, permiteCompra, errors);
 
         errors.throwIfAny("No se puede actualizar el almacén.");
-
-        if (duplicatedCodigo) {
-            throw new ConflictException(
-                    "ALMACEN_CODIGO_DUPLICADO",
-                    "Ya existe otro almacén activo con el mismo código."
-            );
-        }
 
         if (duplicatedNombre) {
             throw new ConflictException(

@@ -1,6 +1,8 @@
 // ruta: src/main/java/com/upsjb/ms3/controller/MarcaController.java
 package com.upsjb.ms3.controller;
 
+import com.upsjb.ms3.domain.value.SlugValue;
+
 import com.upsjb.ms3.dto.catalogo.marca.filter.MarcaFilterDto;
 import com.upsjb.ms3.dto.catalogo.marca.request.MarcaCreateRequestDto;
 import com.upsjb.ms3.dto.catalogo.marca.request.MarcaUpdateRequestDto;
@@ -127,7 +129,7 @@ public class MarcaController {
     public ResponseEntity<ApiResponseDto<MarcaResponseDto>> obtenerPorSlug(
             @Parameter(description = "Slug de la marca.", required = true)
             @NotBlank(message = "El slug de la marca es obligatorio.")
-            @Size(max = 150, message = "El slug no debe superar 150 caracteres.")
+            @Size(max = SlugValue.MAX_LENGTH, message = "El slug no debe superar 240 caracteres.")
             @PathVariable String slug
     ) {
         return ResponseEntity.ok(marcaService.obtenerPorSlug(slug));

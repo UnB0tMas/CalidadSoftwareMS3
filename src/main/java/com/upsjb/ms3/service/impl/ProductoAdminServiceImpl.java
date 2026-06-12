@@ -8,8 +8,7 @@ import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoAtributoValor;
 import com.upsjb.ms3.domain.entity.ProductoImagenCloudinary;
 import com.upsjb.ms3.domain.entity.ProductoSku;
-import com.upsjb.ms3.domain.entity.TipoProducto;
-import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
+import com.upsjb.ms3.domain.entity.CategoriaAtributo;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoProductoPublicacion;
 import com.upsjb.ms3.domain.enums.EstadoProductoRegistro;
@@ -51,7 +50,7 @@ import com.upsjb.ms3.repository.ProductoRepository;
 import com.upsjb.ms3.repository.ProductoSkuRepository;
 import com.upsjb.ms3.repository.ReservaStockRepository;
 import com.upsjb.ms3.repository.StockSkuRepository;
-import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
+import com.upsjb.ms3.repository.CategoriaAtributoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
@@ -69,15 +68,13 @@ import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.reference.AtributoReferenceResolver;
 import com.upsjb.ms3.shared.reference.CategoriaReferenceResolver;
 import com.upsjb.ms3.shared.reference.MarcaReferenceResolver;
-import com.upsjb.ms3.shared.reference.TipoProductoReferenceResolver;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.ProductoSpecifications;
 import com.upsjb.ms3.util.DateTimeUtil;
 import com.upsjb.ms3.util.StringNormalizer;
-import com.upsjb.ms3.validator.AtributoValidator;
+import com.upsjb.ms3.validator.ProductoAtributoValorValidator;
 import com.upsjb.ms3.validator.ProductoPublicacionValidator;
 import com.upsjb.ms3.validator.ProductoValidator;
-import com.upsjb.ms3.validator.TipoProductoAtributoValidator;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,7 +97,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
             "codigoProducto",
             "nombre",
             "slug",
-            "tipoProducto.nombre",
             "categoria.nombre",
             "marca.nombre",
             "generoObjetivo",
@@ -123,13 +119,12 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
     private final ProductoRepository productoRepository;
     private final ProductoSkuRepository productoSkuRepository;
     private final ProductoAtributoValorRepository productoAtributoValorRepository;
-    private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
+    private final CategoriaAtributoRepository categoriaAtributoRepository;
     private final ProductoImagenCloudinaryRepository productoImagenRepository;
     private final PrecioSkuHistorialRepository precioSkuHistorialRepository;
     private final StockSkuRepository stockSkuRepository;
     private final ReservaStockRepository reservaStockRepository;
 
-    private final TipoProductoReferenceResolver tipoProductoReferenceResolver;
     private final CategoriaReferenceResolver categoriaReferenceResolver;
     private final MarcaReferenceResolver marcaReferenceResolver;
     private final AtributoReferenceResolver atributoReferenceResolver;
@@ -141,8 +136,7 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
 
     private final ProductoValidator productoValidator;
     private final ProductoPublicacionValidator productoPublicacionValidator;
-    private final AtributoValidator atributoValidator;
-    private final TipoProductoAtributoValidator tipoProductoAtributoValidator;
+    private final ProductoAtributoValorValidator productoAtributoValorValidator;
     private final ProductoPolicy productoPolicy;
 
     private final CodigoGeneradorService codigoGeneradorService;
@@ -161,7 +155,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         productoPolicy.ensureCanCreate(actor, employeeCanCreateProductBasic(actor));
 
         ProductoCreateRequestDto normalized = normalizeCreateRequest(request);
-        TipoProducto tipoProducto = resolveTipoProducto(normalized.tipoProducto());
         Categoria categoria = resolveCategoria(normalized.categoria());
         Marca marca = resolveMarca(normalized.marca());
 
@@ -172,7 +165,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         );
 
         productoValidator.validateCreate(
-                tipoProducto,
                 categoria,
                 marca,
                 codigoProducto,
@@ -185,7 +177,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
 
         Producto producto = productoMapper.toEntity(
                 normalized,
-                tipoProducto,
                 categoria,
                 marca,
                 codigoProducto,
@@ -231,19 +222,13 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         Producto producto = findActiveRequired(idProducto);
         ProductoUpdateRequestDto normalized = normalizeUpdateRequest(request);
 
-        TipoProducto tipoProducto = resolveTipoProducto(normalized.tipoProducto());
         Categoria categoria = resolveCategoria(normalized.categoria());
         Marca marca = resolveMarca(normalized.marca());
 
-        String slug = slugGeneratorService.generarSlugUnicoExcluyendoId(
-                normalized.nombre(),
-                producto.getIdProducto(),
-                productoRepository::existsBySlugIgnoreCaseAndEstadoTrueAndIdProductoNot
-        );
+        String slug = producto.getSlug();
 
         productoValidator.validateUpdate(
                 producto,
-                tipoProducto,
                 categoria,
                 marca,
                 normalized.nombre(),
@@ -263,7 +248,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         productoMapper.updateEntity(
                 producto,
                 normalized,
-                tipoProducto,
                 categoria,
                 marca,
                 slug,
@@ -625,7 +609,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         }
 
         return ProductoCreateRequestDto.builder()
-                .tipoProducto(request.tipoProducto())
                 .categoria(request.categoria())
                 .marca(request.marca())
                 .nombre(StringNormalizer.truncateOrNull(request.nombre(), 180))
@@ -647,7 +630,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         }
 
         return ProductoUpdateRequestDto.builder()
-                .tipoProducto(request.tipoProducto())
                 .categoria(request.categoria())
                 .marca(request.marca())
                 .nombre(StringNormalizer.truncateOrNull(request.nombre(), 180))
@@ -758,21 +740,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
                 || request.estadoPublicacion() == EstadoProductoPublicacion.PROGRAMADO;
     }
 
-    private TipoProducto resolveTipoProducto(EntityReferenceDto reference) {
-        if (reference == null) {
-            throw new ValidationException(
-                    "TIPO_PRODUCTO_REFERENCIA_REQUERIDA",
-                    "Debe indicar el tipo de producto."
-            );
-        }
-
-        return tipoProductoReferenceResolver.resolve(
-                reference.id(),
-                firstText(reference.codigo(), reference.codigoProducto()),
-                reference.nombre()
-        );
-    }
-
     private Categoria resolveCategoria(EntityReferenceDto reference) {
         if (reference == null) {
             throw new ValidationException(
@@ -802,19 +769,32 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
         );
     }
 
-    private void guardarAtributosIniciales(Producto producto, List<ProductoAtributoValorRequestDto> atributos) {
-        if (atributos == null || atributos.isEmpty()) {
-            return;
-        }
-
+    private void guardarAtributosIniciales(
+            Producto producto,
+            List<ProductoAtributoValorRequestDto> atributos
+    ) {
         reemplazarAtributosInterno(producto, atributos);
     }
 
-    private void reemplazarAtributosInterno(Producto producto, List<ProductoAtributoValorRequestDto> atributos) {
-        List<ProductoAtributoValorRequestDto> safeAtributos = atributos == null ? List.of() : atributos;
+    private void reemplazarAtributosInterno(
+            Producto producto,
+            List<ProductoAtributoValorRequestDto> atributos
+    ) {
+        productoAtributoValorValidator.requireProductWithCategory(producto);
+
+        List<ProductoAtributoValorRequestDto> safeAtributos = atributos == null
+                ? List.of()
+                : atributos;
+
+        List<CategoriaAtributo> plantilla = categoriaAtributoRepository
+                .findByCategoria_IdCategoriaAndEstadoTrueOrderByOrdenAscIdCategoriaAtributoAsc(
+                        producto.getCategoria().getIdCategoria()
+                );
 
         productoAtributoValorRepository
-                .findByProducto_IdProductoAndEstadoTrueOrderByIdProductoAtributoValorAsc(producto.getIdProducto())
+                .findByProducto_IdProductoAndEstadoTrueOrderByIdProductoAtributoValorAsc(
+                        producto.getIdProducto()
+                )
                 .forEach(valor -> {
                     valor.inactivar();
                     productoAtributoValorRepository.save(valor);
@@ -826,28 +806,46 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
             ProductoAtributoValorRequestDto normalized = normalizeAtributoValorRequest(atributoRequest);
             Atributo atributo = resolveAtributo(normalized.atributo());
 
-            if (!atributosProcesados.add(atributo.getIdAtributo())) {
-                throw new ConflictException(
-                        "PRODUCTO_ATRIBUTO_DUPLICADO",
-                        "No se puede registrar dos veces el mismo atributo para el producto."
-                );
-            }
+            productoAtributoValorValidator.validateDuplicateInReplacement(
+                    atributo.getIdAtributo(),
+                    atributosProcesados
+            );
 
-            TipoProductoAtributo relation = resolveTipoProductoAtributo(producto, atributo);
-            tipoProductoAtributoValidator.requireActive(relation);
+            CategoriaAtributo relation = plantilla.stream()
+                    .filter(item -> item.getAtributo() != null)
+                    .filter(item -> atributo.getIdAtributo().equals(item.getAtributo().getIdAtributo()))
+                    .findFirst()
+                    .orElse(null);
 
-            atributoValidator.validateValueByType(
+            productoAtributoValorValidator.validateAssociationAllowed(
+                    producto,
                     atributo,
+                    relation
+            );
+
+            productoAtributoValorValidator.validateValueByTemplate(
+                    atributo,
+                    relation,
                     normalized.valorTexto(),
                     normalized.valorNumero(),
                     normalized.valorBoolean(),
                     normalized.valorFecha()
             );
 
-            ProductoAtributoValor entity = productoAtributoValorMapper.toEntity(normalized, producto, atributo);
+            ProductoAtributoValor entity = productoAtributoValorMapper.toEntity(
+                    normalized,
+                    producto,
+                    atributo
+            );
+
             entity.activar();
             productoAtributoValorRepository.save(entity);
         }
+
+        productoAtributoValorValidator.validateRequiredAttributesPresent(
+                plantilla,
+                atributosProcesados
+        );
 
         productoAtributoValorRepository.flush();
     }
@@ -882,18 +880,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
                 reference.codigo(),
                 reference.nombre()
         );
-    }
-
-    private TipoProductoAtributo resolveTipoProductoAtributo(Producto producto, Atributo atributo) {
-        return tipoProductoAtributoRepository
-                .findByTipoProducto_IdTipoProductoAndAtributo_IdAtributoAndEstadoTrue(
-                        producto.getTipoProducto().getIdTipoProducto(),
-                        atributo.getIdAtributo()
-                )
-                .orElseThrow(() -> new ConflictException(
-                        "ATRIBUTO_NO_ASOCIADO_TIPO_PRODUCTO",
-                        "El atributo no está asociado al tipo de producto."
-                ));
     }
 
     private boolean hasActiveSku(Producto producto) {
@@ -958,7 +944,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
                 .map(this::toImagenSnapshotPayload)
                 .toList();
 
-        TipoProducto tipoProducto = producto.getTipoProducto();
         Categoria categoria = producto.getCategoria();
         Marca marca = producto.getMarca();
 
@@ -967,9 +952,6 @@ public class ProductoAdminServiceImpl implements ProductoAdminService {
                 .codigoProducto(producto.getCodigoProducto())
                 .nombre(producto.getNombre())
                 .slug(producto.getSlug())
-                .idTipoProducto(tipoProducto == null ? null : tipoProducto.getIdTipoProducto())
-                .codigoTipoProducto(tipoProducto == null ? null : tipoProducto.getCodigo())
-                .nombreTipoProducto(tipoProducto == null ? null : tipoProducto.getNombre())
                 .idCategoria(categoria == null ? null : categoria.getIdCategoria())
                 .codigoCategoria(categoria == null ? null : categoria.getCodigo())
                 .nombreCategoria(categoria == null ? null : categoria.getNombre())

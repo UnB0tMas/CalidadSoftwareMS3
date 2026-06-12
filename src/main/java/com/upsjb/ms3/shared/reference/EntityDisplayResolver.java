@@ -67,7 +67,6 @@ public class EntityDisplayResolver {
         }
 
         for (String fieldName : List.of(
-                "idTipoProducto",
                 "idCategoria",
                 "idMarca",
                 "idAtributo",

@@ -1,9 +1,6 @@
-// ruta: src/main/java/com/upsjb/ms3/service/impl/MarcaServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Marca;
-import com.upsjb.ms3.domain.entity.Producto;
-import com.upsjb.ms3.domain.enums.AggregateType;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.TipoEventoAuditoria;
 import com.upsjb.ms3.dto.catalogo.marca.filter.MarcaFilterDto;
@@ -24,12 +21,13 @@ import com.upsjb.ms3.repository.ProductoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
+import com.upsjb.ms3.service.contract.CodigoGeneradorService;
 import com.upsjb.ms3.service.contract.EmpleadoInventarioPermisoService;
-import com.upsjb.ms3.service.contract.EventoDominioOutboxService;
 import com.upsjb.ms3.service.contract.MarcaService;
 import com.upsjb.ms3.service.contract.SlugGeneratorService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
+import com.upsjb.ms3.shared.outbox.ProductoSnapshotOutboxRegistrar;
 import com.upsjb.ms3.shared.pagination.PaginationService;
 import com.upsjb.ms3.shared.response.ApiResponseFactory;
 import com.upsjb.ms3.specification.MarcaSpecifications;
@@ -52,8 +50,6 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class MarcaServiceImpl implements MarcaService {
 
-    private static final String EVENTO_PRODUCTO_MARCA_ACTUALIZADA = "ProductoSnapshotMarcaActualizada";
-
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "idMarca",
             "codigo",
@@ -73,47 +69,87 @@ public class MarcaServiceImpl implements MarcaService {
     private final MarcaMapper marcaMapper;
     private final MarcaValidator marcaValidator;
     private final MarcaPolicy marcaPolicy;
+    private final CodigoGeneradorService codigoGeneradorService;
     private final SlugGeneratorService slugGeneratorService;
     private final CurrentUserResolver currentUserResolver;
-    private final EmpleadoInventarioPermisoService empleadoInventarioPermisoService;
-    private final EventoDominioOutboxService eventoDominioOutboxService;
+    private final EmpleadoInventarioPermisoService
+            empleadoInventarioPermisoService;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
+    private final ProductoSnapshotOutboxRegistrar
+            productoSnapshotOutboxRegistrar;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
 
     @Override
     @Transactional
-    public ApiResponseDto<MarcaResponseDto> crear(MarcaCreateRequestDto request) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        marcaPolicy.ensureCanCreate(actor, employeeCanCreateProductBasic(actor));
+    public ApiResponseDto<MarcaResponseDto> crear(
+            MarcaCreateRequestDto request
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
 
-        MarcaCreateRequestDto normalized = normalizeCreate(request);
-        String slug = slugGeneratorService.generarSlugUnico(
-                normalized.nombre(),
-                marcaRepository::existsBySlugIgnoreCaseAndEstadoTrue
+        marcaPolicy.ensureCanCreate(
+                actor,
+                employeeCanCreateProductBasic(actor)
         );
+
+        MarcaCreateRequestDto normalized =
+                normalizeCreate(request);
+
+        String codigo =
+                codigoGeneradorService.generarCodigoMarca();
+
+        String slug =
+                slugGeneratorService.generarSlugUnico(
+                        normalized.nombre(),
+                        marcaRepository
+                                ::existsBySlugIgnoreCase
+                );
 
         marcaValidator.validateCreate(
-                normalized.codigo(),
+                codigo,
                 normalized.nombre(),
                 slug,
-                marcaRepository.existsByCodigoIgnoreCaseAndEstadoTrue(normalized.codigo()),
-                marcaRepository.existsByNombreIgnoreCaseAndEstadoTrue(normalized.nombre()),
-                marcaRepository.existsBySlugIgnoreCaseAndEstadoTrue(slug)
+                marcaRepository
+                        .existsByCodigoIgnoreCase(
+                                codigo
+                        ),
+                marcaRepository
+                        .existsByNombreIgnoreCaseAndEstadoTrue(
+                                normalized.nombre()
+                        ),
+                marcaRepository
+                        .existsBySlugIgnoreCase(
+                                slug
+                        )
         );
 
-        Marca entity = marcaMapper.toEntity(normalized, slug, Boolean.TRUE);
+        Marca entity =
+                marcaMapper.toEntity(
+                        normalized,
+                        codigo,
+                        slug,
+                        Boolean.TRUE
+                );
+
         entity.activar();
 
-        Marca saved = marcaRepository.save(entity);
+        Marca saved =
+                marcaRepository.save(entity);
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.MARCA_CREADA,
                 EntidadAuditada.MARCA,
-                String.valueOf(saved.getIdMarca()),
+                String.valueOf(
+                        saved.getIdMarca()
+                ),
                 "CREAR_MARCA",
                 "Marca registrada correctamente.",
-                auditMetadata(saved, actor, null)
+                auditMetadata(
+                        saved,
+                        actor,
+                        null
+                )
         );
 
         log.info(
@@ -132,72 +168,120 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional
-    public ApiResponseDto<MarcaResponseDto> actualizar(Long idMarca, MarcaUpdateRequestDto request) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
-        marcaPolicy.ensureCanUpdate(actor, employeeCanEditProductBasic(actor));
+    public ApiResponseDto<MarcaResponseDto> actualizar(
+            Long idMarca,
+            MarcaUpdateRequestDto request
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
 
-        Marca entity = findActiveRequired(idMarca);
-        MarcaUpdateRequestDto normalized = normalizeUpdate(request);
-
-        String slug = slugGeneratorService.generarSlugUnicoExcluyendoId(
-                normalized.nombre(),
-                entity.getIdMarca(),
-                marcaRepository::existsBySlugIgnoreCaseAndEstadoTrueAndIdMarcaNot
+        marcaPolicy.ensureCanUpdate(
+                actor,
+                employeeCanEditProductBasic(actor)
         );
+
+        Marca entity =
+                findActiveRequired(idMarca);
+
+        MarcaUpdateRequestDto normalized =
+                normalizeUpdate(request);
+
+        String slug = entity.getSlug();
 
         marcaValidator.validateUpdate(
                 entity,
-                normalized.codigo(),
                 normalized.nombre(),
                 slug,
-                marcaRepository.existsByCodigoIgnoreCaseAndEstadoTrueAndIdMarcaNot(
-                        normalized.codigo(),
-                        entity.getIdMarca()
-                ),
-                marcaRepository.existsByNombreIgnoreCaseAndEstadoTrueAndIdMarcaNot(
-                        normalized.nombre(),
-                        entity.getIdMarca()
-                ),
-                marcaRepository.existsBySlugIgnoreCaseAndEstadoTrueAndIdMarcaNot(
-                        slug,
-                        entity.getIdMarca()
-                )
+                marcaRepository
+                        .existsByNombreIgnoreCaseAndEstadoTrueAndIdMarcaNot(
+                                normalized.nombre(),
+                                entity.getIdMarca()
+                        ),
+                marcaRepository
+                        .existsBySlugIgnoreCaseAndEstadoTrueAndIdMarcaNot(
+                                slug,
+                                entity.getIdMarca()
+                        )
         );
 
-        Map<String, Object> before = auditSnapshot(entity);
-        boolean publicIdentityChanged = hasPublicIdentityChanged(entity, normalized, slug);
+        Map<String, Object> before =
+                auditSnapshot(entity);
 
-        marcaMapper.updateEntity(entity, normalized, slug, Boolean.TRUE);
-        Marca saved = marcaRepository.save(entity);
+        boolean publicIdentityChanged =
+                hasPublicIdentityChanged(
+                        entity,
+                        normalized,
+                        slug
+                );
 
-        List<Long> affectedProductIds = publicIdentityChanged
-                ? findActiveProductIdsByMarca(saved.getIdMarca())
-                : List.of();
+        marcaMapper.updateEntity(
+                entity,
+                normalized,
+                slug,
+                Boolean.TRUE
+        );
 
-        if (!affectedProductIds.isEmpty()) {
-            registrarMarcaProductoSnapshotOutbox(saved, affectedProductIds, actor);
+        Marca saved =
+                marcaRepository.save(entity);
+
+        long affectedProducts =
+                0L;
+
+        /*
+         * Solo es necesario regenerar el snapshot cuando
+         * cambia información de marca incluida en el
+         * contrato Kafka del producto.
+         */
+        if (publicIdentityChanged) {
+            affectedProducts =
+                    productoRepository
+                            .countByMarca_IdMarcaAndEstadoTrue(
+                                    saved.getIdMarca()
+                            );
+
+            registrarSnapshotsProductosMarca(
+                    saved,
+                    actor,
+                    "ACTUALIZAR_MARCA",
+                    null
+            );
         }
 
-        Map<String, Object> auditExtra = new LinkedHashMap<>();
-        auditExtra.put("before", before);
-        auditExtra.put("productosAfectados", affectedProductIds.size());
+        Map<String, Object> auditExtra =
+                new LinkedHashMap<>();
+
+        auditExtra.put(
+                "before",
+                before
+        );
+
+        auditExtra.put(
+                "productosActivosAfectados",
+                affectedProducts
+        );
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.MARCA_ACTUALIZADA,
                 EntidadAuditada.MARCA,
-                String.valueOf(saved.getIdMarca()),
+                String.valueOf(
+                        saved.getIdMarca()
+                ),
                 "ACTUALIZAR_MARCA",
                 "Marca actualizada correctamente.",
-                auditMetadata(saved, actor, auditExtra)
+                auditMetadata(
+                        saved,
+                        actor,
+                        auditExtra
+                )
         );
 
         log.info(
-                "Marca actualizada. idMarca={}, codigo={}, slug={}, actor={}, productosAfectados={}",
+                "Marca actualizada. idMarca={}, codigo={}, slug={}, actor={}, productosActivosAfectados={}",
                 saved.getIdMarca(),
                 saved.getCodigo(),
                 saved.getSlug(),
                 actor.actorLabel(),
-                affectedProductIds.size()
+                affectedProducts
         );
 
         return apiResponseFactory.dtoOk(
@@ -208,34 +292,69 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional
-    public ApiResponseDto<MarcaResponseDto> cambiarEstado(Long idMarca, EstadoChangeRequestDto request) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<MarcaResponseDto> cambiarEstado(
+            Long idMarca,
+            EstadoChangeRequestDto request
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         marcaPolicy.ensureCanChangeState(actor);
 
         validateEstadoRequest(request);
 
-        Marca entity = findAnyRequired(idMarca);
+        Marca entity =
+                findAnyRequired(idMarca);
 
-        if (Objects.equals(entity.getEstado(), request.estado())) {
+        if (
+                Objects.equals(
+                        entity.getEstado(),
+                        request.estado()
+                )
+        ) {
             return apiResponseFactory.dtoOk(
                     "Operación realizada correctamente.",
                     marcaMapper.toResponse(entity)
             );
         }
 
-        if (Boolean.TRUE.equals(request.estado())) {
-            marcaValidator.validateCanActivate(entity);
+        if (
+                Boolean.TRUE.equals(
+                        request.estado()
+                )
+        ) {
+            marcaValidator.validateCanActivate(
+                    entity
+            );
+
             entity.activar();
 
-            Marca saved = marcaRepository.save(entity);
+            Marca saved =
+                    marcaRepository.save(entity);
+
+            registrarSnapshotsProductosMarca(
+                    saved,
+                    actor,
+                    "ACTIVAR_MARCA",
+                    request.motivo()
+            );
 
             auditoriaFuncionalService.registrarExito(
                     TipoEventoAuditoria.MARCA_ACTIVADA,
                     EntidadAuditada.MARCA,
-                    String.valueOf(saved.getIdMarca()),
+                    String.valueOf(
+                            saved.getIdMarca()
+                    ),
                     "ACTIVAR_MARCA",
                     "Marca activada correctamente.",
-                    auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                    auditMetadata(
+                            saved,
+                            actor,
+                            Map.of(
+                                    "motivo",
+                                    request.motivo()
+                            )
+                    )
             );
 
             return apiResponseFactory.dtoOk(
@@ -244,19 +363,45 @@ public class MarcaServiceImpl implements MarcaService {
             );
         }
 
-        boolean hasActiveProducts = productoRepository.existsByMarca_IdMarcaAndEstadoTrue(entity.getIdMarca());
-        marcaValidator.validateCanDeactivate(entity, hasActiveProducts);
+        boolean hasActiveProducts =
+                productoRepository
+                        .existsByMarca_IdMarcaAndEstadoTrue(
+                                entity.getIdMarca()
+                        );
+
+        marcaValidator.validateCanDeactivate(
+                entity,
+                hasActiveProducts
+        );
 
         entity.inactivar();
-        Marca saved = marcaRepository.save(entity);
+
+        Marca saved =
+                marcaRepository.save(entity);
+
+        registrarSnapshotsProductosMarca(
+                saved,
+                actor,
+                "INACTIVAR_MARCA",
+                request.motivo()
+        );
 
         auditoriaFuncionalService.registrarExito(
                 TipoEventoAuditoria.MARCA_INACTIVADA,
                 EntidadAuditada.MARCA,
-                String.valueOf(saved.getIdMarca()),
+                String.valueOf(
+                        saved.getIdMarca()
+                ),
                 "INACTIVAR_MARCA",
                 "Marca inactivada correctamente.",
-                auditMetadata(saved, actor, Map.of("motivo", request.motivo()))
+                auditMetadata(
+                        saved,
+                        actor,
+                        Map.of(
+                                "motivo",
+                                request.motivo()
+                        )
+                )
         );
 
         return apiResponseFactory.dtoOk(
@@ -267,11 +412,16 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<MarcaResponseDto> obtenerPorId(Long idMarca) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<MarcaResponseDto> obtenerPorId(
+            Long idMarca
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         marcaPolicy.ensureCanViewAdmin(actor);
 
-        Marca entity = findActiveRequired(idMarca);
+        Marca entity =
+                findActiveRequired(idMarca);
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -281,17 +431,33 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<MarcaResponseDto> obtenerPorCodigo(String codigo) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<MarcaResponseDto> obtenerPorCodigo(
+            String codigo
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         marcaPolicy.ensureCanViewAdmin(actor);
 
-        String cleanCodigo = requireText(codigo, "MARCA_CODIGO_REQUERIDO", "Debe indicar el código de la marca.");
+        String cleanCodigo =
+                requireText(
+                        codigo,
+                        "MARCA_CODIGO_REQUERIDO",
+                        "Debe indicar el código de la marca."
+                );
 
-        Marca entity = marcaRepository.findByCodigoIgnoreCaseAndEstadoTrue(cleanCodigo)
-                .orElseThrow(() -> new NotFoundException(
-                        "MARCA_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        Marca entity =
+                marcaRepository
+                        .findByCodigoIgnoreCaseAndEstadoTrue(
+                                cleanCodigo
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "MARCA_NO_ENCONTRADA",
+                                                "No se encontró el registro solicitado."
+                                        )
+                        );
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -301,16 +467,30 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<MarcaResponseDto> obtenerPorSlug(String slug) {
+    public ApiResponseDto<MarcaResponseDto> obtenerPorSlug(
+            String slug
+    ) {
         marcaPolicy.canViewPublic();
 
-        String cleanSlug = requireText(slug, "MARCA_SLUG_REQUERIDO", "Debe indicar el slug de la marca.");
+        String cleanSlug =
+                requireText(
+                        slug,
+                        "MARCA_SLUG_REQUERIDO",
+                        "Debe indicar el slug de la marca."
+                );
 
-        Marca entity = marcaRepository.findBySlugIgnoreCaseAndEstadoTrue(cleanSlug)
-                .orElseThrow(() -> new NotFoundException(
-                        "MARCA_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        Marca entity =
+                marcaRepository
+                        .findBySlugIgnoreCaseAndEstadoTrue(
+                                cleanSlug
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "MARCA_NO_ENCONTRADA",
+                                                "No se encontró el registro solicitado."
+                                        )
+                        );
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
@@ -320,7 +500,9 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<MarcaResponseDto> obtenerPorReferencia(EntityReferenceDto reference) {
+    public ApiResponseDto<MarcaResponseDto> obtenerPorReferencia(
+            EntityReferenceDto reference
+    ) {
         if (reference == null) {
             throw new ValidationException(
                     "MARCA_REFERENCIA_REQUERIDA",
@@ -329,26 +511,55 @@ public class MarcaServiceImpl implements MarcaService {
         }
 
         if (reference.id() != null) {
-            return obtenerPorId(reference.id());
+            return obtenerPorId(
+                    reference.id()
+            );
         }
 
-        if (StringNormalizer.hasText(reference.codigo())) {
-            return obtenerPorCodigo(reference.codigo());
+        if (
+                StringNormalizer.hasText(
+                        reference.codigo()
+                )
+        ) {
+            return obtenerPorCodigo(
+                    reference.codigo()
+            );
         }
 
-        if (StringNormalizer.hasText(reference.slug())) {
-            return obtenerPorSlug(reference.slug());
+        if (
+                StringNormalizer.hasText(
+                        reference.slug()
+                )
+        ) {
+            return obtenerPorSlug(
+                    reference.slug()
+            );
         }
 
-        if (StringNormalizer.hasText(reference.nombre())) {
-            AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        if (
+                StringNormalizer.hasText(
+                        reference.nombre()
+                )
+        ) {
+            AuthenticatedUserContext actor =
+                    currentUserResolver.resolveRequired();
+
             marcaPolicy.ensureCanViewAdmin(actor);
 
-            Marca entity = marcaRepository.findByNombreIgnoreCaseAndEstadoTrue(StringNormalizer.clean(reference.nombre()))
-                    .orElseThrow(() -> new NotFoundException(
-                            "MARCA_NO_ENCONTRADA",
-                            "No se encontró el registro solicitado."
-                    ));
+            Marca entity =
+                    marcaRepository
+                            .findByNombreIgnoreCaseAndEstadoTrue(
+                                    StringNormalizer.clean(
+                                            reference.nombre()
+                                    )
+                            )
+                            .orElseThrow(
+                                    () ->
+                                            new NotFoundException(
+                                                    "MARCA_NO_ENCONTRADA",
+                                                    "No se encontró el registro solicitado."
+                                            )
+                            );
 
             return apiResponseFactory.dtoOk(
                     "Detalle obtenido correctamente.",
@@ -364,16 +575,29 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<MarcaDetailResponseDto> obtenerDetalle(Long idMarca) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+    public ApiResponseDto<MarcaDetailResponseDto> obtenerDetalle(
+            Long idMarca
+    ) {
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         marcaPolicy.ensureCanViewAdmin(actor);
 
-        Marca entity = findAnyRequired(idMarca);
-        Long cantidadProductos = productoRepository.countByMarca_IdMarcaAndEstadoTrue(entity.getIdMarca());
+        Marca entity =
+                findAnyRequired(idMarca);
+
+        Long cantidadProductos =
+                productoRepository
+                        .countByMarca_IdMarcaAndEstadoTrue(
+                                entity.getIdMarca()
+                        );
 
         return apiResponseFactory.dtoOk(
                 "Detalle obtenido correctamente.",
-                marcaMapper.toDetailResponse(entity, cantidadProductos)
+                marcaMapper.toDetailResponse(
+                        entity,
+                        cantidadProductos
+                )
         );
     }
 
@@ -383,25 +607,40 @@ public class MarcaServiceImpl implements MarcaService {
             MarcaFilterDto filter,
             PageRequestDto pageRequest
     ) {
-        AuthenticatedUserContext actor = currentUserResolver.resolveRequired();
+        AuthenticatedUserContext actor =
+                currentUserResolver.resolveRequired();
+
         marcaPolicy.ensureCanViewAdmin(actor);
 
-        MarcaFilterDto safeFilter = normalizeFilter(filter);
-        PageRequestDto safePage = safePageRequest(pageRequest, "nombre");
+        MarcaFilterDto safeFilter =
+                normalizeFilter(filter);
 
-        Pageable pageable = paginationService.pageable(
-                safePage.page(),
-                safePage.size(),
-                safePage.sortBy(),
-                safePage.sortDirection(),
-                ALLOWED_SORT_FIELDS,
-                "nombre"
-        );
+        PageRequestDto safePage =
+                safePageRequest(
+                        pageRequest,
+                        "nombre"
+                );
 
-        PageResponseDto<MarcaResponseDto> response = paginationService.toPageResponseDto(
-                marcaRepository.findAll(MarcaSpecifications.fromFilter(safeFilter), pageable),
-                marcaMapper::toResponse
-        );
+        Pageable pageable =
+                paginationService.pageable(
+                        safePage.page(),
+                        safePage.size(),
+                        safePage.sortBy(),
+                        safePage.sortDirection(),
+                        ALLOWED_SORT_FIELDS,
+                        "nombre"
+                );
+
+        PageResponseDto<MarcaResponseDto> response =
+                paginationService.toPageResponseDto(
+                        marcaRepository.findAll(
+                                MarcaSpecifications.fromFilter(
+                                        safeFilter
+                                ),
+                                pageable
+                        ),
+                        marcaMapper::toResponse
+                );
 
         return apiResponseFactory.dtoOk(
                 "Lista obtenida correctamente.",
@@ -411,28 +650,47 @@ public class MarcaServiceImpl implements MarcaService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponseDto<List<MarcaOptionDto>> lookup(String search, Integer limit) {
-        int safeLimit = resolveLookupLimit(limit);
+    public ApiResponseDto<List<MarcaOptionDto>> lookup(
+            String search,
+            Integer limit
+    ) {
+        int safeLimit =
+                resolveLookupLimit(limit);
 
-        MarcaFilterDto filter = MarcaFilterDto.builder()
-                .search(StringNormalizer.cleanOrNull(search))
-                .estado(Boolean.TRUE)
-                .build();
+        MarcaFilterDto filter =
+                MarcaFilterDto.builder()
+                        .search(
+                                StringNormalizer.cleanOrNull(
+                                        search
+                                )
+                        )
+                        .estado(Boolean.TRUE)
+                        .build();
 
-        Pageable pageable = paginationService.pageable(
-                0,
-                safeLimit,
-                "nombre",
-                "ASC",
-                ALLOWED_SORT_FIELDS,
-                "nombre"
-        );
+        Pageable pageable =
+                paginationService.pageable(
+                        0,
+                        safeLimit,
+                        "nombre",
+                        "ASC",
+                        ALLOWED_SORT_FIELDS,
+                        "nombre"
+                );
 
-        List<MarcaOptionDto> response = marcaRepository.findAll(MarcaSpecifications.fromFilter(filter), pageable)
-                .getContent()
-                .stream()
-                .map(this::toOption)
-                .toList();
+        List<MarcaOptionDto> response =
+                marcaRepository
+                        .findAll(
+                                MarcaSpecifications.fromFilter(
+                                        filter
+                                ),
+                                pageable
+                        )
+                        .getContent()
+                        .stream()
+                        .map(
+                                this::toOption
+                        )
+                        .toList();
 
         return apiResponseFactory.dtoOk(
                 "Lista obtenida correctamente.",
@@ -440,7 +698,9 @@ public class MarcaServiceImpl implements MarcaService {
         );
     }
 
-    private Marca findActiveRequired(Long idMarca) {
+    private Marca findActiveRequired(
+            Long idMarca
+    ) {
         if (idMarca == null) {
             throw new ValidationException(
                     "MARCA_ID_REQUERIDO",
@@ -448,17 +708,27 @@ public class MarcaServiceImpl implements MarcaService {
             );
         }
 
-        Marca entity = marcaRepository.findByIdMarcaAndEstadoTrue(idMarca)
-                .orElseThrow(() -> new NotFoundException(
-                        "MARCA_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        Marca entity =
+                marcaRepository
+                        .findByIdMarcaAndEstadoTrue(
+                                idMarca
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "MARCA_NO_ENCONTRADA",
+                                                "No se encontró el registro solicitado."
+                                        )
+                        );
 
         marcaValidator.requireActive(entity);
+
         return entity;
     }
 
-    private Marca findAnyRequired(Long idMarca) {
+    private Marca findAnyRequired(
+            Long idMarca
+    ) {
         if (idMarca == null) {
             throw new ValidationException(
                     "MARCA_ID_REQUERIDO",
@@ -466,17 +736,25 @@ public class MarcaServiceImpl implements MarcaService {
             );
         }
 
-        Marca entity = marcaRepository.findById(idMarca)
-                .orElseThrow(() -> new NotFoundException(
-                        "MARCA_NO_ENCONTRADA",
-                        "No se encontró el registro solicitado."
-                ));
+        Marca entity =
+                marcaRepository
+                        .findById(idMarca)
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "MARCA_NO_ENCONTRADA",
+                                                "No se encontró el registro solicitado."
+                                        )
+                        );
 
         marcaValidator.requireExists(entity);
+
         return entity;
     }
 
-    private MarcaCreateRequestDto normalizeCreate(MarcaCreateRequestDto request) {
+    private MarcaCreateRequestDto normalizeCreate(
+            MarcaCreateRequestDto request
+    ) {
         if (request == null) {
             throw new ValidationException(
                     "MARCA_REQUEST_REQUERIDO",
@@ -485,13 +763,23 @@ public class MarcaServiceImpl implements MarcaService {
         }
 
         return MarcaCreateRequestDto.builder()
-                .codigo(StringNormalizer.normalizeForCode(request.codigo()))
-                .nombre(StringNormalizer.clean(request.nombre()))
-                .descripcion(StringNormalizer.truncateOrNull(request.descripcion(), 300))
+                .nombre(
+                        StringNormalizer.clean(
+                                request.nombre()
+                        )
+                )
+                .descripcion(
+                        StringNormalizer.truncateOrNull(
+                                request.descripcion(),
+                                300
+                        )
+                )
                 .build();
     }
 
-    private MarcaUpdateRequestDto normalizeUpdate(MarcaUpdateRequestDto request) {
+    private MarcaUpdateRequestDto normalizeUpdate(
+            MarcaUpdateRequestDto request
+    ) {
         if (request == null) {
             throw new ValidationException(
                     "MARCA_REQUEST_REQUERIDO",
@@ -500,13 +788,23 @@ public class MarcaServiceImpl implements MarcaService {
         }
 
         return MarcaUpdateRequestDto.builder()
-                .codigo(StringNormalizer.normalizeForCode(request.codigo()))
-                .nombre(StringNormalizer.clean(request.nombre()))
-                .descripcion(StringNormalizer.truncateOrNull(request.descripcion(), 300))
+                .nombre(
+                        StringNormalizer.clean(
+                                request.nombre()
+                        )
+                )
+                .descripcion(
+                        StringNormalizer.truncateOrNull(
+                                request.descripcion(),
+                                300
+                        )
+                )
                 .build();
     }
 
-    private MarcaFilterDto normalizeFilter(MarcaFilterDto filter) {
+    private MarcaFilterDto normalizeFilter(
+            MarcaFilterDto filter
+    ) {
         if (filter == null) {
             return MarcaFilterDto.builder()
                     .estado(Boolean.TRUE)
@@ -514,24 +812,55 @@ public class MarcaServiceImpl implements MarcaService {
         }
 
         return MarcaFilterDto.builder()
-                .search(StringNormalizer.cleanOrNull(filter.search()))
-                .codigo(StringNormalizer.cleanOrNull(filter.codigo()))
-                .nombre(StringNormalizer.cleanOrNull(filter.nombre()))
-                .slug(StringNormalizer.cleanOrNull(filter.slug()))
-                .estado(filter.estado() == null ? Boolean.TRUE : filter.estado())
-                .fechaCreacion(filter.fechaCreacion())
+                .search(
+                        StringNormalizer.cleanOrNull(
+                                filter.search()
+                        )
+                )
+                .codigo(
+                        StringNormalizer.cleanOrNull(
+                                filter.codigo()
+                        )
+                )
+                .nombre(
+                        StringNormalizer.cleanOrNull(
+                                filter.nombre()
+                        )
+                )
+                .slug(
+                        StringNormalizer.cleanOrNull(
+                                filter.slug()
+                        )
+                )
+                .estado(
+                        filter.estado() == null
+                                ? Boolean.TRUE
+                                : filter.estado()
+                )
+                .fechaCreacion(
+                        filter.fechaCreacion()
+                )
                 .build();
     }
 
-    private void validateEstadoRequest(EstadoChangeRequestDto request) {
-        if (request == null || request.estado() == null) {
+    private void validateEstadoRequest(
+            EstadoChangeRequestDto request
+    ) {
+        if (
+                request == null
+                        || request.estado() == null
+        ) {
             throw new ValidationException(
                     "MARCA_ESTADO_REQUERIDO",
                     "Debe indicar el estado solicitado."
             );
         }
 
-        if (!StringUtils.hasText(request.motivo())) {
+        if (
+                !StringUtils.hasText(
+                        request.motivo()
+                )
+        ) {
             throw new ValidationException(
                     "MARCA_MOTIVO_REQUERIDO",
                     "Debe indicar el motivo de la operación."
@@ -539,62 +868,127 @@ public class MarcaServiceImpl implements MarcaService {
         }
     }
 
-    private boolean hasPublicIdentityChanged(Marca entity, MarcaUpdateRequestDto normalized, String slug) {
-        return !Objects.equals(entity.getCodigo(), normalized.codigo())
-                || !Objects.equals(entity.getNombre(), normalized.nombre())
-                || !Objects.equals(entity.getSlug(), slug);
-    }
-
-    private List<Long> findActiveProductIdsByMarca(Long idMarca) {
-        if (idMarca == null) {
-            return List.of();
-        }
-
-        return productoRepository.findByMarca_IdMarcaAndEstadoTrueOrderByIdProductoAsc(idMarca)
-                .stream()
-                .map(Producto::getIdProducto)
-                .toList();
-    }
-
-    private void registrarMarcaProductoSnapshotOutbox(
-            Marca marca,
-            List<Long> affectedProductIds,
-            AuthenticatedUserContext actor
+    private boolean hasPublicIdentityChanged(
+            Marca entity,
+            MarcaUpdateRequestDto normalized,
+            String slug
     ) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("eventType", EVENTO_PRODUCTO_MARCA_ACTUALIZADA);
-        payload.put("source", "MarcaService");
-        payload.put("idMarca", marca.getIdMarca());
-        payload.put("codigoMarca", marca.getCodigo());
-        payload.put("nombreMarca", marca.getNombre());
-        payload.put("slugMarca", marca.getSlug());
-        payload.put("estadoMarca", marca.getEstado());
-        payload.put("productosAfectados", affectedProductIds);
-        payload.put("totalProductosAfectados", affectedProductIds.size());
-        payload.put("actorIdUsuarioMs1", actor == null ? null : actor.getIdUsuarioMs1());
-        payload.put("actor", actor == null ? null : actor.actorLabel());
-
-        eventoDominioOutboxService.registrarEvento(
-                AggregateType.PRODUCTO,
-                "MARCA:" + marca.getIdMarca(),
-                EVENTO_PRODUCTO_MARCA_ACTUALIZADA,
-                payload
+        return !Objects.equals(
+                entity.getNombre(),
+                normalized.nombre()
+        )
+                || !Objects.equals(
+                entity.getSlug(),
+                slug
         );
     }
 
-    private boolean employeeCanCreateProductBasic(AuthenticatedUserContext actor) {
-        return actor != null
-                && actor.getIdUsuarioMs1() != null
-                && empleadoInventarioPermisoService.puedeCrearProductoBasico(actor.getIdUsuarioMs1());
+    private void registrarSnapshotsProductosMarca(
+            Marca marca,
+            AuthenticatedUserContext actor,
+            String accion,
+            String motivo
+    ) {
+        if (
+                marca == null
+                        || marca.getIdMarca() == null
+        ) {
+            return;
+        }
+
+        Map<String, Object> metadata =
+                new LinkedHashMap<>();
+
+        metadata.put(
+                "accion",
+                accion
+        );
+
+        metadata.put(
+                "idMarca",
+                marca.getIdMarca()
+        );
+
+        metadata.put(
+                "codigoMarca",
+                marca.getCodigo()
+        );
+
+        metadata.put(
+                "nombreMarca",
+                marca.getNombre()
+        );
+
+        metadata.put(
+                "slugMarca",
+                marca.getSlug()
+        );
+
+        metadata.put(
+                "estadoMarca",
+                marca.getEstado()
+        );
+
+        metadata.put(
+                "actorIdUsuarioMs1",
+                actor == null
+                        ? null
+                        : actor.getIdUsuarioMs1()
+        );
+
+        metadata.put(
+                "actor",
+                actor == null
+                        ? null
+                        : actor.actorLabel()
+        );
+
+        if (StringNormalizer.hasText(motivo)) {
+            metadata.put(
+                    "motivo",
+                    StringNormalizer.clean(motivo)
+            );
+        }
+
+        /*
+         * El registrador obtiene los productos asociados
+         * y crea un evento Outbox independiente para cada
+         * snapshot completo.
+         */
+        productoSnapshotOutboxRegistrar
+                .registrarProductosDeMarcaActualizados(
+                        marca.getIdMarca(),
+                        "MarcaService",
+                        metadata
+                );
     }
 
-    private boolean employeeCanEditProductBasic(AuthenticatedUserContext actor) {
+    private boolean employeeCanCreateProductBasic(
+            AuthenticatedUserContext actor
+    ) {
         return actor != null
                 && actor.getIdUsuarioMs1() != null
-                && empleadoInventarioPermisoService.puedeEditarProductoBasico(actor.getIdUsuarioMs1());
+                && empleadoInventarioPermisoService
+                .puedeCrearProductoBasico(
+                        actor.getIdUsuarioMs1()
+                );
     }
 
-    private PageRequestDto safePageRequest(PageRequestDto pageRequest, String defaultSortBy) {
+    private boolean employeeCanEditProductBasic(
+            AuthenticatedUserContext actor
+    ) {
+        return actor != null
+                && actor.getIdUsuarioMs1() != null
+                && empleadoInventarioPermisoService
+                .puedeEditarProductoBasico(
+                        actor.getIdUsuarioMs1()
+                );
+    }
+
+    private PageRequestDto safePageRequest(
+            PageRequestDto pageRequest,
+            String defaultSortBy
+    ) {
         if (pageRequest == null) {
             return PageRequestDto.builder()
                     .page(0)
@@ -607,25 +1001,41 @@ public class MarcaServiceImpl implements MarcaService {
         return pageRequest;
     }
 
-    private int resolveLookupLimit(Integer limit) {
-        if (limit == null) {
+    private int resolveLookupLimit(
+            Integer limit
+    ) {
+        if (
+                limit == null
+                        || limit < 1
+        ) {
             return DEFAULT_LOOKUP_LIMIT;
         }
 
-        if (limit < 1) {
-            return DEFAULT_LOOKUP_LIMIT;
-        }
-
-        return Math.min(limit, MAX_LOOKUP_LIMIT);
+        return Math.min(
+                limit,
+                MAX_LOOKUP_LIMIT
+        );
     }
 
-    private MarcaOptionDto toOption(Marca entity) {
+    private MarcaOptionDto toOption(
+            Marca entity
+    ) {
         return MarcaOptionDto.builder()
-                .idMarca(entity.getIdMarca())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
-                .slug(entity.getSlug())
-                .estado(entity.getEstado())
+                .idMarca(
+                        entity.getIdMarca()
+                )
+                .codigo(
+                        entity.getCodigo()
+                )
+                .nombre(
+                        entity.getNombre()
+                )
+                .slug(
+                        entity.getSlug()
+                )
+                .estado(
+                        entity.getEstado()
+                )
                 .build();
     }
 
@@ -634,41 +1044,130 @@ public class MarcaServiceImpl implements MarcaService {
             AuthenticatedUserContext actor,
             Map<String, Object> extra
     ) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("idMarca", entity.getIdMarca());
-        metadata.put("codigo", safe(entity.getCodigo()));
-        metadata.put("nombre", safe(entity.getNombre()));
-        metadata.put("slug", safe(entity.getSlug()));
-        metadata.put("estado", Boolean.TRUE.equals(entity.getEstado()));
-        metadata.put("actor", actor == null ? null : actor.actorLabel());
-        metadata.put("idUsuarioMs1", actor == null ? null : actor.getIdUsuarioMs1());
+        Map<String, Object> metadata =
+                new LinkedHashMap<>();
 
-        if (extra != null && !extra.isEmpty()) {
+        metadata.put(
+                "idMarca",
+                entity.getIdMarca()
+        );
+
+        metadata.put(
+                "codigo",
+                safe(
+                        entity.getCodigo()
+                )
+        );
+
+        metadata.put(
+                "nombre",
+                safe(
+                        entity.getNombre()
+                )
+        );
+
+        metadata.put(
+                "slug",
+                safe(
+                        entity.getSlug()
+                )
+        );
+
+        metadata.put(
+                "estado",
+                Boolean.TRUE.equals(
+                        entity.getEstado()
+                )
+        );
+
+        metadata.put(
+                "actor",
+                actor == null
+                        ? null
+                        : actor.actorLabel()
+        );
+
+        metadata.put(
+                "idUsuarioMs1",
+                actor == null
+                        ? null
+                        : actor.getIdUsuarioMs1()
+        );
+
+        if (
+                extra != null
+                        && !extra.isEmpty()
+        ) {
             metadata.putAll(extra);
         }
 
         return metadata;
     }
 
-    private Map<String, Object> auditSnapshot(Marca entity) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("codigo", safe(entity.getCodigo()));
-        metadata.put("nombre", safe(entity.getNombre()));
-        metadata.put("slug", safe(entity.getSlug()));
-        metadata.put("descripcion", safe(entity.getDescripcion()));
-        metadata.put("estado", Boolean.TRUE.equals(entity.getEstado()));
+    private Map<String, Object> auditSnapshot(
+            Marca entity
+    ) {
+        Map<String, Object> metadata =
+                new LinkedHashMap<>();
+
+        metadata.put(
+                "codigo",
+                safe(
+                        entity.getCodigo()
+                )
+        );
+
+        metadata.put(
+                "nombre",
+                safe(
+                        entity.getNombre()
+                )
+        );
+
+        metadata.put(
+                "slug",
+                safe(
+                        entity.getSlug()
+                )
+        );
+
+        metadata.put(
+                "descripcion",
+                safe(
+                        entity.getDescripcion()
+                )
+        );
+
+        metadata.put(
+                "estado",
+                Boolean.TRUE.equals(
+                        entity.getEstado()
+                )
+        );
+
         return metadata;
     }
 
-    private String requireText(String value, String code, String message) {
+    private String requireText(
+            String value,
+            String code,
+            String message
+    ) {
         if (!StringNormalizer.hasText(value)) {
-            throw new ValidationException(code, message);
+            throw new ValidationException(
+                    code,
+                    message
+            );
         }
 
         return StringNormalizer.clean(value);
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value;
+    private String safe(
+            String value
+    ) {
+        return value == null
+                ? ""
+                : value;
     }
 }

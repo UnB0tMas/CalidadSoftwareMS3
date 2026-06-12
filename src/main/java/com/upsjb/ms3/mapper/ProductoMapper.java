@@ -4,7 +4,6 @@ package com.upsjb.ms3.mapper;
 import com.upsjb.ms3.domain.entity.Categoria;
 import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.Producto;
-import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.domain.enums.EstadoProductoPublicacion;
 import com.upsjb.ms3.domain.enums.EstadoProductoRegistro;
 import com.upsjb.ms3.domain.enums.EstadoProductoVenta;
@@ -31,7 +30,6 @@ public class ProductoMapper {
 
     public Producto toEntity(
             ProductoCreateRequestDto request,
-            TipoProducto tipoProducto,
             Categoria categoria,
             Marca marca,
             String codigoProducto,
@@ -43,7 +41,6 @@ public class ProductoMapper {
         }
 
         Producto entity = new Producto();
-        entity.setTipoProducto(tipoProducto);
         entity.setCategoria(categoria);
         entity.setMarca(marca);
         entity.setCodigoProducto(codigoProducto);
@@ -69,7 +66,6 @@ public class ProductoMapper {
     public void updateEntity(
             Producto entity,
             ProductoUpdateRequestDto request,
-            TipoProducto tipoProducto,
             Categoria categoria,
             Marca marca,
             String slug,
@@ -79,7 +75,6 @@ public class ProductoMapper {
             return;
         }
 
-        entity.setTipoProducto(tipoProducto);
         entity.setCategoria(categoria);
         entity.setMarca(marca);
         entity.setNombre(request.nombre());
@@ -104,7 +99,6 @@ public class ProductoMapper {
 
         return ProductoResponseDto.builder()
                 .idProducto(entity.getIdProducto())
-                .tipoProducto(referenceMapper.toIdCodigoNombre(entity.getTipoProducto()))
                 .categoria(referenceMapper.toIdCodigoNombre(entity.getCategoria()))
                 .marca(referenceMapper.toIdCodigoNombre(entity.getMarca()))
                 .codigoProducto(entity.getCodigoProducto())
@@ -145,7 +139,6 @@ public class ProductoMapper {
 
         return ProductoDetailResponseDto.builder()
                 .idProducto(entity.getIdProducto())
-                .tipoProducto(referenceMapper.toIdCodigoNombre(entity.getTipoProducto()))
                 .categoria(referenceMapper.toIdCodigoNombre(entity.getCategoria()))
                 .marca(referenceMapper.toIdCodigoNombre(entity.getMarca()))
                 .codigoProducto(entity.getCodigoProducto())

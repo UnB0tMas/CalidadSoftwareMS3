@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/repository/ProductoRepository.java
 package com.upsjb.ms3.repository;
 
 import com.upsjb.ms3.domain.entity.Producto;
@@ -19,106 +18,266 @@ public interface ProductoRepository extends
         JpaRepository<Producto, Long>,
         JpaSpecificationExecutor<Producto> {
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
     @Override
-    Page<Producto> findAll(Specification<Producto> specification, Pageable pageable);
+    Optional<Producto> findById(
+            Long idProducto
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    Optional<Producto> findByIdProductoAndEstadoTrue(Long idProducto);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    @Override
+    Page<Producto> findAll(
+            Specification<Producto> specification,
+            Pageable pageable
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    Optional<Producto> findByCodigoProductoIgnoreCaseAndEstadoTrue(String codigoProducto);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Optional<Producto> findByIdProductoAndEstadoTrue(
+            Long idProducto
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    Optional<Producto> findBySlugIgnoreCaseAndEstadoTrue(String slug);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Optional<Producto> findByCodigoProductoIgnoreCaseAndEstadoTrue(
+            String codigoProducto
+    );
 
-    Optional<Producto> findByNombreIgnoreCaseAndEstadoTrue(String nombre);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Optional<Producto> findBySlugIgnoreCaseAndEstadoTrue(
+            String slug
+    );
 
-    boolean existsByCodigoProductoIgnoreCaseAndEstadoTrue(String codigoProducto);
+    Optional<Producto> findByNombreIgnoreCaseAndEstadoTrue(
+            String nombre
+    );
 
-    boolean existsBySlugIgnoreCaseAndEstadoTrue(String slug);
+    boolean existsByCodigoProductoIgnoreCaseAndEstadoTrue(
+            String codigoProducto
+    );
 
-    boolean existsByNombreIgnoreCaseAndEstadoTrue(String nombre);
+    boolean existsBySlugIgnoreCaseAndEstadoTrue(
+            String slug
+    );
 
-    boolean existsByCodigoProductoIgnoreCaseAndEstadoTrueAndIdProductoNot(String codigoProducto, Long idProducto);
+    boolean existsByNombreIgnoreCaseAndEstadoTrue(
+            String nombre
+    );
 
-    boolean existsBySlugIgnoreCaseAndEstadoTrueAndIdProductoNot(String slug, Long idProducto);
+    boolean existsByCodigoProductoIgnoreCaseAndEstadoTrueAndIdProductoNot(
+            String codigoProducto,
+            Long idProducto
+    );
 
-    boolean existsByNombreIgnoreCaseAndEstadoTrueAndIdProductoNot(String nombre, Long idProducto);
+    boolean existsBySlugIgnoreCaseAndEstadoTrueAndIdProductoNot(
+            String slug,
+            Long idProducto
+    );
 
-    boolean existsByTipoProducto_IdTipoProductoAndEstadoTrue(Long idTipoProducto);
+    boolean existsByNombreIgnoreCaseAndEstadoTrueAndIdProductoNot(
+            String nombre,
+            Long idProducto
+    );
 
-    boolean existsByCategoria_IdCategoriaAndEstadoTrue(Long idCategoria);
+    boolean existsByCategoria_IdCategoriaAndEstadoTrue(
+            Long idCategoria
+    );
 
-    boolean existsByMarca_IdMarcaAndEstadoTrue(Long idMarca);
+    boolean existsByMarca_IdMarcaAndEstadoTrue(
+            Long idMarca
+    );
 
-    long countByTipoProducto_IdTipoProductoAndEstadoTrue(Long idTipoProducto);
+    long countByCategoria_IdCategoriaAndEstadoTrue(
+            Long idCategoria
+    );
 
-    long countByCategoria_IdCategoriaAndEstadoTrue(Long idCategoria);
+    long countByMarca_IdMarcaAndEstadoTrue(
+            Long idMarca
+    );
 
-    long countByMarca_IdMarcaAndEstadoTrue(Long idMarca);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Page<Producto> findByEstadoTrue(
+            Pageable pageable
+    );
 
-    Page<Producto> findByEstadoTrue(Pageable pageable);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Page<Producto> findByCategoria_IdCategoriaAndEstadoTrue(
+            Long idCategoria,
+            Pageable pageable
+    );
 
-    Page<Producto> findByTipoProducto_IdTipoProductoAndEstadoTrue(Long idTipoProducto, Pageable pageable);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByCategoria_IdCategoriaAndEstadoTrueOrderByIdProductoAsc(
+            Long idCategoria
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    List<Producto> findByTipoProducto_IdTipoProductoAndEstadoTrueOrderByIdProductoAsc(Long idTipoProducto);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByCategoria_IdCategoriaOrderByIdProductoAsc(
+            Long idCategoria
+    );
 
-    Page<Producto> findByCategoria_IdCategoriaAndEstadoTrue(Long idCategoria, Pageable pageable);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByCategoria_IdCategoriaInAndEstadoTrueOrderByIdProductoAsc(
+            Collection<Long> idCategorias
+    );
 
-    Page<Producto> findByMarca_IdMarcaAndEstadoTrue(Long idMarca, Pageable pageable);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByCategoria_IdCategoriaInOrderByIdProductoAsc(
+            Collection<Long> idCategorias
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    List<Producto> findByMarca_IdMarcaAndEstadoTrueOrderByIdProductoAsc(Long idMarca);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Page<Producto> findByMarca_IdMarcaAndEstadoTrue(
+            Long idMarca,
+            Pageable pageable
+    );
 
-    List<Producto> findByEstadoRegistroAndEstadoTrueOrderByUpdatedAtDesc(EstadoProductoRegistro estadoRegistro);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByMarca_IdMarcaAndEstadoTrueOrderByIdProductoAsc(
+            Long idMarca
+    );
 
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByMarca_IdMarcaOrderByIdProductoAsc(
+            Long idMarca
+    );
+
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByEstadoRegistroAndEstadoTrueOrderByUpdatedAtDesc(
+            EstadoProductoRegistro estadoRegistro
+    );
+
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
     List<Producto> findByEstadoPublicacionAndEstadoTrueOrderByUpdatedAtDesc(
             EstadoProductoPublicacion estadoPublicacion
     );
 
-    List<Producto> findByEstadoVentaAndEstadoTrueOrderByUpdatedAtDesc(EstadoProductoVenta estadoVenta);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    List<Producto> findByEstadoVentaAndEstadoTrueOrderByUpdatedAtDesc(
+            EstadoProductoVenta estadoVenta
+    );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
     Page<Producto> findByEstadoTrueAndVisiblePublicoTrueAndEstadoPublicacionInAndEstadoVentaIn(
             Collection<EstadoProductoPublicacion> estadosPublicacion,
             Collection<EstadoProductoVenta> estadosVenta,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {
-            "tipoProducto",
-            "categoria",
-            "marca"
-    })
-    Optional<Producto> findBySlugIgnoreCaseAndEstadoTrueAndVisiblePublicoTrue(String slug);
+    @EntityGraph(
+            attributePaths = {
+                    "categoria",
+                    "categoria.categoriaPadre",
+                    "marca"
+            }
+    )
+    Optional<Producto> findBySlugIgnoreCaseAndEstadoTrueAndVisiblePublicoTrue(
+            String slug
+    );
 }

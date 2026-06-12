@@ -12,13 +12,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class AlmacenMapper {
 
-    public Almacen toEntity(AlmacenCreateRequestDto request) {
+    public Almacen toEntity(
+            AlmacenCreateRequestDto request,
+            String codigo
+    ) {
         if (request == null) {
             return null;
         }
 
         Almacen entity = new Almacen();
-        entity.setCodigo(request.codigo());
+        entity.setCodigo(codigo);
         entity.setNombre(request.nombre());
         entity.setDireccion(request.direccion());
         entity.setPrincipal(defaultBoolean(request.principal(), false));
@@ -34,7 +37,6 @@ public class AlmacenMapper {
             return;
         }
 
-        entity.setCodigo(request.codigo());
         entity.setNombre(request.nombre());
         entity.setDireccion(request.direccion());
         entity.setPrincipal(defaultBoolean(request.principal(), Boolean.FALSE));

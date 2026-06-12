@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/controller/CatalogoLookupController.java
 package com.upsjb.ms3.controller;
 
 import com.upsjb.ms3.dto.reference.filter.ReferenceSearchFilterDto;
@@ -11,7 +10,6 @@ import com.upsjb.ms3.dto.reference.response.ProductoOptionDto;
 import com.upsjb.ms3.dto.reference.response.ProductoSkuOptionDto;
 import com.upsjb.ms3.dto.reference.response.PromocionOptionDto;
 import com.upsjb.ms3.dto.reference.response.ProveedorOptionDto;
-import com.upsjb.ms3.dto.reference.response.TipoProductoOptionDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.service.contract.CatalogoLookupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,26 +37,22 @@ public class CatalogoLookupController {
 
     private final CatalogoLookupService catalogoLookupService;
 
-    @GetMapping("/tipos-producto")
-    @Operation(
-            summary = "Buscar tipos de producto",
-            description = "Devuelve opciones livianas de tipos de producto para selects o autocompletados."
-    )
-    public ResponseEntity<ApiResponseDto<List<TipoProductoOptionDto>>> buscarTiposProducto(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
-    ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarTiposProducto(filter));
-    }
-
     @GetMapping("/categorias")
     @Operation(
             summary = "Buscar categorías",
             description = "Devuelve opciones livianas de categorías por código, nombre, slug o búsqueda general."
     )
     public ResponseEntity<ApiResponseDto<List<CategoriaOptionDto>>> buscarCategorias(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarCategorias(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarCategorias(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/marcas")
@@ -67,9 +61,16 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de marcas por código, nombre, slug o búsqueda general."
     )
     public ResponseEntity<ApiResponseDto<List<MarcaOptionDto>>> buscarMarcas(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarMarcas(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarMarcas(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/atributos")
@@ -78,9 +79,16 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de atributos dinámicos para formularios de producto y SKU."
     )
     public ResponseEntity<ApiResponseDto<List<AtributoOptionDto>>> buscarAtributos(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarAtributos(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarAtributos(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/productos")
@@ -89,9 +97,16 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de productos por código, nombre, slug o búsqueda general."
     )
     public ResponseEntity<ApiResponseDto<List<ProductoOptionDto>>> buscarProductos(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarProductos(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarProductos(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/skus")
@@ -100,20 +115,34 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de SKU por código, barcode, producto o búsqueda general."
     )
     public ResponseEntity<ApiResponseDto<List<ProductoSkuOptionDto>>> buscarSkus(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarSkus(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarSkus(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/proveedores")
     @Operation(
             summary = "Buscar proveedores",
-            description = "Devuelve opciones livianas de proveedores para compras e inventario. Endpoint protegido; no es público."
+            description = "Devuelve opciones livianas de proveedores para compras e inventario."
     )
     public ResponseEntity<ApiResponseDto<List<ProveedorOptionDto>>> buscarProveedores(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarProveedores(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarProveedores(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/almacenes")
@@ -122,9 +151,16 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de almacenes para operaciones de compra, reserva, stock y movimientos."
     )
     public ResponseEntity<ApiResponseDto<List<AlmacenOptionDto>>> buscarAlmacenes(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarAlmacenes(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarAlmacenes(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/promociones")
@@ -133,19 +169,33 @@ public class CatalogoLookupController {
             description = "Devuelve opciones livianas de promociones para formularios administrativos."
     )
     public ResponseEntity<ApiResponseDto<List<PromocionOptionDto>>> buscarPromociones(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarPromociones(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarPromociones(
+                        filter
+                )
+        );
     }
 
     @GetMapping("/empleados-inventario")
     @Operation(
             summary = "Buscar empleados de inventario",
-            description = "Devuelve opciones livianas de empleados sincronizados desde MS2 para permisos u operaciones de inventario."
+            description = "Devuelve opciones livianas de empleados sincronizados desde MS2."
     )
     public ResponseEntity<ApiResponseDto<List<EmpleadoInventarioOptionDto>>> buscarEmpleadosInventario(
-            @Valid @ParameterObject @ModelAttribute ReferenceSearchFilterDto filter
+            @Valid
+            @ParameterObject
+            @ModelAttribute
+            ReferenceSearchFilterDto filter
     ) {
-        return ResponseEntity.ok(catalogoLookupService.buscarEmpleadosInventario(filter));
+        return ResponseEntity.ok(
+                catalogoLookupService.buscarEmpleadosInventario(
+                        filter
+                )
+        );
     }
 }

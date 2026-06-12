@@ -19,7 +19,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -32,7 +31,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -41,7 +39,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -50,7 +47,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -73,7 +69,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -84,7 +79,6 @@ public interface ProductoAtributoValorRepository extends
 
     @EntityGraph(attributePaths = {
             "producto",
-            "producto.tipoProducto",
             "producto.categoria",
             "producto.marca",
             "atributo"
@@ -97,15 +91,33 @@ public interface ProductoAtributoValorRepository extends
 
     long countByAtributo_IdAtributoAndEstadoTrue(Long idAtributo);
 
-    @Query("""
-            select count(v)
-            from ProductoAtributoValor v
-            where v.estado = true
-              and v.atributo.idAtributo = :idAtributo
-              and v.producto.tipoProducto.idTipoProducto = :idTipoProducto
-            """)
-    long countByTipoProductoAndAtributoActivos(
-            @Param("idTipoProducto") Long idTipoProducto,
+    @Query(
+            value = """
+                    WITH categoria_descendientes AS (
+                        SELECT c.id_categoria
+                        FROM categoria c
+                        WHERE c.id_categoria = :idCategoria
+
+                        UNION ALL
+
+                        SELECT hija.id_categoria
+                        FROM categoria hija
+                        INNER JOIN categoria_descendientes padre
+                            ON hija.id_categoria_padre = padre.id_categoria
+                    )
+                    SELECT COUNT_BIG(1)
+                    FROM producto_atributo_valor v
+                        INNER JOIN producto p
+                            ON p.id_producto = v.id_producto
+                        INNER JOIN categoria_descendientes cd
+                            ON cd.id_categoria = p.id_categoria
+                    WHERE v.estado = 1
+                      AND v.id_atributo = :idAtributo
+                    """,
+            nativeQuery = true
+    )
+    long countByCategoriaAndAtributoActivos(
+            @Param("idCategoria") Long idCategoria,
             @Param("idAtributo") Long idAtributo
     );
 }

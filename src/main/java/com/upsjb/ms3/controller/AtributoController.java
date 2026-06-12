@@ -3,14 +3,14 @@ package com.upsjb.ms3.controller;
 
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
 import com.upsjb.ms3.dto.catalogo.atributo.filter.AtributoFilterDto;
-import com.upsjb.ms3.dto.catalogo.atributo.filter.TipoProductoAtributoFilterDto;
+import com.upsjb.ms3.dto.catalogo.atributo.filter.CategoriaAtributoFilterDto;
 import com.upsjb.ms3.dto.catalogo.atributo.request.AtributoCreateRequestDto;
 import com.upsjb.ms3.dto.catalogo.atributo.request.AtributoUpdateRequestDto;
-import com.upsjb.ms3.dto.catalogo.atributo.request.TipoProductoAtributoAssignRequestDto;
-import com.upsjb.ms3.dto.catalogo.atributo.request.TipoProductoAtributoUpdateRequestDto;
+import com.upsjb.ms3.dto.catalogo.atributo.request.CategoriaAtributoAssignRequestDto;
+import com.upsjb.ms3.dto.catalogo.atributo.request.CategoriaAtributoUpdateRequestDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.atributo.response.AtributoResponseDto;
-import com.upsjb.ms3.dto.catalogo.atributo.response.TipoProductoAtributoResponseDto;
+import com.upsjb.ms3.dto.catalogo.atributo.response.CategoriaAtributoResponseDto;
 import com.upsjb.ms3.dto.reference.response.AtributoOptionDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import com.upsjb.ms3.dto.shared.EntityReferenceDto;
@@ -18,7 +18,7 @@ import com.upsjb.ms3.dto.shared.EstadoChangeRequestDto;
 import com.upsjb.ms3.dto.shared.PageRequestDto;
 import com.upsjb.ms3.dto.shared.PageResponseDto;
 import com.upsjb.ms3.service.contract.AtributoService;
-import com.upsjb.ms3.service.contract.TipoProductoAtributoService;
+import com.upsjb.ms3.service.contract.CategoriaAtributoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,12 +50,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/ms3/catalogo/atributos")
 @Tag(
         name = "MS3 - Catálogo - Atributos",
-        description = "Endpoints administrativos para gestionar atributos dinámicos y asociaciones con tipos de producto."
+        description = "Endpoints administrativos para gestionar atributos dinámicos y asociaciones con categorías."
 )
 public class AtributoController {
 
     private final AtributoService atributoService;
-    private final TipoProductoAtributoService tipoProductoAtributoService;
+    private final CategoriaAtributoService categoriaAtributoService;
 
     @PostMapping
     @Operation(
@@ -114,7 +114,7 @@ public class AtributoController {
     @GetMapping("/{idAtributo}/detalle")
     @Operation(
             summary = "Obtener detalle de atributo",
-            description = "Obtiene detalle administrativo del atributo, incluyendo conteos de uso y asociaciones con tipos de producto."
+            description = "Obtiene detalle administrativo del atributo, incluyendo conteos de uso y asociaciones con categorías."
     )
     public ResponseEntity<ApiResponseDto<AtributoDetailResponseDto>> obtenerDetalle(
             @Parameter(description = "ID técnico del atributo.", required = true)
@@ -183,92 +183,92 @@ public class AtributoController {
         return ResponseEntity.ok(atributoService.listarPorTipoDato(tipoDato));
     }
 
-    @PostMapping("/tipo-producto-asociaciones")
+    @PostMapping("/categoria-asociaciones")
     @Operation(
-            summary = "Asociar atributo a tipo de producto",
-            description = "Asocia un atributo dinámico a un tipo de producto. La resolución de referencias y validaciones se realiza en el service."
+            summary = "Asociar atributo a categoría",
+            description = "Asocia un atributo dinámico a una categoría. La resolución de referencias y validaciones se realiza en el service."
     )
-    public ResponseEntity<ApiResponseDto<TipoProductoAtributoResponseDto>> asignarATipoProducto(
-            @Valid @RequestBody TipoProductoAtributoAssignRequestDto request
+    public ResponseEntity<ApiResponseDto<CategoriaAtributoResponseDto>> asignarACategoria(
+            @Valid @RequestBody CategoriaAtributoAssignRequestDto request
     ) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(tipoProductoAtributoService.asignar(request));
+                .body(categoriaAtributoService.asignar(request));
     }
 
-    @PutMapping("/tipo-producto-asociaciones/{idTipoProductoAtributo}")
+    @PutMapping("/categoria-asociaciones/{idCategoriaAtributo}")
     @Operation(
-            summary = "Actualizar asociación atributo-tipo producto",
+            summary = "Actualizar asociación atributo-categoría",
             description = "Actualiza datos funcionales de la asociación, como requerido u orden."
     )
-    public ResponseEntity<ApiResponseDto<TipoProductoAtributoResponseDto>> actualizarAsociacionTipoProducto(
+    public ResponseEntity<ApiResponseDto<CategoriaAtributoResponseDto>> actualizarAsociacionCategoria(
             @Parameter(description = "ID técnico de la asociación.", required = true)
             @Positive(message = "El ID de la asociación debe ser positivo.")
-            @PathVariable Long idTipoProductoAtributo,
-            @Valid @RequestBody TipoProductoAtributoUpdateRequestDto request
+            @PathVariable Long idCategoriaAtributo,
+            @Valid @RequestBody CategoriaAtributoUpdateRequestDto request
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.actualizar(idTipoProductoAtributo, request));
+        return ResponseEntity.ok(categoriaAtributoService.actualizar(idCategoriaAtributo, request));
     }
 
-    @PatchMapping("/tipo-producto-asociaciones/{idTipoProductoAtributo}/estado")
+    @PatchMapping("/categoria-asociaciones/{idCategoriaAtributo}/estado")
     @Operation(
-            summary = "Cambiar estado de asociación atributo-tipo producto",
-            description = "Activa o inactiva lógicamente la asociación entre atributo y tipo de producto."
+            summary = "Cambiar estado de asociación atributo-categoría",
+            description = "Activa o inactiva lógicamente la asociación entre atributo y categoría."
     )
-    public ResponseEntity<ApiResponseDto<TipoProductoAtributoResponseDto>> cambiarEstadoAsociacionTipoProducto(
+    public ResponseEntity<ApiResponseDto<CategoriaAtributoResponseDto>> cambiarEstadoAsociacionCategoria(
             @Parameter(description = "ID técnico de la asociación.", required = true)
             @Positive(message = "El ID de la asociación debe ser positivo.")
-            @PathVariable Long idTipoProductoAtributo,
+            @PathVariable Long idCategoriaAtributo,
             @Valid @RequestBody EstadoChangeRequestDto request
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.cambiarEstado(idTipoProductoAtributo, request));
+        return ResponseEntity.ok(categoriaAtributoService.cambiarEstado(idCategoriaAtributo, request));
     }
 
-    @GetMapping("/tipo-producto-asociaciones/{idTipoProductoAtributo}")
+    @GetMapping("/categoria-asociaciones/{idCategoriaAtributo}")
     @Operation(
-            summary = "Obtener detalle de asociación atributo-tipo producto",
-            description = "Obtiene el detalle de la asociación entre un atributo y un tipo de producto."
+            summary = "Obtener detalle de asociación atributo-categoría",
+            description = "Obtiene el detalle de la asociación entre un atributo y una categoría."
     )
-    public ResponseEntity<ApiResponseDto<TipoProductoAtributoResponseDto>> obtenerDetalleAsociacionTipoProducto(
+    public ResponseEntity<ApiResponseDto<CategoriaAtributoResponseDto>> obtenerDetalleAsociacionCategoria(
             @Parameter(description = "ID técnico de la asociación.", required = true)
             @Positive(message = "El ID de la asociación debe ser positivo.")
-            @PathVariable Long idTipoProductoAtributo
+            @PathVariable Long idCategoriaAtributo
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.obtenerDetalle(idTipoProductoAtributo));
+        return ResponseEntity.ok(categoriaAtributoService.obtenerDetalle(idCategoriaAtributo));
     }
 
-    @GetMapping("/tipo-producto-asociaciones")
+    @GetMapping("/categoria-asociaciones")
     @Operation(
-            summary = "Listar asociaciones atributo-tipo producto",
-            description = "Lista asociaciones entre tipos de producto y atributos con filtros y paginación."
+            summary = "Listar asociaciones atributo-categoría",
+            description = "Lista asociaciones entre categorías y atributos con filtros y paginación."
     )
-    public ResponseEntity<ApiResponseDto<PageResponseDto<TipoProductoAtributoResponseDto>>> listarAsociacionesTipoProducto(
-            @Valid @ParameterObject @ModelAttribute TipoProductoAtributoFilterDto filter,
+    public ResponseEntity<ApiResponseDto<PageResponseDto<CategoriaAtributoResponseDto>>> listarAsociacionesCategoria(
+            @Valid @ParameterObject @ModelAttribute CategoriaAtributoFilterDto filter,
             @Valid @ParameterObject @ModelAttribute PageRequestDto pageRequest
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.listar(filter, pageRequest));
+        return ResponseEntity.ok(categoriaAtributoService.listar(filter, pageRequest));
     }
 
-    @GetMapping("/tipo-producto-asociaciones/por-tipo-producto")
+    @GetMapping("/categoria-asociaciones/por-categoria")
     @Operation(
-            summary = "Listar asociaciones por tipo de producto",
-            description = "Lista atributos asociados a un tipo de producto usando referencia funcional: id, código, nombre o slug."
+            summary = "Listar asociaciones por categoría",
+            description = "Lista atributos asociados a una categoría usando referencia funcional: id, código, nombre o slug."
     )
-    public ResponseEntity<ApiResponseDto<PageResponseDto<TipoProductoAtributoResponseDto>>> listarPorTipoProducto(
-            @Valid @ParameterObject @ModelAttribute EntityReferenceDto tipoProducto,
+    public ResponseEntity<ApiResponseDto<PageResponseDto<CategoriaAtributoResponseDto>>> listarPorCategoria(
+            @Valid @ParameterObject @ModelAttribute EntityReferenceDto categoria,
             @Valid @ParameterObject @ModelAttribute PageRequestDto pageRequest
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.listarPorTipoProducto(tipoProducto, pageRequest));
+        return ResponseEntity.ok(categoriaAtributoService.listarPorCategoria(categoria, pageRequest));
     }
 
-    @GetMapping("/tipo-producto-asociaciones/plantilla-activa")
+    @GetMapping("/categoria-asociaciones/plantilla-activa")
     @Operation(
-            summary = "Obtener plantilla activa por tipo de producto",
-            description = "Obtiene la plantilla activa de atributos para un tipo de producto usando referencia funcional."
+            summary = "Obtener plantilla activa por categoría",
+            description = "Obtiene la plantilla activa de atributos para una categoría usando referencia funcional."
     )
-    public ResponseEntity<ApiResponseDto<List<TipoProductoAtributoResponseDto>>> obtenerPlantillaActiva(
-            @Valid @ParameterObject @ModelAttribute EntityReferenceDto tipoProducto
+    public ResponseEntity<ApiResponseDto<List<CategoriaAtributoResponseDto>>> obtenerPlantillaActiva(
+            @Valid @ParameterObject @ModelAttribute EntityReferenceDto categoria
     ) {
-        return ResponseEntity.ok(tipoProductoAtributoService.obtenerPlantillaActiva(tipoProducto));
+        return ResponseEntity.ok(categoriaAtributoService.obtenerPlantillaActiva(categoria));
     }
 }

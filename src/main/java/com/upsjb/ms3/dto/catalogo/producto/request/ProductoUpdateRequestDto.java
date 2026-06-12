@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/request/ProductoUpdateRequestDto.java
 package com.upsjb.ms3.dto.catalogo.producto.request;
 
 import com.upsjb.ms3.domain.enums.GeneroObjetivo;
@@ -12,10 +11,6 @@ import lombok.Builder;
 
 @Builder
 public record ProductoUpdateRequestDto(
-
-        @Valid
-        @NotNull(message = "El tipo de producto es obligatorio.")
-        EntityReferenceDto tipoProducto,
 
         @Valid
         @NotNull(message = "La categoría es obligatoria.")

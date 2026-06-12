@@ -48,11 +48,9 @@ public class AtributoValidator {
 
     public void validateUpdate(
             Atributo atributo,
-            String codigo,
             String nombre,
             TipoDatoAtributo tipoDato,
             String unidadMedida,
-            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean hasExistingValues
     ) {
@@ -60,7 +58,7 @@ public class AtributoValidator {
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
 
-        validateCodigo(codigo, errors);
+        validateCodigo(atributo.getCodigo(), errors);
         validateNombre(nombre, errors);
         validateTipoDato(tipoDato, errors);
         validateUnidadMedida(unidadMedida, errors);
@@ -74,13 +72,6 @@ public class AtributoValidator {
             throw new ConflictException(
                     "ATRIBUTO_TIPO_DATO_NO_EDITABLE",
                     "No se puede cambiar el tipo de dato porque el atributo ya tiene valores registrados."
-            );
-        }
-
-        if (duplicatedCodigo) {
-            throw new ConflictException(
-                    "ATRIBUTO_CODIGO_DUPLICADO",
-                    "Ya existe otro atributo activo con el mismo código."
             );
         }
 

@@ -3,6 +3,7 @@ package com.upsjb.ms3.controller;
 
 import com.upsjb.ms3.dto.inventario.stock.filter.StockSkuFilterDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockDisponibleResponseDto;
+import com.upsjb.ms3.dto.inventario.stock.response.StockInventarioResumenResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuResponseDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
@@ -39,6 +40,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class StockController {
 
     private final StockService stockService;
+
+    @GetMapping("/resumen")
+    @Operation(
+            summary = "Obtener resumen global de existencias",
+            description = "Obtiene indicadores globales o filtrados por almacén para usar como accesos rápidos en la gestión de inventario."
+    )
+    public ResponseEntity<ApiResponseDto<StockInventarioResumenResponseDto>> obtenerResumen(
+            @Parameter(description = "ID opcional del almacén que se desea resumir.")
+            @Positive(message = "El ID del almacén debe ser positivo.")
+            @RequestParam(required = false) Long idAlmacen
+    ) {
+        return ResponseEntity.ok(stockService.obtenerResumen(idAlmacen));
+    }
 
     @GetMapping
     @Operation(

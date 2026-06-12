@@ -1,6 +1,8 @@
 // ruta: src/main/java/com/upsjb/ms3/dto/catalogo/marca/filter/MarcaFilterDto.java
 package com.upsjb.ms3.dto.catalogo.marca.filter;
 
+import com.upsjb.ms3.domain.value.SlugValue;
+
 import com.upsjb.ms3.dto.shared.DateRangeFilterDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
@@ -18,7 +20,7 @@ public record MarcaFilterDto(
         @Size(max = 120, message = "El nombre no debe superar 120 caracteres.")
         String nombre,
 
-        @Size(max = 150, message = "El slug no debe superar 150 caracteres.")
+        @Size(max = SlugValue.MAX_LENGTH, message = "El slug no debe superar 240 caracteres.")
         String slug,
 
         Boolean estado,

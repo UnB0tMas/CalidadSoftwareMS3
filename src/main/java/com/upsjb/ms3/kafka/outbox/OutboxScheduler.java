@@ -1,5 +1,6 @@
 package com.upsjb.ms3.kafka.outbox;
 
+import com.upsjb.ms3.config.AppPropertiesConfig;
 import com.upsjb.ms3.config.OutboxProperties;
 import com.upsjb.ms3.dto.outbox.response.OutboxPublishResultResponseDto;
 import com.upsjb.ms3.service.contract.KafkaPublisherService;
@@ -13,29 +14,57 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "outbox", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+        prefix = "outbox",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class OutboxScheduler {
 
     private final KafkaPublisherService kafkaPublisherService;
     private final OutboxProperties outboxProperties;
+    private final AppPropertiesConfig appPropertiesConfig;
 
-    @Scheduled(fixedDelayString = "#{@outboxProperties.fixedDelayMillis()}")
+    @Scheduled(
+            fixedDelayString =
+                    "#{@outboxProperties.fixedDelayMillis()}"
+    )
     public void publishPendingEvents() {
-        if (!outboxProperties.isEnabled()) {
+        if (
+                !outboxProperties.isEnabled()
+                        || !appPropertiesConfig
+                        .getKafka()
+                        .isEnabled()
+        ) {
             return;
         }
 
         try {
-            List<OutboxPublishResultResponseDto> results = kafkaPublisherService.publicarPendientesInterno();
+            List<OutboxPublishResultResponseDto> results =
+                    kafkaPublisherService
+                            .publicarPendientesInterno();
 
             if (!results.isEmpty()) {
-                long success = results.stream()
-                        .filter(result -> Boolean.TRUE.equals(result.success()))
-                        .count();
+                long success =
+                        results.stream()
+                                .filter(
+                                        result ->
+                                                Boolean.TRUE.equals(
+                                                        result.success()
+                                                )
+                                )
+                                .count();
 
-                long failed = results.stream()
-                        .filter(result -> !Boolean.TRUE.equals(result.success()))
-                        .count();
+                long failed =
+                        results.stream()
+                                .filter(
+                                        result ->
+                                                !Boolean.TRUE.equals(
+                                                        result.success()
+                                                )
+                                )
+                                .count();
 
                 log.info(
                         "Outbox Kafka MS3 batch procesado. total={}, publicados={}, fallidos={}",

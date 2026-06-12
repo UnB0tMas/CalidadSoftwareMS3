@@ -1,4 +1,3 @@
-// ruta: src/main/java/com/upsjb/ms3/dto/catalogo/producto/filter/ProductoFilterDto.java
 package com.upsjb.ms3.dto.catalogo.producto.filter;
 
 import com.upsjb.ms3.domain.enums.EstadoProductoPublicacion;
@@ -17,7 +16,6 @@ public record ProductoFilterDto(
         String codigoProducto,
         String nombre,
         String slug,
-        Long idTipoProducto,
         Long idCategoria,
         Long idMarca,
         GeneroObjetivo generoObjetivo,

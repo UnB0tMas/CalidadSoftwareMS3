@@ -11,13 +11,10 @@ import com.upsjb.ms3.dto.reference.response.ProductoOptionDto;
 import com.upsjb.ms3.dto.reference.response.ProductoSkuOptionDto;
 import com.upsjb.ms3.dto.reference.response.PromocionOptionDto;
 import com.upsjb.ms3.dto.reference.response.ProveedorOptionDto;
-import com.upsjb.ms3.dto.reference.response.TipoProductoOptionDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
 import java.util.List;
 
 public interface CatalogoLookupService {
-
-    ApiResponseDto<List<TipoProductoOptionDto>> buscarTiposProducto(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<CategoriaOptionDto>> buscarCategorias(ReferenceSearchFilterDto filter);
 
@@ -36,8 +33,6 @@ public interface CatalogoLookupService {
     ApiResponseDto<List<PromocionOptionDto>> buscarPromociones(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<EmpleadoInventarioOptionDto>> buscarEmpleadosInventario(ReferenceSearchFilterDto filter);
-
-    ApiResponseDto<List<TipoProductoOptionDto>> buscarTiposProductoPublicos(ReferenceSearchFilterDto filter);
 
     ApiResponseDto<List<CategoriaOptionDto>> buscarCategoriasPublicas(ReferenceSearchFilterDto filter);
 

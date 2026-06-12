@@ -20,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
+public class CodigoGeneradorServiceImpl
+        implements CodigoGeneradorService {
 
     private static final int DEFAULT_LENGTH = 6;
     private static final int MIN_LENGTH = 3;
@@ -31,27 +32,99 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
     private static final String ENTIDAD_PROMOCION = "PROMOCION";
     private static final String ENTIDAD_COMPRA = "COMPRA";
     private static final String ENTIDAD_RESERVA_STOCK = "RESERVA_STOCK";
-    private static final String ENTIDAD_MOVIMIENTO_INVENTARIO = "MOVIMIENTO_INVENTARIO";
+    private static final String ENTIDAD_MOVIMIENTO_INVENTARIO =
+            "MOVIMIENTO_INVENTARIO";
+    private static final String ENTIDAD_ALMACEN = "ALMACEN";
+    private static final String ENTIDAD_CATEGORIA = "CATEGORIA";
+    private static final String ENTIDAD_MARCA = "MARCA";
+    private static final String ENTIDAD_ATRIBUTO = "ATRIBUTO";
 
-    private static final Map<String, CodigoDefault> DEFAULTS = Map.ofEntries(
-            Map.entry(ENTIDAD_PRODUCTO, new CodigoDefault("PROD", DEFAULT_LENGTH, "Código de producto")),
-            Map.entry(ENTIDAD_SKU, new CodigoDefault("SKU", DEFAULT_LENGTH, "Código de SKU")),
-            Map.entry(ENTIDAD_PROMOCION, new CodigoDefault("PROM", DEFAULT_LENGTH, "Código de promoción")),
-            Map.entry(ENTIDAD_COMPRA, new CodigoDefault("COMP", DEFAULT_LENGTH, "Código de compra")),
-            Map.entry(ENTIDAD_RESERVA_STOCK, new CodigoDefault("RES", DEFAULT_LENGTH, "Código de reserva de stock")),
-            Map.entry(
-                    ENTIDAD_MOVIMIENTO_INVENTARIO,
-                    new CodigoDefault("MOV", DEFAULT_LENGTH, "Código de movimiento de inventario")
-            ),
-            Map.entry("ALMACEN", new CodigoDefault("ALM", DEFAULT_LENGTH, "Código de almacén")),
-            Map.entry("PROVEEDOR", new CodigoDefault("PROV", DEFAULT_LENGTH, "Código de proveedor")),
-            Map.entry("CATEGORIA", new CodigoDefault("CAT", DEFAULT_LENGTH, "Código de categoría")),
-            Map.entry("MARCA", new CodigoDefault("MAR", DEFAULT_LENGTH, "Código de marca")),
-            Map.entry("ATRIBUTO", new CodigoDefault("ATR", DEFAULT_LENGTH, "Código de atributo")),
-            Map.entry("TIPO_PRODUCTO", new CodigoDefault("TPROD", DEFAULT_LENGTH, "Código de tipo de producto"))
-    );
+    private static final Map<String, CodigoDefault> DEFAULTS =
+            Map.ofEntries(
+                    Map.entry(
+                            ENTIDAD_PRODUCTO,
+                            new CodigoDefault(
+                                    "PROD",
+                                    DEFAULT_LENGTH,
+                                    "Código de producto"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_SKU,
+                            new CodigoDefault(
+                                    "SKU",
+                                    DEFAULT_LENGTH,
+                                    "Código de SKU"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_PROMOCION,
+                            new CodigoDefault(
+                                    "PROM",
+                                    DEFAULT_LENGTH,
+                                    "Código de promoción"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_COMPRA,
+                            new CodigoDefault(
+                                    "COMP",
+                                    DEFAULT_LENGTH,
+                                    "Código de compra"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_RESERVA_STOCK,
+                            new CodigoDefault(
+                                    "RES",
+                                    DEFAULT_LENGTH,
+                                    "Código de reserva de stock"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_MOVIMIENTO_INVENTARIO,
+                            new CodigoDefault(
+                                    "MOV",
+                                    DEFAULT_LENGTH,
+                                    "Código de movimiento de inventario"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_ALMACEN,
+                            new CodigoDefault(
+                                    "ALM",
+                                    DEFAULT_LENGTH,
+                                    "Código de almacén"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_CATEGORIA,
+                            new CodigoDefault(
+                                    "CAT",
+                                    DEFAULT_LENGTH,
+                                    "Código de categoría"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_MARCA,
+                            new CodigoDefault(
+                                    "MAR",
+                                    DEFAULT_LENGTH,
+                                    "Código de marca"
+                            )
+                    ),
+                    Map.entry(
+                            ENTIDAD_ATRIBUTO,
+                            new CodigoDefault(
+                                    "ATR",
+                                    DEFAULT_LENGTH,
+                                    "Código de atributo"
+                            )
+                    )
+            );
 
-    private final CorrelativoCodigoRepository correlativoCodigoRepository;
+    private final CorrelativoCodigoRepository
+            correlativoCodigoRepository;
     private final CodigoGenerator codigoGenerator;
     private final CodigoSequenceLock codigoSequenceLock;
 
@@ -88,45 +161,116 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
     @Override
     @Transactional
     public String generarCodigoMovimientoInventario() {
-        return generarCodigo(ENTIDAD_MOVIMIENTO_INVENTARIO);
+        return generarCodigo(
+                ENTIDAD_MOVIMIENTO_INVENTARIO
+        );
+    }
+
+    @Override
+    @Transactional
+    public String generarCodigoAlmacen() {
+        return generarCodigo(ENTIDAD_ALMACEN);
+    }
+
+    @Override
+    @Transactional
+    public String generarCodigoCategoria() {
+        return generarCodigo(ENTIDAD_CATEGORIA);
+    }
+
+    @Override
+    @Transactional
+    public String generarCodigoMarca() {
+        return generarCodigo(ENTIDAD_MARCA);
+    }
+
+    @Override
+    @Transactional
+    public String generarCodigoAtributo() {
+        return generarCodigo(ENTIDAD_ATRIBUTO);
     }
 
     @Override
     @Transactional
     public String generarCodigo(String entidad) {
         String safeEntidad = normalizeEntidad(entidad);
+
         CodigoDefault defaults = DEFAULTS.getOrDefault(
                 safeEntidad,
-                new CodigoDefault(defaultPrefixFromEntidad(safeEntidad), DEFAULT_LENGTH, "Código generado de " + safeEntidad)
+                new CodigoDefault(
+                        defaultPrefixFromEntidad(safeEntidad),
+                        DEFAULT_LENGTH,
+                        "Código generado de " + safeEntidad
+                )
         );
 
-        return generarCodigo(safeEntidad, defaults.prefijo(), defaults.longitud());
+        return generarCodigo(
+                safeEntidad,
+                defaults.prefijo(),
+                defaults.longitud()
+        );
     }
 
     @Override
     @Transactional
-    public String generarCodigo(String entidad, String prefijoPorDefecto, int longitudPorDefecto) {
+    public String generarCodigo(
+            String entidad,
+            String prefijoPorDefecto,
+            int longitudPorDefecto
+    ) {
         String safeEntidad = normalizeEntidad(entidad);
-        String safePrefix = normalizePrefix(prefijoPorDefecto);
-        int safeLength = normalizeLength(longitudPorDefecto);
+        String safePrefix = normalizePrefix(
+                prefijoPorDefecto
+        );
+        int safeLength = normalizeLength(
+                longitudPorDefecto
+        );
+        String description = resolveDescription(
+                safeEntidad
+        );
 
-        try (CodigoSequenceLock.LockHandle ignored = codigoSequenceLock.lock(safeEntidad)) {
-            CorrelativoCodigo correlativo = correlativoCodigoRepository
-                    .findActivoByEntidadForUpdate(safeEntidad)
-                    .orElseGet(() -> createCorrelativo(safeEntidad, safePrefix, safeLength));
+        try (
+                CodigoSequenceLock.LockHandle ignored =
+                        codigoSequenceLock.lock(safeEntidad)
+        ) {
+            correlativoCodigoRepository.ensureExists(
+                    safeEntidad,
+                    safePrefix,
+                    safeLength,
+                    description
+            );
+
+            CorrelativoCodigo correlativo =
+                    correlativoCodigoRepository
+                            .findActivoByEntidadForUpdate(
+                                    safeEntidad
+                            )
+                            .orElseThrow(
+                                    () -> resolveCorrelativoException(
+                                            safeEntidad
+                                    )
+                            );
 
             validateCorrelativo(correlativo);
 
-            Long nextNumber = correlativo.siguienteNumero();
+            Long nextNumber =
+                    correlativo.siguienteNumero();
+
             String generated = codigoGenerator.format(
                     correlativo.getPrefijo(),
-                    normalizeLength(correlativo.getLongitud()),
+                    normalizeLength(
+                            correlativo.getLongitud()
+                    ),
                     nextNumber
             );
 
-            String validated = CodigoGeneradoValue.of(generated).raw();
+            String validated =
+                    CodigoGeneradoValue.of(generated)
+                            .raw();
 
-            correlativoCodigoRepository.saveAndFlush(correlativo);
+            correlativoCodigoRepository.saveAndFlush(
+                    correlativo
+            );
 
             log.debug(
                     "Código generado. entidad={}, prefijo={}, numero={}, codigo={}",
@@ -140,19 +284,28 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
         }
     }
 
-    private CorrelativoCodigo createCorrelativo(String entidad, String prefijo, int longitud) {
-        CorrelativoCodigo correlativo = new CorrelativoCodigo();
-        correlativo.setEntidad(entidad);
-        correlativo.setPrefijo(prefijo);
-        correlativo.setLongitud(longitud);
-        correlativo.setUltimoNumero(0L);
-        correlativo.setDescripcion(resolveDescription(entidad));
-        correlativo.activar();
-
-        return correlativo;
+    private RuntimeException resolveCorrelativoException(
+            String entidad
+    ) {
+        return correlativoCodigoRepository
+                .findByEntidadIgnoreCase(entidad)
+                .<RuntimeException>map(
+                        ignored -> new ConflictException(
+                                "CORRELATIVO_INACTIVO",
+                                "No se puede generar código porque el correlativo está inactivo."
+                        )
+                )
+                .orElseGet(
+                        () -> new ConflictException(
+                                "CORRELATIVO_NO_CONFIGURADO",
+                                "No se pudo resolver el correlativo de código."
+                        )
+                );
     }
 
-    private void validateCorrelativo(CorrelativoCodigo correlativo) {
+    private void validateCorrelativo(
+            CorrelativoCodigo correlativo
+    ) {
         if (correlativo == null) {
             throw new ConflictException(
                     "CORRELATIVO_NO_CONFIGURADO",
@@ -167,9 +320,15 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
             );
         }
 
-        normalizeEntidad(correlativo.getEntidad());
-        normalizePrefix(correlativo.getPrefijo());
-        normalizeLength(correlativo.getLongitud());
+        normalizeEntidad(
+                correlativo.getEntidad()
+        );
+        normalizePrefix(
+                correlativo.getPrefijo()
+        );
+        normalizeLength(
+                correlativo.getLongitud()
+        );
     }
 
     private String normalizeEntidad(String entidad) {
@@ -221,7 +380,9 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
                 .replaceAll("^_+", "")
                 .replaceAll("_+$", "");
 
-        if (!normalized.matches("^[A-Z0-9][A-Z0-9_-]{1,29}$")) {
+        if (!normalized.matches(
+                "^[A-Z0-9][A-Z0-9_-]{1,29}$"
+        )) {
             throw new ValidationException(
                     "PREFIJO_CORRELATIVO_INVALIDO",
                     "El prefijo del correlativo no tiene un formato válido."
@@ -236,17 +397,26 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
             return DEFAULT_LENGTH;
         }
 
-        if (length < MIN_LENGTH || length > MAX_LENGTH) {
+        if (
+                length < MIN_LENGTH
+                        || length > MAX_LENGTH
+        ) {
             throw new ValidationException(
                     "LONGITUD_CORRELATIVO_INVALIDA",
-                    "La longitud del correlativo debe estar entre " + MIN_LENGTH + " y " + MAX_LENGTH + "."
+                    "La longitud del correlativo debe estar entre "
+                            + MIN_LENGTH
+                            + " y "
+                            + MAX_LENGTH
+                            + "."
             );
         }
 
         return length;
     }
 
-    private String defaultPrefixFromEntidad(String entidad) {
+    private String defaultPrefixFromEntidad(
+            String entidad
+    ) {
         String normalized = normalizeEntidad(entidad)
                 .replace("_", "")
                 .toUpperCase(Locale.ROOT);
@@ -265,7 +435,8 @@ public class CodigoGeneradorServiceImpl implements CodigoGeneradorService {
             return defaults.descripcion();
         }
 
-        return "Correlativo generado automáticamente para " + entidad;
+        return "Correlativo generado automáticamente para "
+                + entidad;
     }
 
     private record CodigoDefault(

@@ -2,6 +2,7 @@
 package com.upsjb.ms3.validator;
 
 import com.upsjb.ms3.domain.entity.Marca;
+import com.upsjb.ms3.domain.value.SlugValue;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.validation.ValidationErrorCollector;
@@ -34,23 +35,19 @@ public class MarcaValidator {
 
     public void validateUpdate(
             Marca marca,
-            String codigo,
             String nombre,
             String slug,
-            boolean duplicatedCodigo,
             boolean duplicatedNombre,
             boolean duplicatedSlug
     ) {
         requireActive(marca);
 
         ValidationErrorCollector errors = ValidationErrorCollector.create();
-        validateCodigo(codigo, errors);
+        validateCodigo(marca.getCodigo(), errors);
         validateNombre(nombre, errors);
         validateSlug(slug, errors);
 
         errors.throwIfAny("No se puede actualizar la marca.");
-
-        requireNotDuplicated(duplicatedCodigo, "Ya existe otra marca activa con el mismo código.");
         requireNotDuplicated(duplicatedNombre, "Ya existe otra marca activa con el mismo nombre.");
         requireNotDuplicated(duplicatedSlug, "Ya existe otra marca activa con el mismo slug.");
     }
@@ -125,8 +122,13 @@ public class MarcaValidator {
             return;
         }
 
-        if (StringNormalizer.clean(slug).length() > 150) {
-            errors.add("slug", "El slug no debe superar 150 caracteres.", "MAX_LENGTH", slug);
+        if (StringNormalizer.clean(slug).length() > SlugValue.MAX_LENGTH) {
+            errors.add(
+                    "slug",
+                    "El slug no debe superar " + SlugValue.MAX_LENGTH + " caracteres.",
+                    "MAX_LENGTH",
+                    slug
+            );
         }
     }
 

@@ -1,11 +1,14 @@
 package com.upsjb.ms3.domain.entity;
 
+import com.upsjb.ms3.domain.value.SlugValue;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,7 +17,19 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "marca")
+@Table(
+        name = "marca",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_marca_codigo",
+                        columnNames = "codigo"
+                ),
+                @UniqueConstraint(
+                        name = "uk_marca_slug",
+                        columnNames = "slug"
+                )
+        }
+)
 public class Marca extends AuditableEntity {
 
     @Id
@@ -28,7 +43,7 @@ public class Marca extends AuditableEntity {
     @Column(name = "nombre", nullable = false, length = 120, columnDefinition = "nvarchar(120)")
     private String nombre;
 
-    @Column(name = "slug", nullable = false, length = 150)
+    @Column(name = "slug", nullable = false, length = SlugValue.MAX_LENGTH)
     private String slug;
 
     @Column(name = "slug_generado", nullable = false)

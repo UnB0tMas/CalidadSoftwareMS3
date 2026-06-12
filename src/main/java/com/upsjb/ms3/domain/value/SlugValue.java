@@ -7,19 +7,29 @@ import java.util.regex.Pattern;
 
 public record SlugValue(String value) implements Serializable {
 
-    private static final int MIN_LENGTH = 3;
-    private static final int MAX_LENGTH = 240;
-    private static final Pattern DIACRITICS = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+    public static final int MIN_LENGTH = 3;
+    public static final int MAX_LENGTH = 240;
+
+    private static final Pattern DIACRITICS =
+            Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
     public SlugValue {
         value = normalizeSlug(value);
 
         if (value.length() < MIN_LENGTH || value.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("El slug debe tener entre 3 y 240 caracteres.");
+            throw new IllegalArgumentException(
+                    "El slug debe tener entre "
+                            + MIN_LENGTH
+                            + " y "
+                            + MAX_LENGTH
+                            + " caracteres."
+            );
         }
 
         if (!value.matches("^[a-z0-9]+(?:-[a-z0-9]+)*$")) {
-            throw new IllegalArgumentException("El slug no tiene un formato válido.");
+            throw new IllegalArgumentException(
+                    "El slug no tiene un formato válido."
+            );
         }
     }
 
@@ -40,7 +50,10 @@ public record SlugValue(String value) implements Serializable {
         String base = value;
 
         if (base.length() + suffixText.length() > MAX_LENGTH) {
-            base = base.substring(0, MAX_LENGTH - suffixText.length());
+            base = base.substring(
+                    0,
+                    MAX_LENGTH - suffixText.length()
+            );
             base = trimTrailingHyphen(base);
         }
 
@@ -53,10 +66,15 @@ public record SlugValue(String value) implements Serializable {
 
     public static String toSlug(String input) {
         if (input == null || input.isBlank()) {
-            throw new IllegalArgumentException("El texto para generar slug es obligatorio.");
+            throw new IllegalArgumentException(
+                    "El texto para generar slug es obligatorio."
+            );
         }
 
-        String normalized = Normalizer.normalize(input.trim(), Normalizer.Form.NFD);
+        String normalized = Normalizer.normalize(
+                input.trim(),
+                Normalizer.Form.NFD
+        );
         normalized = DIACRITICS.matcher(normalized).replaceAll("");
         normalized = normalized.toLowerCase();
         normalized = normalized.replaceAll("[^a-z0-9]+", "-");
@@ -64,7 +82,9 @@ public record SlugValue(String value) implements Serializable {
         normalized = trimHyphens(normalized);
 
         if (normalized.isBlank()) {
-            throw new IllegalArgumentException("No se pudo generar un slug válido.");
+            throw new IllegalArgumentException(
+                    "No se pudo generar un slug válido."
+            );
         }
 
         if (normalized.length() > MAX_LENGTH) {
@@ -77,7 +97,9 @@ public record SlugValue(String value) implements Serializable {
 
     private static String normalizeSlug(String slug) {
         if (slug == null || slug.isBlank()) {
-            throw new IllegalArgumentException("El slug es obligatorio.");
+            throw new IllegalArgumentException(
+                    "El slug es obligatorio."
+            );
         }
 
         return toSlug(slug);
@@ -85,20 +107,31 @@ public record SlugValue(String value) implements Serializable {
 
     private static String trimHyphens(String value) {
         String result = value;
+
         while (result.startsWith("-")) {
             result = result.substring(1);
         }
+
         while (result.endsWith("-")) {
-            result = result.substring(0, result.length() - 1);
+            result = result.substring(
+                    0,
+                    result.length() - 1
+            );
         }
+
         return result;
     }
 
     private static String trimTrailingHyphen(String value) {
         String result = value;
+
         while (result.endsWith("-")) {
-            result = result.substring(0, result.length() - 1);
+            result = result.substring(
+                    0,
+                    result.length() - 1
+            );
         }
+
         return result;
     }
 

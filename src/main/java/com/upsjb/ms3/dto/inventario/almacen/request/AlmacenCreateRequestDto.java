@@ -8,10 +8,6 @@ import lombok.Builder;
 @Builder
 public record AlmacenCreateRequestDto(
 
-        @NotBlank(message = "El código del almacén es obligatorio.")
-        @Size(max = 50, message = "El código no debe superar 50 caracteres.")
-        String codigo,
-
         @NotBlank(message = "El nombre del almacén es obligatorio.")
         @Size(max = 150, message = "El nombre no debe superar 150 caracteres.")
         String nombre,

@@ -1,7 +1,9 @@
+
 // ruta: src/main/java/com/upsjb/ms3/service/impl/ProductoSkuServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
 import com.upsjb.ms3.domain.entity.Atributo;
+import com.upsjb.ms3.domain.entity.CategoriaAtributo;
 import com.upsjb.ms3.domain.entity.Categoria;
 import com.upsjb.ms3.domain.entity.Marca;
 import com.upsjb.ms3.domain.entity.PrecioSkuHistorial;
@@ -11,7 +13,6 @@ import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.PromocionSkuDescuentoVersion;
 import com.upsjb.ms3.domain.entity.SkuAtributoValor;
 import com.upsjb.ms3.domain.entity.StockSku;
-import com.upsjb.ms3.domain.entity.TipoProducto;
 import com.upsjb.ms3.domain.enums.EntidadAuditada;
 import com.upsjb.ms3.domain.enums.EstadoPromocion;
 import com.upsjb.ms3.domain.enums.EstadoSku;
@@ -49,7 +50,7 @@ import com.upsjb.ms3.repository.PromocionSkuDescuentoVersionRepository;
 import com.upsjb.ms3.repository.ReservaStockRepository;
 import com.upsjb.ms3.repository.SkuAtributoValorRepository;
 import com.upsjb.ms3.repository.StockSkuRepository;
-import com.upsjb.ms3.repository.TipoProductoAtributoRepository;
+import com.upsjb.ms3.repository.CategoriaAtributoRepository;
 import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
@@ -73,6 +74,7 @@ import com.upsjb.ms3.util.PercentageUtil;
 import com.upsjb.ms3.util.StringNormalizer;
 import com.upsjb.ms3.validator.AtributoValidator;
 import com.upsjb.ms3.validator.ProductoSkuValidator;
+import com.upsjb.ms3.validator.SkuAtributoValorValidator;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -120,7 +122,7 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
     private final ReservaStockRepository reservaStockRepository;
     private final SkuAtributoValorRepository skuAtributoValorRepository;
     private final ProductoImagenCloudinaryRepository productoImagenRepository;
-    private final TipoProductoAtributoRepository tipoProductoAtributoRepository;
+    private final CategoriaAtributoRepository categoriaAtributoRepository;
 
     private final ProductoReferenceResolver productoReferenceResolver;
     private final AtributoReferenceResolver atributoReferenceResolver;
@@ -131,6 +133,7 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
 
     private final ProductoSkuValidator productoSkuValidator;
     private final AtributoValidator atributoValidator;
+    private final SkuAtributoValorValidator skuAtributoValorValidator;
     private final ProductoSkuPolicy productoSkuPolicy;
 
     private final CodigoGeneradorService codigoGeneradorService;
@@ -560,79 +563,222 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
         return sku;
     }
 
-    private void reemplazarAtributos(ProductoSku sku, List<SkuAtributoValorRequestDto> atributosRequest) {
-        if (atributosRequest == null) {
-            return;
-        }
+    private void reemplazarAtributos(
+            ProductoSku sku,
+            List<SkuAtributoValorRequestDto> atributosRequest
+    ) {
+        skuAtributoValorValidator.requireSkuWithCategory(sku);
 
-        List<SkuAtributoValor> actuales = skuAtributoValorRepository
-                .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(sku.getIdSku());
+        List<SkuAtributoValorRequestDto> safeAtributos =
+                atributosRequest == null
+                        ? List.of()
+                        : atributosRequest;
 
-        actuales.forEach(SkuAtributoValor::inactivar);
-        skuAtributoValorRepository.saveAll(actuales);
+        List<CategoriaAtributo> plantilla =
+                findPlantillaActiva(sku);
 
-        Set<Long> atributosProcesados = new LinkedHashSet<>();
+        List<SkuAtributoValor> actuales =
+                skuAtributoValorRepository
+                        .findBySku_IdSkuAndEstadoTrueOrderByIdSkuAtributoValorAsc(
+                                sku.getIdSku()
+                        );
 
-        for (SkuAtributoValorRequestDto item : atributosRequest) {
-            if (item == null || item.atributo() == null) {
-                throw new ValidationException(
-                        "SKU_ATRIBUTO_REQUERIDO",
-                        "Debe indicar el atributo del SKU."
-                );
-            }
+        actuales.forEach(
+                SkuAtributoValor::inactivar
+        );
 
-            Atributo atributo = atributoReferenceResolver.resolve(
-                    item.atributo().id(),
-                    item.atributo().codigo(),
-                    item.atributo().nombre()
+        skuAtributoValorRepository.saveAll(
+                actuales
+        );
+
+        Set<Long> atributosProcesados =
+                new LinkedHashSet<>();
+
+        for (SkuAtributoValorRequestDto item : safeAtributos) {
+            SkuAtributoValorRequestDto normalized =
+                    normalizeSkuAtributoValorRequest(
+                            item
+                    );
+
+            Atributo atributo =
+                    atributoReferenceResolver.resolve(
+                            normalized.atributo().id(),
+                            normalized.atributo().codigo(),
+                            normalized.atributo().nombre()
+                    );
+
+            skuAtributoValorValidator.validateDuplicateInReplacement(
+                    atributo.getIdAtributo(),
+                    atributosProcesados
             );
 
-            if (!atributosProcesados.add(atributo.getIdAtributo())) {
-                throw new ConflictException(
-                        "SKU_ATRIBUTO_DUPLICADO",
-                        "No se puede registrar el mismo atributo más de una vez para el SKU."
-                );
-            }
+            CategoriaAtributo relation =
+                    findRelationFromTemplate(
+                            plantilla,
+                            atributo.getIdAtributo()
+                    );
 
-            validarAtributoPermitidoParaProducto(sku, atributo);
-            atributoValidator.validateValueByType(
+            validateSkuAtributoValue(
+                    sku,
                     atributo,
-                    item.valorTexto(),
-                    item.valorNumero(),
-                    item.valorBoolean(),
-                    item.valorFecha()
+                    relation,
+                    normalized
             );
 
-            SkuAtributoValor nuevo = skuAtributoValorMapper.toEntity(item, sku, atributo);
+            SkuAtributoValor nuevo =
+                    skuAtributoValorMapper.toEntity(
+                            normalized,
+                            sku,
+                            atributo
+                    );
+
             nuevo.activar();
             skuAtributoValorRepository.save(nuevo);
         }
 
+        skuAtributoValorValidator.validateRequiredAttributesPresent(
+                plantilla,
+                atributosProcesados
+        );
+
         skuAtributoValorRepository.flush();
     }
 
-    private void validarAtributoPermitidoParaProducto(ProductoSku sku, Atributo atributo) {
-        Producto producto = sku.getProducto();
-        TipoProducto tipoProducto = producto == null ? null : producto.getTipoProducto();
+    private void validarAtributoPermitidoParaProducto(
+            ProductoSku sku,
+            Atributo atributo
+    ) {
+        Producto producto =
+                sku.getProducto();
 
-        if (tipoProducto == null || tipoProducto.getIdTipoProducto() == null) {
+        Categoria categoria =
+                producto == null
+                        ? null
+                        : producto.getCategoria();
+
+        if (
+                categoria == null
+                        || categoria.getIdCategoria() == null
+        ) {
             throw new ConflictException(
-                    "PRODUCTO_SIN_TIPO",
-                    "No se puede registrar atributos porque el producto no tiene tipo configurado."
+                    "PRODUCTO_SIN_CATEGORIA",
+                    "No se puede registrar atributos porque el producto no tiene categoría configurada."
             );
         }
 
-        boolean asociado = tipoProductoAtributoRepository.existsByTipoProducto_IdTipoProductoAndAtributo_IdAtributoAndEstadoTrue(
-                tipoProducto.getIdTipoProducto(),
-                atributo.getIdAtributo()
-        );
+        boolean asociado =
+                categoriaAtributoRepository
+                        .existsByCategoria_IdCategoriaAndAtributo_IdAtributoAndEstadoTrue(
+                                categoria.getIdCategoria(),
+                                atributo.getIdAtributo()
+                        );
 
         if (!asociado) {
             throw new ConflictException(
                     "SKU_ATRIBUTO_NO_PERMITIDO",
-                    "El atributo no está asociado al tipo de producto del SKU."
+                    "El atributo no está asociado a la categoría del SKU."
             );
         }
+    }
+
+    private List<CategoriaAtributo> findPlantillaActiva(
+            ProductoSku sku
+    ) {
+        skuAtributoValorValidator.requireSkuWithCategory(
+                sku
+        );
+
+        return categoriaAtributoRepository
+                .findByCategoria_IdCategoriaAndEstadoTrueOrderByOrdenAscIdCategoriaAtributoAsc(
+                        sku.getProducto()
+                                .getCategoria()
+                                .getIdCategoria()
+                );
+    }
+
+    private CategoriaAtributo findRelationFromTemplate(
+            List<CategoriaAtributo> plantilla,
+            Long idAtributo
+    ) {
+        if (
+                plantilla == null
+                        || idAtributo == null
+        ) {
+            return null;
+        }
+
+        return plantilla.stream()
+                .filter(
+                        item ->
+                                item.getAtributo()
+                                        != null
+                )
+                .filter(
+                        item ->
+                                idAtributo.equals(
+                                        item.getAtributo()
+                                                .getIdAtributo()
+                                )
+                )
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void validateSkuAtributoValue(
+            ProductoSku sku,
+            Atributo atributo,
+            CategoriaAtributo relation,
+            SkuAtributoValorRequestDto request
+    ) {
+        skuAtributoValorValidator.validateAssociationAllowed(
+                sku,
+                atributo,
+                relation
+        );
+
+        atributoValidator.validateValueByType(
+                atributo,
+                request.valorTexto(),
+                request.valorNumero(),
+                request.valorBoolean(),
+                request.valorFecha()
+        );
+
+        skuAtributoValorValidator.validateValueByTemplate(
+                atributo,
+                relation,
+                request.valorTexto(),
+                request.valorNumero(),
+                request.valorBoolean(),
+                request.valorFecha()
+        );
+    }
+
+    private SkuAtributoValorRequestDto normalizeSkuAtributoValorRequest(
+            SkuAtributoValorRequestDto request
+    ) {
+        if (
+                request == null
+                        || request.atributo() == null
+        ) {
+            throw new ValidationException(
+                    "SKU_ATRIBUTO_REQUERIDO",
+                    "Debe indicar el atributo del SKU."
+            );
+        }
+
+        return SkuAtributoValorRequestDto.builder()
+                .atributo(request.atributo())
+                .valorTexto(
+                        StringNormalizer.truncateOrNull(
+                                request.valorTexto(),
+                                500
+                        )
+                )
+                .valorNumero(request.valorNumero())
+                .valorBoolean(request.valorBoolean())
+                .valorFecha(request.valorFecha())
+                .build();
     }
 
     private ProductoSkuResponseDto toResponse(ProductoSku sku) {
@@ -828,7 +974,6 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
                 .map(this::toImagenSnapshotPayload)
                 .toList();
 
-        TipoProducto tipoProducto = producto.getTipoProducto();
         Categoria categoria = producto.getCategoria();
         Marca marca = producto.getMarca();
 
@@ -837,9 +982,6 @@ public class ProductoSkuServiceImpl implements ProductoSkuService {
                 .codigoProducto(producto.getCodigoProducto())
                 .nombre(producto.getNombre())
                 .slug(producto.getSlug())
-                .idTipoProducto(tipoProducto == null ? null : tipoProducto.getIdTipoProducto())
-                .codigoTipoProducto(tipoProducto == null ? null : tipoProducto.getCodigo())
-                .nombreTipoProducto(tipoProducto == null ? null : tipoProducto.getNombre())
                 .idCategoria(categoria == null ? null : categoria.getIdCategoria())
                 .codigoCategoria(categoria == null ? null : categoria.getCodigo())
                 .nombreCategoria(categoria == null ? null : categoria.getNombre())

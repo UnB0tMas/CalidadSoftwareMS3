@@ -5,7 +5,7 @@ import com.upsjb.ms3.domain.entity.Atributo;
 import com.upsjb.ms3.domain.entity.Producto;
 import com.upsjb.ms3.domain.entity.ProductoSku;
 import com.upsjb.ms3.domain.entity.SkuAtributoValor;
-import com.upsjb.ms3.domain.entity.TipoProductoAtributo;
+import com.upsjb.ms3.domain.entity.CategoriaAtributo;
 import com.upsjb.ms3.domain.enums.TipoDatoAtributo;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.NotFoundException;
@@ -26,22 +26,22 @@ public class SkuAtributoValorValidator {
     public void validateAssociationAllowed(
             ProductoSku sku,
             Atributo atributo,
-            TipoProductoAtributo relation
+            CategoriaAtributo relation
     ) {
-        requireSkuWithProductType(sku);
+        requireSkuWithCategory(sku);
         requireActiveAttribute(atributo);
 
         if (relation == null || !relation.isActivo()) {
             throw new ConflictException(
                     "SKU_ATRIBUTO_NO_PERMITIDO",
-                    "El atributo no está asociado al tipo de producto del SKU."
+                    "El atributo no está asociado a la categoría del SKU."
             );
         }
     }
 
     public void validateValueByTemplate(
             Atributo atributo,
-            TipoProductoAtributo relation,
+            CategoriaAtributo relation,
             String valorTexto,
             BigDecimal valorNumero,
             Boolean valorBoolean,
@@ -93,7 +93,7 @@ public class SkuAtributoValorValidator {
     }
 
     public void validateRequiredAttributesPresent(
-            List<TipoProductoAtributo> plantilla,
+            List<CategoriaAtributo> plantilla,
             Set<Long> atributosProcesados
     ) {
         if (plantilla == null || plantilla.isEmpty()) {
@@ -102,7 +102,7 @@ public class SkuAtributoValorValidator {
 
         StringJoiner faltantes = new StringJoiner(", ");
 
-        for (TipoProductoAtributo relation : plantilla) {
+        for (CategoriaAtributo relation : plantilla) {
             if (relation == null || relation.getAtributo() == null) {
                 continue;
             }
@@ -127,7 +127,7 @@ public class SkuAtributoValorValidator {
 
     public void validateCanInactivate(
             SkuAtributoValor valor,
-            TipoProductoAtributo relation
+            CategoriaAtributo relation
     ) {
         requireActiveValue(valor);
 
@@ -141,7 +141,7 @@ public class SkuAtributoValorValidator {
         }
     }
 
-    public void requireSkuWithProductType(ProductoSku sku) {
+    public void requireSkuWithCategory(ProductoSku sku) {
         if (sku == null || !sku.isActivo()) {
             throw new NotFoundException(
                     "SKU_NO_ENCONTRADO",
@@ -157,10 +157,24 @@ public class SkuAtributoValorValidator {
             );
         }
 
-        if (producto.getTipoProducto() == null || producto.getTipoProducto().getIdTipoProducto() == null) {
+        if (producto.getCategoria() == null || producto.getCategoria().getIdCategoria() == null) {
             throw new ConflictException(
-                    "PRODUCTO_SIN_TIPO",
-                    "No se puede registrar atributos porque el producto no tiene tipo configurado."
+                    "PRODUCTO_SIN_CATEGORIA",
+                    "No se puede registrar atributos porque el producto no tiene categoría configurada."
+            );
+        }
+
+        if (!producto.getCategoria().isActivo()) {
+            throw new ConflictException(
+                    "CATEGORIA_INACTIVA",
+                    "No se puede registrar atributos porque la categoría no está activa."
+            );
+        }
+
+        if (!producto.getCategoria().aceptaProductos()) {
+            throw new ConflictException(
+                    "CATEGORIA_NO_PERMITE_PRODUCTOS",
+                    "No se puede registrar atributos porque la categoría solo organiza el catálogo."
             );
         }
     }
@@ -183,7 +197,7 @@ public class SkuAtributoValorValidator {
         }
     }
 
-    private boolean isRequired(Atributo atributo, TipoProductoAtributo relation) {
+    private boolean isRequired(Atributo atributo, CategoriaAtributo relation) {
         return (atributo != null && Boolean.TRUE.equals(atributo.getRequerido()))
                 || (relation != null && Boolean.TRUE.equals(relation.getRequerido()));
     }

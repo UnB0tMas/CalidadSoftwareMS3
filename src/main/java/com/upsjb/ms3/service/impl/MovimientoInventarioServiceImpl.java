@@ -122,7 +122,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         EntradaInventarioRequestDto normalized = normalizeEntrada(request);
         ProductoSku sku = resolveSku(normalized.sku());
         Almacen almacen = resolveAlmacen(normalized.almacen());
-        validateAlmacenCompra(almacen);
+        if (normalized.tipoMovimiento() == TipoMovimientoInventario.ENTRADA_COMPRA) {
+            validateAlmacenCompra(almacen);
+        }
 
         StockSku stock = resolveOrCreateStockForEntry(sku, almacen);
 
@@ -170,7 +172,9 @@ public class MovimientoInventarioServiceImpl implements MovimientoInventarioServ
         SalidaInventarioRequestDto normalized = normalizeSalida(request);
         ProductoSku sku = resolveSku(normalized.sku());
         Almacen almacen = resolveAlmacen(normalized.almacen());
-        validateAlmacenVenta(almacen);
+        if (normalized.tipoMovimiento() == TipoMovimientoInventario.SALIDA_VENTA) {
+            validateAlmacenVenta(almacen);
+        }
 
         StockSku stock = resolveStockForUpdate(sku, almacen);
         stockValidator.validateOutput(stock, normalized.cantidad());

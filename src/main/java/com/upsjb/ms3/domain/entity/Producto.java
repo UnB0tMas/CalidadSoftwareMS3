@@ -33,10 +33,6 @@ public class Producto extends AuditableEntity {
     private Long idProducto;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_tipo_producto", nullable = false)
-    private TipoProducto tipoProducto;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_categoria", nullable = false)
     private Categoria categoria;
 

@@ -1,9 +1,9 @@
-// ruta: src/main/java/com/upsjb/ms3/mapper/CategoriaMapper.java
 package com.upsjb.ms3.mapper;
 
 import com.upsjb.ms3.domain.entity.Categoria;
 import com.upsjb.ms3.dto.catalogo.categoria.request.CategoriaCreateRequestDto;
 import com.upsjb.ms3.dto.catalogo.categoria.request.CategoriaUpdateRequestDto;
+import com.upsjb.ms3.dto.catalogo.atributo.response.CategoriaAtributoResponseDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaDetailResponseDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaResponseDto;
 import com.upsjb.ms3.dto.catalogo.categoria.response.CategoriaTreeResponseDto;
@@ -18,6 +18,7 @@ public class CategoriaMapper {
     public Categoria toEntity(
             CategoriaCreateRequestDto request,
             Categoria categoriaPadre,
+            String codigo,
             String slug,
             Integer nivel
     ) {
@@ -25,15 +26,45 @@ public class CategoriaMapper {
             return null;
         }
 
-        Categoria entity = new Categoria();
-        entity.setCategoriaPadre(categoriaPadre);
-        entity.setCodigo(request.codigo());
-        entity.setNombre(request.nombre());
+        Categoria entity =
+                new Categoria();
+
+        entity.setCategoriaPadre(
+                categoriaPadre
+        );
+
+        entity.setCodigo(
+                codigo
+        );
+
+        entity.setNombre(
+                request.nombre()
+        );
+
         entity.setSlug(slug);
         entity.setSlugGenerado(Boolean.TRUE);
-        entity.setDescripcion(request.descripcion());
-        entity.setNivel(nivel);
-        entity.setOrden(request.orden() == null ? 0 : request.orden());
+
+        entity.setDescripcion(
+                request.descripcion()
+        );
+
+        entity.setNivel(
+                nivel == null
+                        ? 1
+                        : nivel
+        );
+
+        entity.setOrden(
+                request.orden() == null
+                        ? 0
+                        : request.orden()
+        );
+
+        entity.setPermiteProductos(
+                Boolean.TRUE.equals(
+                        request.permiteProductos()
+                )
+        );
 
         return entity;
     }
@@ -42,60 +73,144 @@ public class CategoriaMapper {
             Categoria entity,
             CategoriaUpdateRequestDto request,
             Categoria categoriaPadre,
-            String slug,
             Integer nivel
     ) {
-        if (entity == null || request == null) {
+        if (
+                entity == null
+                        || request == null
+        ) {
             return;
         }
 
-        entity.setCategoriaPadre(categoriaPadre);
-        entity.setCodigo(request.codigo());
-        entity.setNombre(request.nombre());
-        entity.setSlug(slug);
-        entity.setSlugGenerado(Boolean.TRUE);
-        entity.setDescripcion(request.descripcion());
-        entity.setNivel(nivel);
-        entity.setOrden(request.orden() == null ? 0 : request.orden());
+        entity.setCategoriaPadre(
+                categoriaPadre
+        );
+
+        entity.setNombre(
+                request.nombre()
+        );
+
+        entity.setDescripcion(
+                request.descripcion()
+        );
+
+        entity.setNivel(
+                nivel == null
+                        ? 1
+                        : nivel
+        );
+
+        entity.setOrden(
+                request.orden() == null
+                        ? 0
+                        : request.orden()
+        );
+
+        entity.setPermiteProductos(
+                Boolean.TRUE.equals(
+                        request.permiteProductos()
+                )
+        );
     }
 
-    public CategoriaResponseDto toResponse(Categoria entity) {
+    public CategoriaResponseDto toResponse(
+            Categoria entity
+    ) {
+        if (entity == null) {
+            return null;
+        }
+
+        Categoria parent =
+                entity.getCategoriaPadre();
+
+        return CategoriaResponseDto.builder()
+                .idCategoria(
+                        entity.getIdCategoria()
+                )
+                .idCategoriaPadre(
+                        parent == null
+                                ? null
+                                : parent.getIdCategoria()
+                )
+                .codigoCategoriaPadre(
+                        parent == null
+                                ? null
+                                : parent.getCodigo()
+                )
+                .nombreCategoriaPadre(
+                        parent == null
+                                ? null
+                                : parent.getNombre()
+                )
+                .codigo(
+                        entity.getCodigo()
+                )
+                .nombre(
+                        entity.getNombre()
+                )
+                .slug(
+                        entity.getSlug()
+                )
+                .slugGenerado(
+                        entity.getSlugGenerado()
+                )
+                .descripcion(
+                        entity.getDescripcion()
+                )
+                .nivel(
+                        entity.getNivel()
+                )
+                .orden(
+                        entity.getOrden()
+                )
+                .permiteProductos(
+                        entity.getPermiteProductos()
+                )
+                .estado(
+                        entity.getEstado()
+                )
+                .createdAt(
+                        entity.getCreatedAt()
+                )
+                .updatedAt(
+                        entity.getUpdatedAt()
+                )
+                .build();
+    }
+
+
+    public CategoriaDetailResponseDto toDetailResponse(
+            Categoria entity,
+            Long cantidadProductos,
+            List<Categoria> subcategorias,
+            List<CategoriaAtributoResponseDto> atributos
+    ) {
         if (entity == null) {
             return null;
         }
 
         Categoria parent = entity.getCategoriaPadre();
 
-        return CategoriaResponseDto.builder()
-                .idCategoria(entity.getIdCategoria())
-                .idCategoriaPadre(parent == null ? null : parent.getIdCategoria())
-                .codigoCategoriaPadre(parent == null ? null : parent.getCodigo())
-                .nombreCategoriaPadre(parent == null ? null : parent.getNombre())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
-                .slug(entity.getSlug())
-                .slugGenerado(entity.getSlugGenerado())
-                .descripcion(entity.getDescripcion())
-                .nivel(entity.getNivel())
-                .orden(entity.getOrden())
-                .estado(entity.getEstado())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
-    }
-
-    public CategoriaDetailResponseDto toDetailResponse(
-            Categoria entity,
-            Long cantidadProductos,
-            List<Categoria> subcategorias
-    ) {
-        if (entity == null) {
-            return null;
-        }
+        List<IdCodigoNombreResponseDto> children = subcategorias == null
+                ? List.of()
+                : subcategorias.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(child -> IdCodigoNombreResponseDto.builder()
+                        .id(child.getIdCategoria())
+                        .codigo(child.getCodigo())
+                        .nombre(child.getNombre())
+                        .build())
+                .toList();
 
         return CategoriaDetailResponseDto.builder()
                 .idCategoria(entity.getIdCategoria())
-                .categoriaPadre(toIdCodigoNombre(entity.getCategoriaPadre()))
+                .categoriaPadre(parent == null
+                        ? null
+                        : IdCodigoNombreResponseDto.builder()
+                        .id(parent.getIdCategoria())
+                        .codigo(parent.getCodigo())
+                        .nombre(parent.getNombre())
+                        .build())
                 .codigo(entity.getCodigo())
                 .nombre(entity.getNombre())
                 .slug(entity.getSlug())
@@ -103,11 +218,11 @@ public class CategoriaMapper {
                 .descripcion(entity.getDescripcion())
                 .nivel(entity.getNivel())
                 .orden(entity.getOrden())
+                .permiteProductos(entity.getPermiteProductos())
                 .estado(entity.getEstado())
                 .cantidadProductos(cantidadProductos == null ? 0L : cantidadProductos)
-                .subcategorias(subcategorias == null
-                        ? List.of()
-                        : subcategorias.stream().map(this::toIdCodigoNombre).toList())
+                .subcategorias(children)
+                .atributos(atributos == null ? List.of() : atributos)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
@@ -122,44 +237,76 @@ public class CategoriaMapper {
         }
 
         return CategoriaTreeResponseDto.builder()
-                .idCategoria(entity.getIdCategoria())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
-                .slug(entity.getSlug())
-                .nivel(entity.getNivel())
-                .orden(entity.getOrden())
-                .estado(entity.getEstado())
-                .hijos(children == null ? List.of() : children)
+                .idCategoria(
+                        entity.getIdCategoria()
+                )
+                .codigo(
+                        entity.getCodigo()
+                )
+                .nombre(
+                        entity.getNombre()
+                )
+                .slug(
+                        entity.getSlug()
+                )
+                .nivel(
+                        entity.getNivel()
+                )
+                .orden(
+                        entity.getOrden()
+                )
+                .permiteProductos(
+                        entity.getPermiteProductos()
+                )
+                .estado(
+                        entity.getEstado()
+                )
+                .hijos(
+                        children == null
+                                ? List.of()
+                                : children
+                )
                 .build();
     }
 
-    public CategoriaOptionDto toOption(Categoria entity) {
+    public CategoriaOptionDto toOption(
+            Categoria entity
+    ) {
         if (entity == null) {
             return null;
         }
 
         return CategoriaOptionDto.builder()
-                .idCategoria(entity.getIdCategoria())
-                .idCategoriaPadre(entity.getCategoriaPadre() == null ? null : entity.getCategoriaPadre().getIdCategoria())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
-                .slug(entity.getSlug())
-                .nivel(entity.getNivel())
-                .orden(entity.getOrden())
-                .estado(entity.getEstado())
-                .build();
-    }
-
-    private IdCodigoNombreResponseDto toIdCodigoNombre(Categoria entity) {
-        if (entity == null) {
-            return null;
-        }
-
-        return IdCodigoNombreResponseDto.builder()
-                .id(entity.getIdCategoria())
-                .codigo(entity.getCodigo())
-                .nombre(entity.getNombre())
-                .estado(entity.getEstado())
+                .idCategoria(
+                        entity.getIdCategoria()
+                )
+                .idCategoriaPadre(
+                        entity.getCategoriaPadre() == null
+                                ? null
+                                : entity.getCategoriaPadre()
+                                .getIdCategoria()
+                )
+                .codigo(
+                        entity.getCodigo()
+                )
+                .nombre(
+                        entity.getNombre()
+                )
+                .slug(
+                        entity.getSlug()
+                )
+                .nivel(
+                        entity.getNivel()
+                )
+                .orden(
+                        entity.getOrden()
+                )
+                .permiteProductos(
+                        entity.getPermiteProductos()
+                )
+                .estado(
+                        entity.getEstado()
+                )
                 .build();
     }
 }

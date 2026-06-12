@@ -92,15 +92,35 @@ public interface SkuAtributoValorRepository extends
 
     long countByAtributo_IdAtributoAndEstadoTrue(Long idAtributo);
 
-    @Query("""
-            select count(v)
-            from SkuAtributoValor v
-            where v.estado = true
-              and v.atributo.idAtributo = :idAtributo
-              and v.sku.producto.tipoProducto.idTipoProducto = :idTipoProducto
-            """)
-    long countByTipoProductoAndAtributoActivos(
-            @Param("idTipoProducto") Long idTipoProducto,
+    @Query(
+            value = """
+                    WITH categoria_descendientes AS (
+                        SELECT c.id_categoria
+                        FROM categoria c
+                        WHERE c.id_categoria = :idCategoria
+
+                        UNION ALL
+
+                        SELECT hija.id_categoria
+                        FROM categoria hija
+                        INNER JOIN categoria_descendientes padre
+                            ON hija.id_categoria_padre = padre.id_categoria
+                    )
+                    SELECT COUNT_BIG(1)
+                    FROM sku_atributo_valor v
+                        INNER JOIN producto_sku s
+                            ON s.id_sku = v.id_sku
+                        INNER JOIN producto p
+                            ON p.id_producto = s.id_producto
+                        INNER JOIN categoria_descendientes cd
+                            ON cd.id_categoria = p.id_categoria
+                    WHERE v.estado = 1
+                      AND v.id_atributo = :idAtributo
+                    """,
+            nativeQuery = true
+    )
+    long countByCategoriaAndAtributoActivos(
+            @Param("idCategoria") Long idCategoria,
             @Param("idAtributo") Long idAtributo
     );
 }

@@ -21,6 +21,10 @@ public interface MarcaRepository extends
 
     Optional<Marca> findByNombreIgnoreCaseAndEstadoTrue(String nombre);
 
+    boolean existsByCodigoIgnoreCase(String codigo);
+
+    boolean existsBySlugIgnoreCase(String slug);
+
     boolean existsByCodigoIgnoreCaseAndEstadoTrue(String codigo);
 
     boolean existsBySlugIgnoreCaseAndEstadoTrue(String slug);

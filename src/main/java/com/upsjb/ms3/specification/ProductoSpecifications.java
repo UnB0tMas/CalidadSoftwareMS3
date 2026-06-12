@@ -36,14 +36,11 @@ public final class ProductoSpecifications {
                         "categoria.nombre",
                         "categoria.codigo",
                         "marca.nombre",
-                        "marca.codigo",
-                        "tipoProducto.nombre",
-                        "tipoProducto.codigo"
+                        "marca.codigo"
                 )
                 .like("codigoProducto", filter.codigoProducto())
                 .like("nombre", filter.nombre())
                 .like("slug", filter.slug())
-                .equal("tipoProducto.idTipoProducto", filter.idTipoProducto())
                 .equal("categoria.idCategoria", filter.idCategoria())
                 .equal("marca.idMarca", filter.idMarca())
                 .equal("generoObjetivo", filter.generoObjetivo())
@@ -74,12 +71,6 @@ public final class ProductoSpecifications {
     public static Specification<Producto> byMarca(Long idMarca) {
         return SpecificationBuilder.<Producto>create()
                 .equal("marca.idMarca", idMarca)
-                .build();
-    }
-
-    public static Specification<Producto> byTipoProducto(Long idTipoProducto) {
-        return SpecificationBuilder.<Producto>create()
-                .equal("tipoProducto.idTipoProducto", idTipoProducto)
                 .build();
     }
 

@@ -25,6 +25,7 @@ import com.upsjb.ms3.security.principal.AuthenticatedUserContext;
 import com.upsjb.ms3.security.principal.CurrentUserResolver;
 import com.upsjb.ms3.service.contract.AlmacenService;
 import com.upsjb.ms3.service.contract.AuditoriaFuncionalService;
+import com.upsjb.ms3.service.contract.CodigoGeneradorService;
 import com.upsjb.ms3.shared.exception.NotFoundException;
 import com.upsjb.ms3.shared.exception.ValidationException;
 import com.upsjb.ms3.shared.pagination.PaginationService;
@@ -71,6 +72,7 @@ public class AlmacenServiceImpl implements AlmacenService {
     private final AlmacenMapper almacenMapper;
     private final AlmacenValidator almacenValidator;
     private final AlmacenPolicy almacenPolicy;
+    private final CodigoGeneradorService codigoGeneradorService;
     private final CurrentUserResolver currentUserResolver;
     private final AuditoriaFuncionalService auditoriaFuncionalService;
     private final PaginationService paginationService;
@@ -84,20 +86,23 @@ public class AlmacenServiceImpl implements AlmacenService {
 
         AlmacenCreateRequestDto normalized = normalizeCreate(request);
 
+        String codigo =
+                codigoGeneradorService.generarCodigoAlmacen();
+
         almacenValidator.validateCreate(
-                normalized.codigo(),
+                codigo,
                 normalized.nombre(),
                 normalized.direccion(),
                 normalized.observacion(),
                 normalized.permiteVenta(),
                 normalized.permiteCompra(),
-                almacenRepository.existsByCodigoIgnoreCaseAndEstadoTrue(normalized.codigo()),
+                almacenRepository.existsByCodigoIgnoreCaseAndEstadoTrue(codigo),
                 almacenRepository.existsByNombreIgnoreCaseAndEstadoTrue(normalized.nombre()),
                 almacenRepository.existsByPrincipalTrueAndEstadoTrue(),
                 normalized.principal()
         );
 
-        Almacen entity = almacenMapper.toEntity(normalized);
+        Almacen entity = almacenMapper.toEntity(normalized, codigo);
         Almacen saved = almacenRepository.save(entity);
 
         auditoriaFuncionalService.registrarExito(
@@ -136,16 +141,11 @@ public class AlmacenServiceImpl implements AlmacenService {
 
         almacenValidator.validateUpdate(
                 entity,
-                normalized.codigo(),
                 normalized.nombre(),
                 normalized.direccion(),
                 normalized.observacion(),
                 normalized.permiteVenta(),
                 normalized.permiteCompra(),
-                almacenRepository.existsByCodigoIgnoreCaseAndEstadoTrueAndIdAlmacenNot(
-                        normalized.codigo(),
-                        entity.getIdAlmacen()
-                ),
                 almacenRepository.existsByNombreIgnoreCaseAndEstadoTrueAndIdAlmacenNot(
                         normalized.nombre(),
                         entity.getIdAlmacen()
@@ -450,7 +450,6 @@ public class AlmacenServiceImpl implements AlmacenService {
         }
 
         return AlmacenCreateRequestDto.builder()
-                .codigo(StringNormalizer.normalizeForCode(request.codigo()))
                 .nombre(StringNormalizer.clean(request.nombre()))
                 .direccion(StringNormalizer.cleanOrNull(request.direccion()))
                 .principal(defaultBoolean(request.principal(), false))
@@ -469,7 +468,6 @@ public class AlmacenServiceImpl implements AlmacenService {
         }
 
         return AlmacenUpdateRequestDto.builder()
-                .codigo(StringNormalizer.normalizeForCode(request.codigo()))
                 .nombre(StringNormalizer.clean(request.nombre()))
                 .direccion(StringNormalizer.cleanOrNull(request.direccion()))
                 .principal(defaultBoolean(request.principal(), Boolean.TRUE.equals(current.getPrincipal())))

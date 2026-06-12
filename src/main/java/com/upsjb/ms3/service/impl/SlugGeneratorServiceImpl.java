@@ -1,6 +1,7 @@
 // ruta: src/main/java/com/upsjb/ms3/service/impl/SlugGeneratorServiceImpl.java
 package com.upsjb.ms3.service.impl;
 
+import com.upsjb.ms3.domain.value.SlugValue;
 import com.upsjb.ms3.service.contract.SlugGeneratorService;
 import com.upsjb.ms3.shared.exception.ConflictException;
 import com.upsjb.ms3.shared.exception.ValidationException;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class SlugGeneratorServiceImpl implements SlugGeneratorService {
 
-    private static final int MAX_SLUG_LENGTH = 150;
+    private static final int MAX_SLUG_LENGTH = SlugValue.MAX_LENGTH;
     private static final int MAX_ATTEMPTS = 500;
     private static final String DEFAULT_FALLBACK = "item";
 
@@ -21,9 +22,15 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
     public String generarSlug(String base) {
         validateBase(base);
 
-        String slug = SlugUtil.toSlug(base, MAX_SLUG_LENGTH);
+        String slug = SlugUtil.toSlug(
+                base,
+                MAX_SLUG_LENGTH
+        );
 
-        if (!StringNormalizer.hasText(slug) || !SlugUtil.isValidSlug(slug)) {
+        if (
+                !StringNormalizer.hasText(slug)
+                        || !SlugUtil.isValidSlug(slug)
+        ) {
             return DEFAULT_FALLBACK;
         }
 
@@ -31,7 +38,10 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
     }
 
     @Override
-    public String generarSlugUnico(String base, Predicate<String> existsPredicate) {
+    public String generarSlugUnico(
+            String base,
+            Predicate<String> existsPredicate
+    ) {
         validateBase(base);
         validatePredicate(existsPredicate);
 
@@ -41,8 +51,15 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
             return baseSlug;
         }
 
-        for (int counter = 2; counter <= MAX_ATTEMPTS; counter++) {
-            String candidate = appendSuffix(baseSlug, counter);
+        for (
+                int counter = 2;
+                counter <= MAX_ATTEMPTS;
+                counter++
+        ) {
+            String candidate = appendSuffix(
+                    baseSlug,
+                    counter
+            );
 
             if (!existsPredicate.test(candidate)) {
                 return candidate;
@@ -66,14 +83,27 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
 
         String baseSlug = generarSlug(base);
 
-        if (!existsPredicate.test(baseSlug, excludedId)) {
+        if (!existsPredicate.test(
+                baseSlug,
+                excludedId
+        )) {
             return baseSlug;
         }
 
-        for (int counter = 2; counter <= MAX_ATTEMPTS; counter++) {
-            String candidate = appendSuffix(baseSlug, counter);
+        for (
+                int counter = 2;
+                counter <= MAX_ATTEMPTS;
+                counter++
+        ) {
+            String candidate = appendSuffix(
+                    baseSlug,
+                    counter
+            );
 
-            if (!existsPredicate.test(candidate, excludedId)) {
+            if (!existsPredicate.test(
+                    candidate,
+                    excludedId
+            )) {
                 return candidate;
             }
         }
@@ -93,7 +123,9 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
         }
     }
 
-    private void validatePredicate(Predicate<String> existsPredicate) {
+    private void validatePredicate(
+            Predicate<String> existsPredicate
+    ) {
         if (existsPredicate == null) {
             throw new ValidationException(
                     "SLUG_VALIDATOR_REQUERIDO",
@@ -102,7 +134,9 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
         }
     }
 
-    private void validateBiPredicate(BiPredicate<String, Long> existsPredicate) {
+    private void validateBiPredicate(
+            BiPredicate<String, Long> existsPredicate
+    ) {
         if (existsPredicate == null) {
             throw new ValidationException(
                     "SLUG_VALIDATOR_REQUERIDO",
@@ -111,13 +145,21 @@ public class SlugGeneratorServiceImpl implements SlugGeneratorService {
         }
     }
 
-    private String appendSuffix(String baseSlug, int suffix) {
+    private String appendSuffix(
+            String baseSlug,
+            int suffix
+    ) {
         String suffixText = "-" + suffix;
-        int maxBaseLength = MAX_SLUG_LENGTH - suffixText.length();
+        int maxBaseLength = MAX_SLUG_LENGTH
+                - suffixText.length();
 
-        String normalizedBase = baseSlug.length() <= maxBaseLength
+        String normalizedBase = baseSlug.length()
+                <= maxBaseLength
                 ? baseSlug
-                : baseSlug.substring(0, maxBaseLength).replaceAll("-+$", "");
+                : baseSlug.substring(
+                        0,
+                        maxBaseLength
+                ).replaceAll("-+$", "");
 
         if (!StringNormalizer.hasText(normalizedBase)) {
             normalizedBase = DEFAULT_FALLBACK;

@@ -7,6 +7,7 @@ import com.upsjb.ms3.domain.entity.StockSku;
 import com.upsjb.ms3.domain.enums.Moneda;
 import com.upsjb.ms3.dto.inventario.stock.filter.StockSkuFilterDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockDisponibleResponseDto;
+import com.upsjb.ms3.dto.inventario.stock.response.StockInventarioResumenResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuDetailResponseDto;
 import com.upsjb.ms3.dto.inventario.stock.response.StockSkuResponseDto;
 import com.upsjb.ms3.dto.shared.ApiResponseDto;
@@ -82,6 +83,42 @@ public class StockServiceImpl implements StockService {
     private final EmpleadoInventarioPermisoService empleadoInventarioPermisoService;
     private final PaginationService paginationService;
     private final ApiResponseFactory apiResponseFactory;
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponseDto<StockInventarioResumenResponseDto> obtenerResumen(Long idAlmacen) {
+        resolveActorAndEnsureCanViewInternalStock();
+
+        Long normalizedWarehouseId = idAlmacen;
+        if (normalizedWarehouseId != null && normalizedWarehouseId <= 0) {
+            throw new ValidationException(
+                    "ALMACEN_ID_INVALIDO",
+                    "El ID del almacén debe ser positivo."
+            );
+        }
+
+        if (normalizedWarehouseId != null) {
+            resolveAlmacen(EntityReferenceDto.builder().id(normalizedWarehouseId).build());
+        }
+
+        StockInventarioResumenResponseDto response = StockInventarioResumenResponseDto.builder()
+                .idAlmacen(normalizedWarehouseId)
+                .totalRegistros(zero(stockSkuRepository.countActiveStocks(normalizedWarehouseId)))
+                .totalSku(zero(stockSkuRepository.countDistinctActiveSku(normalizedWarehouseId)))
+                .agotados(zero(stockSkuRepository.countOutOfStock(normalizedWarehouseId)))
+                .bajoMinimo(zero(stockSkuRepository.countLowStock(normalizedWarehouseId)))
+                .conReservas(zero(stockSkuRepository.countWithReservations(normalizedWarehouseId)))
+                .disponibles(zero(stockSkuRepository.countAvailable(normalizedWarehouseId)))
+                .stockFisico(zero(stockSkuRepository.sumActivePhysicalStock(normalizedWarehouseId)))
+                .stockReservado(zero(stockSkuRepository.sumActiveReservedStock(normalizedWarehouseId)))
+                .stockDisponible(zero(stockSkuRepository.sumActiveAvailableStock(normalizedWarehouseId)))
+                .build();
+
+        return apiResponseFactory.dtoOk(
+                "Resumen de existencias obtenido correctamente.",
+                response
+        );
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -423,6 +460,10 @@ public class StockServiceImpl implements StockService {
 
     private String firstText(String first, String second) {
         return StringNormalizer.hasText(first) ? first : second;
+    }
+
+    private Long zero(Long value) {
+        return value == null ? 0L : value;
     }
 
     private NotFoundException stockNotFound() {

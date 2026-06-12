@@ -8,10 +8,6 @@ import lombok.Builder;
 @Builder
 public record MarcaUpdateRequestDto(
 
-        @NotBlank(message = "El código de la marca es obligatorio.")
-        @Size(max = 50, message = "El código no debe superar 50 caracteres.")
-        String codigo,
-
         @NotBlank(message = "El nombre de la marca es obligatorio.")
         @Size(max = 120, message = "El nombre no debe superar 120 caracteres.")
         String nombre,

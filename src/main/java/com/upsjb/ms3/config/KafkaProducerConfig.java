@@ -14,43 +14,131 @@ import org.springframework.kafka.core.ProducerFactory;
 @Configuration
 public class KafkaProducerConfig {
 
-    private static final String DEFAULT_CLIENT_ID = "ms3-outbox-producer";
+    private static final String DEFAULT_CLIENT_ID =
+            "ms3-outbox-producer";
+
+    private static final String DEFAULT_ACKS =
+            "all";
+
+    private static final String DEFAULT_COMPRESSION_TYPE =
+            "none";
+
+    private static final int DEFAULT_MAX_IN_FLIGHT =
+            5;
+
+    private static final int DEFAULT_DELIVERY_TIMEOUT_MS =
+            120_000;
+
+    private static final int DEFAULT_REQUEST_TIMEOUT_MS =
+            30_000;
+
+    private static final int DEFAULT_LINGER_MS =
+            5;
+
+    private static final int DEFAULT_BATCH_SIZE =
+            32_768;
+
+    private static final int DEFAULT_RETRY_BACKOFF_MS =
+            1_000;
 
     private final KafkaProperties kafkaProperties;
 
-    public KafkaProducerConfig(KafkaProperties kafkaProperties) {
+    public KafkaProducerConfig(
+            KafkaProperties kafkaProperties
+    ) {
         this.kafkaProperties = kafkaProperties;
     }
 
     @Bean
     public ProducerFactory<String, String> producerFactory() {
-        Map<String, Object> props = new HashMap<>(
-                kafkaProperties.buildProducerProperties()
+        Map<String, Object> properties =
+                new HashMap<>(
+                        kafkaProperties.buildProducerProperties()
+                );
+
+        /*
+         * Se usan valores predeterminados únicamente cuando no han
+         * sido configurados en application.properties.
+         *
+         * Esto permite que propiedades como compression.type=none
+         * sean respetadas y evita volver a forzar zstd desde Java.
+         */
+        properties.putIfAbsent(
+                ProducerConfig.CLIENT_ID_CONFIG,
+                DEFAULT_CLIENT_ID
         );
 
-        props.putIfAbsent(ProducerConfig.CLIENT_ID_CONFIG, DEFAULT_CLIENT_ID);
-        props.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        properties.putIfAbsent(
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                StringSerializer.class
+        );
 
-        props.putIfAbsent(ProducerConfig.ACKS_CONFIG, "all");
-        props.putIfAbsent(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        props.putIfAbsent(ProducerConfig.RETRIES_CONFIG, 3);
-        props.putIfAbsent(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+        properties.putIfAbsent(
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                StringSerializer.class
+        );
 
-        props.putIfAbsent(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120_000);
-        props.putIfAbsent(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30_000);
-        props.putIfAbsent(ProducerConfig.LINGER_MS_CONFIG, 5);
-        props.putIfAbsent(ProducerConfig.BATCH_SIZE_CONFIG, 16_384);
-        props.putIfAbsent(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1_000);
-        props.putIfAbsent(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none");
+        properties.putIfAbsent(
+                ProducerConfig.ACKS_CONFIG,
+                DEFAULT_ACKS
+        );
 
-        return new DefaultKafkaProducerFactory<>(props);
+        properties.putIfAbsent(
+                ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG,
+                true
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.RETRIES_CONFIG,
+                Integer.MAX_VALUE
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION,
+                DEFAULT_MAX_IN_FLIGHT
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG,
+                DEFAULT_DELIVERY_TIMEOUT_MS
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                DEFAULT_REQUEST_TIMEOUT_MS
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.LINGER_MS_CONFIG,
+                DEFAULT_LINGER_MS
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.BATCH_SIZE_CONFIG,
+                DEFAULT_BATCH_SIZE
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.RETRY_BACKOFF_MS_CONFIG,
+                DEFAULT_RETRY_BACKOFF_MS
+        );
+
+        properties.putIfAbsent(
+                ProducerConfig.COMPRESSION_TYPE_CONFIG,
+                DEFAULT_COMPRESSION_TYPE
+        );
+
+        return new DefaultKafkaProducerFactory<>(
+                properties
+        );
     }
 
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate(
             ProducerFactory<String, String> producerFactory
     ) {
-        return new KafkaTemplate<>(producerFactory);
+        return new KafkaTemplate<>(
+                producerFactory
+        );
     }
 }
